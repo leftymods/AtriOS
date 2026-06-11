@@ -428,7 +428,7 @@ if apply_patches_to_git and readme_markdown is not None and git_repo is not None
 		f.write(get_gh_pages_workflow_script())
 	log.debug("Committing README.md and .github/workflows/gh-pages.yml")
 	git_repo.git.add("-f", [".github/workflows/publish-ghpages.yaml", "README.md"])
-	maintainer_actor: Actor = Actor("Armbian AutoPatcher", "leftymods@atrios.io")
+	maintainer_actor: Actor = Actor("Armbian AutoPatcher", "ggalab33@gamil.com")
 	commit = git_repo.index.commit(
 		message="Armbian patching summary README",
 		author=maintainer_actor,

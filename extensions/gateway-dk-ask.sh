@@ -411,7 +411,7 @@ Version: ${ask_version}
 Architecture: arm64
 Section: net
 Priority: optional
-Maintainer: leftymods <leftymods@atrios.io>
+Maintainer: leftymods <ggalab33@gamil.com>
 Depends: linux-image-${BRANCH}-${LINUXFAMILY} (>= ${kernel_ver}), libxml2 | libxml2-16, libpcap0.8, iptables
 Description: NXP ASK hardware offloading userspace for Mono Gateway DK
  Userspace tools (fmlib, fmc, libfci, libcli, dpa-app, cmm) and configuration
