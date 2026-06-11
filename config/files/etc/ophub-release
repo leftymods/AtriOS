@@ -1,0 +1,11 @@
+# ophub-release - Amlogic Ophub tool configuration
+PLATFORM='amlogic'
+MODEL_ID='odroidc4'
+FDTFILE='meson-sm1-x96-max-plus.dtb'
+UBOOT_OVERLOAD=''
+MAINLINE_UBOOT='yes'
+KERNEL_REPO='https://github.com/leftymods/linux-6.18.y'
+KERNEL_TAGS='current'
+KERNEL_SIGNATURE='-atrmax'
+DOWNLOAD_TYPE='deb'
+KERNEL_BACKUP='yes'

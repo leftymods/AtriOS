@@ -1,0 +1,1193 @@
+#!/bin/bash
+#==================================================================================================
+#
+# This file is licensed under the terms of the GNU General Public
+# License version 2. This program is licensed "as is" without any
+# warranty of any kind, whether express or implied.
+#
+# This file is a part of the Rebuild Armbian
+# https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Function: Armbian Kernel Update Tool
+# Copyright (C) 2021- https://github.com/unifreq/openwrt_packit
+# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Kernel download server: https://github.com/ophub/kernel/tree/main/pub
+#
+# Command: armbian-update
+#
+#========================================= Functions list =========================================
+#
+# error_msg          : Output error message and abort execution
+#
+# check_depends      : Check and install required dependencies
+# check_network      : Verify network connectivity to GitHub
+# check_disk         : Detect system disk and partition names
+#
+# init_var           : Initialize all runtime variables and parse options
+# query_version      : Query the latest kernel version from GitHub releases
+# verify_version     : Check if the kernel version is already installed
+# search_kernel      : Search for local or remote kernel packages
+# download_kernel    : Download kernel package from GitHub releases
+# check_kernel       : Verify kernel package integrity (.deb and .tar.gz)
+# backup_kernel      : Backup the currently running kernel
+# backup_fdtfile     : Backup the current device tree blob (DTB) file
+# restore_fdtfile    : Restore DTB file from backup if missing
+# update_tar_kernel  : Install the kernel from .tar.gz packages
+# update_deb_kernel  : Install the kernel from .deb packages
+# update_uboot       : Update the U-Boot bootloader
+# update_initrd_addr : Adjust initrd/ramdisk address for Amlogic devices
+# update_os_version  : Update the Armbian OS version string
+#
+# sos_kernel         : Rescue and restore the kernel to a target disk
+#
+# help_info          : Display usage and help information
+#
+#===================================== Set default parameters =====================================
+#
+# Set current path
+current_path="${PWD}"
+# Set kernel backup directory
+backup_path="/ddbr/backup"
+# Set kernel rescue temporary directory
+rescue_path="/ddbr/rescue"
+# Set the release check file
+ophub_release_file="/etc/ophub-release"
+armbian_release_file="/etc/armbian-release"
+armbian_image_file="/etc/armbian-image-release"
+# Set default installation mainline u-boot (-m)
+auto_mainline_uboot="no"
+# Set default kernel download type (-d), option: tar/deb
+download_type="deb"
+
+# Set font color
+STEPS="[\033[95m STEPS \033[0m]"
+INFO="[\033[94m INFO \033[0m]"
+SUCCESS="[\033[92m SUCCESS \033[0m]"
+FINISH="[\033[93m FINISH \033[0m]"
+PROMPT="[\033[93m PROMPT \033[0m]"
+ERROR="[\033[91m ERROR \033[0m]"
+#
+#==================================================================================================
+
+# Encountered a critical error, output the message and abort execution
+error_msg() {
+    echo -e "${ERROR} ${1}"
+    exit 1
+}
+
+# Check and install required dependencies
+check_depends() {
+    echo -e "${STEPS} Checking required dependencies..."
+
+    is_missing="0"
+    necessary_packages=("coreutils" "bsdextrautils" "tar" "curl" "btrfs-progs" "e2fsprogs")
+    i="1"
+    for package in "${necessary_packages[@]}"; do
+        [[ -n "$(dpkg -l | awk '{print $2}' | grep -w "^${package}$" 2>/dev/null)" ]] || is_missing="1"
+        ((i++))
+    done
+
+    if [[ "${is_missing}" -eq "1" ]]; then
+        echo -e "${INFO} Installing missing dependencies..."
+        sudo apt-get update
+        sudo apt-get install -y ${necessary_packages[@]}
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to install dependencies. Update aborted."
+    else
+        echo -e "${INFO} All dependencies are satisfied."
+    fi
+
+    sync && echo ""
+}
+
+# Verify network connectivity to GitHub
+check_network() {
+    # Check the connection status to github.com
+    curl --connect-timeout 10 -s "github.com" >/dev/null 2>&1 && github_net="yes" || github_net="no"
+    if [[ "${github_net}" == "yes" ]]; then
+        echo -e "${INFO} Network connection to [ github.com ] is available."
+    else
+        error_msg "Cannot access [ github.com ]. Please check your network connection."
+    fi
+}
+
+# Detect system disk and partition names
+check_disk() {
+    # Reload system services
+    sudo systemctl daemon-reload
+
+    # Find the partition where root is located
+    ROOT_PTNAME="$(df / | tail -n1 | awk '{print $1}' | awk -F '/' '{print $3}')"
+    [[ -z "${ROOT_PTNAME}" ]] && error_msg "Failed to query system partition information."
+
+    # Find the disk where the partition is located, supporting multi-digit partition numbers
+    case "${ROOT_PTNAME}" in
+    mmcblk?p[0-9]*)
+        # For example, mmcblk0p1 -> mmcblk0
+        DISK_NAME=$(echo "${ROOT_PTNAME}" | sed -E 's/p[0-9]+$//')
+        ;;
+    [hsv]d[a-z][0-9]*)
+        # For example, sda1 -> sda
+        DISK_NAME=$(echo "${ROOT_PTNAME}" | sed -E 's/[0-9]+$//')
+        ;;
+    nvme?n?p[0-9]*)
+        # For example, nvme0n1p1 -> nvme0n1
+        DISK_NAME=$(echo "${ROOT_PTNAME}" | sed -E 's/p[0-9]+$//')
+        ;;
+    *)
+        error_msg "Unrecognized disk type ${ROOT_PTNAME}!"
+        ;;
+    esac
+}
+
+# Initialize all runtime variables and parse command-line options
+init_var() {
+    echo -e "${STEPS} Initializing parameters..."
+
+    # Query the current version
+    kernel_uname="$(uname -r)"
+    current_kernel="$(echo "${kernel_uname}" | grep -oP '\d+\.\d+\.\d+')"
+    [[ -z "${current_kernel}" ]] && error_msg "Failed to detect the current kernel version."
+
+    # Check release file
+    [[ -f "${ophub_release_file}" ]] || error_msg "missing [ ${ophub_release_file} ] file."
+
+    # Adjust parameter name
+    sed -i "s|^KERNEL_BRANCH=|KERNEL_TAGS=|g" ${ophub_release_file}
+
+    # Attempt to detect the FDT file from common boot configuration files
+    FDTFILE=""
+    [[ -f "/boot/uEnv.txt" ]] && { FDTFILE="$(grep -E '^FDT=.*\.dtb$' /boot/uEnv.txt | sed -E 's#.*/##' || true)"; }
+    [[ -z "${FDTFILE}" && -f "/boot/extlinux/extlinux.conf" ]] && { FDTFILE="$(grep -E '/dtb/.*\.dtb$' /boot/extlinux/extlinux.conf | sed -E 's#.*/##' || true)"; }
+    [[ -z "${FDTFILE}" && -f "/boot/armbianEnv.txt" ]] && { FDTFILE="$(grep -E '^fdtfile=.*\.dtb$' /boot/armbianEnv.txt | sed -E 's#.*/##' || true)"; }
+    # Update FDT file records information
+    [[ -n "${FDTFILE}" ]] && sed -i "s|^FDTFILE=.*|FDTFILE='${FDTFILE}'|g" ${ophub_release_file}
+
+    # Get values
+    source "${ophub_release_file}"
+    PLATFORM="${PLATFORM}"
+    MODEL_ID="${MODEL_ID}"
+    FDTFILE="${FDTFILE}"
+    UBOOT_OVERLOAD="${UBOOT_OVERLOAD}"
+    MAINLINE_UBOOT="${MAINLINE_UBOOT}"
+    KERNEL_REPO="${KERNEL_REPO}"
+    KERNEL_TAGS="${KERNEL_TAGS}"
+    KERNEL_SIGNATURE="${KERNEL_SIGNATURE}"
+    DOWNLOAD_TYPE="${DOWNLOAD_TYPE}"
+    KERNEL_BACKUP="${KERNEL_BACKUP}"
+
+    # Check the platform variable
+    [[ -z "${PLATFORM}" ]] && error_msg "[ PLATFORM ] variable is missing. Update aborted."
+    # Check the FDT file variable
+    [[ -z "${FDTFILE}" ]] && error_msg "[ FDTFILE ] variable is missing. Update aborted."
+    # Check kernel download type
+    if [[ -n "${DOWNLOAD_TYPE}" ]]; then
+        download_type="${DOWNLOAD_TYPE}"
+    else
+        download_type="deb"
+        echo "DOWNLOAD_TYPE='deb'" >>${ophub_release_file}
+    fi
+    # Check kernel signature
+    [[ -n "${KERNEL_SIGNATURE}" ]] || {
+        KERNEL_SIGNATURE="${kernel_uname#*-}"
+        echo "KERNEL_SIGNATURE='${KERNEL_SIGNATURE}'" >>${ophub_release_file}
+    }
+
+    # Set the kernel packages
+    declare -A platform_family=(["amlogic"]="meson64" ["rockchip"]="rockchip64" ["allwinner"]="sunxi64")
+    kernel_deb_list=("linux-image" "linux-dtb-${platform_family[${PLATFORM}]}" "linux-headers" "linux-libc-dev")
+    kernel_tar_list=("boot" "dtb-${PLATFORM}" "modules" "header")
+
+    # If it is followed by [ : ], it means that the option requires a parameter value
+    local options="r:u:k:b:m:d:"
+    parsed_args=$(getopt -o "${options}" -- "${@}")
+    [[ ${?} -ne 0 ]] && error_msg "Parameter parsing failed."
+    eval set -- "${parsed_args}"
+
+    while true; do
+        case "${1}" in
+        -r | --kernelRepository)
+            if [[ -n "${2}" ]]; then
+                KERNEL_REPO="${2}"
+                shift 2
+            else
+                error_msg "Invalid -r parameter [ ${2} ]!"
+            fi
+            ;;
+        -u | --kernel_Usage)
+            if [[ -n "${2}" ]]; then
+                kernel_usage="${2}"
+                shift 2
+            else
+                error_msg "Invalid -u parameter [ ${2} ]!"
+            fi
+            ;;
+        -k | --Kernel)
+            if [[ -n "${2}" ]]; then
+                inputs_kernel="${2//.tar.gz/}"
+                inputs_kernel="${inputs_kernel##deb-}"
+                shift 2
+            else
+                error_msg "Invalid -k parameter [ ${2} ]!"
+            fi
+            ;;
+        -b | --kernel_Backup)
+            if [[ -n "${2}" ]]; then
+                KERNEL_BACKUP="${2}"
+                shift 2
+            else
+                error_msg "Invalid -b parameter [ ${2} ]!"
+            fi
+            ;;
+        -m | --Mainline_u-boot)
+            if [[ -n "${2}" ]]; then
+                auto_mainline_uboot="${2}"
+                shift 2
+            else
+                error_msg "Invalid -m parameter [ ${2} ]!"
+            fi
+            ;;
+        -d | --download_type)
+            if [[ -n "${2}" ]]; then
+                download_type="${2}"
+                shift 2
+            else
+                error_msg "Invalid -d parameter [ ${2} ]!"
+            fi
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            [[ -n "${1}" ]] && error_msg "Invalid option [ ${1} ]!"
+            break
+            ;;
+        esac
+    done
+
+    # Adjust the custom kernel repository url format
+    [[ -z "${KERNEL_REPO}" ]] && KERNEL_REPO="ophub/kernel"
+    [[ "${KERNEL_REPO}" =~ ^https: ]] && KERNEL_REPO="$(echo ${KERNEL_REPO} | awk -F'/' '{print $4"/"$5}')"
+    kernel_api="https://github.com/${KERNEL_REPO}"
+
+    # Set kernel download tags
+    [[ -n "${kernel_usage}" ]] && KERNEL_TAGS="${kernel_usage}"
+    KERNEL_TAGS="${KERNEL_TAGS//kernel_/}"
+    [[ -z "$(echo ${KERNEL_TAGS} | grep -oE "(stable|flippy|beta|rk3588|rk35xx)")" ]] && {
+        echo -e "${PROMPT} Invalid KERNEL_TAGS value [ ${KERNEL_TAGS} ]. Resetting to default [ stable ]."
+        KERNEL_TAGS="stable"
+    }
+
+    # Check if the mainline u-boot exists
+    [[ "${auto_mainline_uboot}" =~ ^(yes|no)$ ]] || auto_mainline_uboot="no"
+    [[ "${auto_mainline_uboot}" == "yes" ]] && {
+        [[ -n "${MAINLINE_UBOOT}" && -f "${MAINLINE_UBOOT}" ]] || error_msg "[ ${MAINLINE_UBOOT} ] not found. Update aborted."
+        sed -i "s|^MLUBOOT_STATUS=.*|MLUBOOT_STATUS='yes'|g" ${ophub_release_file}
+    }
+
+    # Check kernel download type
+    [[ "${download_type}" =~ ^(tar|deb)$ ]] || download_type="deb"
+    # Check kernel backup option
+    [[ "${KERNEL_BACKUP}" =~ ^(yes|no)$ ]] || KERNEL_BACKUP="yes"
+
+    # Check the current system running disk
+    check_disk
+
+    # Display settings results
+    echo -e "${INFO} Armbian platform: [ ${PLATFORM} ]"
+    echo -e "${INFO} Current kernel: [ ${kernel_uname} ]"
+    echo -e "${INFO} Kernel signature: [ ${KERNEL_SIGNATURE} ]"
+    echo -e "${INFO} Kernel download type: [ ${download_type} ]"
+    echo -e "${INFO} Kernel download repository: [ ${KERNEL_REPO} ]"
+    echo -e "${INFO} Kernel tags: [ ${KERNEL_TAGS} ]"
+    echo -e "${INFO} Specify kernel: [ ${inputs_kernel} ]"
+    echo -e "${INFO} Backup kernel: [ ${KERNEL_BACKUP} ]"
+    echo -e "${INFO} Mainline u-boot update: [ ${auto_mainline_uboot} ]"
+    echo -e "${INFO} Running on disk: [ /dev/${DISK_NAME} ]"
+
+    sync && echo ""
+}
+
+# Query the latest kernel version from GitHub releases
+query_version() {
+    kernel_prefix="${1}"
+    echo -e "${INFO} Querying the latest version for [ ${kernel_prefix} ]..."
+
+    # Using lookbehind (?<=...) to extract ONLY the patch number, such as 6.1.164 -> 164
+    latest_kernel="$(
+        curl -fsSL ${kernel_api}/releases/expanded_assets/kernel_${KERNEL_TAGS} |
+            grep -oP "(?<=${kernel_prefix}\.)[0-9]+(?=\.tar\.gz)" |
+            sort -urV | head -n 1
+    )"
+}
+
+# Check whether the kernel version matching the system version has already been installed
+verify_version() {
+    # Check if the kernel is already installed
+    if [[ "${current_kernel}" == "${inputs_kernel}" ]]; then
+        echo -e "${INFO} The current kernel [ ${current_kernel} ] is already up to date."
+        # In non-interactive contexts (cron, systemd timers, automated SSH), prompting
+        # for input would hang forever; default to a safe "no" instead of blocking.
+        if [[ ! -t 0 ]]; then
+            echo -e "${FINISH} Non-interactive shell detected; skipping force update."
+            exit 0
+        fi
+        echo -ne "${PROMPT} Do you want to force update? [y/n]: "
+        read force_update
+        case "${force_update,,}" in
+        y*)
+            echo -e "${INFO} Proceeding with force update..."
+            ;;
+        *)
+            echo -e "${FINISH} Update cancelled by user."
+            exit 0
+            ;;
+        esac
+    fi
+}
+
+# Search for local or remote kernel packages
+search_kernel() {
+    cd ${current_path}
+    echo -e "${STEPS} Searching for kernel packages..."
+
+    # Set the kernel save path and clear old files
+    kernel_save_path="/var/cache/apt/archives/ophub"
+    [[ -d "${kernel_save_path}" ]] || mkdir -p "${kernel_save_path}"
+    rm -rf "${kernel_save_path}"/*
+    # Set the kernel path
+    kernel_path="${kernel_save_path}"
+    local_found="no"
+
+    # Check for local .deb files first, e.g: linux-image_6.1.164-1-ophub_arm64.deb -> 6.1.164
+    if [[ "$(find . -maxdepth 1 -type f -name "*.deb" 2>/dev/null | wc -l)" -ge "3" ]]; then
+        target_file="$(ls linux-image_*.deb 2>/dev/null | head -n 1)"
+        if [[ -n "${target_file}" ]]; then
+            inputs_kernel="$(echo "${target_file}" | grep -oP '(?<=_)\d+\.\d+\.\d+(?=-)' || echo "${target_file}" | grep -oP '\d+\.\d+\.\d+')"
+            download_type="deb"
+            local_found="yes"
+        fi
+
+    # Check for local .tar.gz files, e.g: boot-6.6.123-ophub.tar.gz -> 6.6.123
+    elif [[ "$(find . -maxdepth 1 -type f -name "*.tar.gz" 2>/dev/null | wc -l)" -ge "3" ]]; then
+        target_file="$(ls boot-*.tar.gz 2>/dev/null | head -n 1)"
+        if [[ -n "${target_file}" ]]; then
+            inputs_kernel="$(echo "${target_file}" | grep -oP '(?<=boot-)\d+\.\d+\.\d+')"
+            download_type="tar"
+            local_found="yes"
+        fi
+    fi
+
+    # Handle Local Files
+    if [[ "${local_found}" == "yes" ]]; then
+        echo -e "${INFO} Found local kernel packages. Version: [ ${inputs_kernel} ] Type: [ ${download_type} ]"
+
+        # Move local kernel files to the kernel path for subsequent installation and verification
+        [[ -f "sha256sums" ]] && mv -f sha256sums -t "${kernel_path}"
+        mv -f *".${download_type}"* -t "${kernel_path}"
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to move local kernel files."
+
+    else
+        # Handle Online Query
+        check_network
+
+        # If the last character of the string (e.g: 6.1.) is ".", append "y" to it.
+        [[ -n "${inputs_kernel}" && "${inputs_kernel: -1}" == "." ]] && inputs_kernel="${inputs_kernel}y"
+        # If the string (e.g: 6.1) contains only one period, add ".y" to it.
+        [[ -n "${inputs_kernel}" && "$(grep -o "\." <<<"${inputs_kernel}" | wc -l)" -eq "1" ]] && inputs_kernel="${inputs_kernel}.y"
+
+        # Automatically retrieve the latest version of the current kernel series and the specified kernel series (e.g: 6.1.y)
+        # However, when the specified kernel parameter contains a "-" character, the specified version will be used (e.g: 6.1.141-rk3588)
+        [[ -z "${inputs_kernel}" ]] || [[ "${inputs_kernel}" =~ ^[0-9].*[a-z]$ && "${inputs_kernel}" != *"-"* ]] && {
+            # kernel_verpatch, such as [ 6.1 ]
+            kernel_verpatch="$(echo ${current_kernel} | awk -F '.' '{print $1"."$2}')"
+
+            # Setting the kernel series for the query (6.1.y -> 6.1)
+            [[ "${inputs_kernel}" =~ ^[0-9].*[a-z]$ ]] && kernel_verpatch="${inputs_kernel%.*}"
+
+            # Define the search order of kernel types based on priority
+            [[ "${download_type}" == "deb" ]] && search_types=("deb" "tar") || search_types=("tar" "deb")
+            # Traverse kernel types to query the latest kernel version
+            for type in "${search_types[@]}"; do
+                # If deb: search for 'deb-6.1' to extract kernel version
+                # If tar: search for '6.1' to extract kernel version
+                [[ "${type}" == "deb" ]] && prefix="deb-${kernel_verpatch}" || prefix="${kernel_verpatch}"
+
+                # Query the latest kernel version
+                query_version "${prefix}"
+
+                # If found, update global variables and stop searching
+                if [[ -n "${latest_kernel}" ]]; then
+                    download_type="${type}"
+                    break
+                fi
+            done
+
+            # If the latest kernel version is still not found, no suitable kernel exists in the repository
+            [[ -z "${latest_kernel}" ]] && error_msg "No matching kernel version found in GitHub releases."
+
+            # Construct pure version number (e.g. 6.12.89)
+            inputs_kernel="${kernel_verpatch}.${latest_kernel}"
+        }
+
+        echo -e "${INFO} Target online kernel: [ ${inputs_kernel} ]"
+    fi
+
+    # Check whether the kernel version matching the system version has already been installed
+    verify_version
+
+    sync && echo ""
+}
+
+# Download kernel package from GitHub releases
+download_kernel() {
+    cd ${current_path}
+    echo -e "${STEPS} Downloading kernel package..."
+
+    # Construct filename based on type
+    if [[ "${download_type}" == "deb" ]]; then
+        # deb-6.12.89.tar.gz
+        down_filename="deb-${inputs_kernel}.tar.gz"
+    else
+        # 6.12.89.tar.gz
+        down_filename="${inputs_kernel}.tar.gz"
+    fi
+
+    # Download the kernel package from GitHub releases
+    kernel_down_from="https://github.com/${KERNEL_REPO}/releases/download/kernel_${KERNEL_TAGS}/${down_filename}"
+
+    echo -e "${INFO} Download URL: [ ${kernel_down_from} ]"
+    curl -fsSL --retry 5 --retry-delay 5 "${kernel_down_from}" -o "${kernel_path}/${down_filename}"
+    [[ "${?}" -ne "0" ]] && error_msg "Failed to download the kernel package."
+
+    # Extract the downloaded kernel package
+    tar -mxzf "${kernel_path}/${down_filename}" -C "${kernel_path}"
+    [[ "${?}" -ne "0" ]] && error_msg "Failed to extract the kernel package."
+
+    # Handle if extraction creates a subdir
+    if [[ -d "${kernel_path}/${inputs_kernel}" ]]; then
+        kernel_path="${kernel_path}/${inputs_kernel}"
+    elif [[ -d "${kernel_path}/deb-${inputs_kernel}" ]]; then
+        kernel_path="${kernel_path}/deb-${inputs_kernel}"
+    fi
+
+    # Set permissions for directories and files separately
+    find "${kernel_path}" -type d -exec chmod 755 {} \;
+    find "${kernel_path}" -type f -exec chmod a+r {} \;
+
+    sync && echo ""
+}
+
+# Verify kernel package integrity (supports .deb and .tar.gz)
+check_kernel() {
+    cd "${kernel_path}"
+    echo -e "${STEPS} Verifying kernel package integrity..."
+
+    if [[ "${download_type}" == "deb" ]]; then
+        # Find .deb kernel file
+        target_file="$(ls linux-image_*.deb 2>/dev/null | head -n 1)"
+        [[ -z "${target_file}" ]] && error_msg "Kernel .deb file not found in [ ${kernel_path} ]."
+
+        # Extract kernel name: linux-image_6.1.164-1-ophub_arm64.deb -> 6.1.164-1-ophub_arm64
+        kernel_name="$(echo "${target_file}" | grep -oP '(?<=linux-image_).*?(?=\.deb)')"
+        # Extract kernel signature: 6.1.164-1-ophub_arm64 -> ophub
+        kernel_signature="$(echo "${kernel_name}" | sed -E 's/^.*-([^-_]+)_.*/\1/')"
+
+        # Set file list for verification
+        check_list=(${kernel_deb_list[@]})
+
+    else
+        # Find .tar.gz kernel file
+        target_file="$(ls boot-*.tar.gz 2>/dev/null | head -n 1)"
+        [[ -z "${target_file}" ]] && error_msg "Kernel .tar.gz file not found in [ ${kernel_path} ]."
+
+        # Extract kernel name: boot-6.6.123-ophub.tar.gz -> 6.6.123-ophub
+        kernel_name="$(echo "${target_file}" | grep -oP '(?<=boot-).*?(?=\.tar\.gz)')"
+        # Extract kernel signature: 6.6.123-ophub -> ophub
+        kernel_signature="${kernel_name#*-}"
+
+        # Set file list for verification
+        check_list=(${kernel_tar_list[@]})
+    fi
+
+    echo -e "${INFO} Kernel name: [ ${kernel_name} ]"
+
+    # Identify Kernel Version
+    kernel_base="$(echo ${kernel_name} | grep -oP '\d+\.\d+\.\d+')"
+    [[ -z "${kernel_base}" ]] && error_msg "Failed to detect a valid kernel version."
+
+    # Check the sha256sums file
+    sha256sums_file="sha256sums"
+    if [[ -s "${sha256sums_file}" && -n "$(cat ${sha256sums_file})" ]]; then
+        echo -e "${INFO} Performing SHA256 checksum verification..."
+
+        local i="1"
+        for prefix in "${check_list[@]}"; do
+            # Construct filename based on prefix and kernel name
+            if [[ "${download_type}" == "deb" ]]; then
+                tmp_file="${prefix}_${kernel_name}.deb"
+            else
+                tmp_file="${prefix}-${kernel_name}.tar.gz"
+            fi
+
+            # Check if file exists
+            if [[ ! -s "${tmp_file}" ]]; then
+                # Handle optional header files
+                if [[ "${prefix}" == "linux-headers" || "${prefix}" == "header" ]]; then
+                    echo -e "${PROMPT} (${i}/4) [ ${tmp_file} ] is missing, skipping verification."
+                    ((i++))
+                    continue
+                else
+                    error_msg "(${i}/4) Required file [ ${tmp_file} ] is missing."
+                fi
+            fi
+
+            # Check checksum
+            tmp_sha256sum="$(sha256sum "${tmp_file}" | awk '{print $1}')"
+            tmp_checkcode="$(grep "${tmp_file}" "${sha256sums_file}" | awk '{print $1}')"
+
+            [[ "${tmp_sha256sum}" == "${tmp_checkcode}" ]] || error_msg "(${i}/4) ${tmp_file}: SHA256 checksum mismatch."
+            echo -e "${INFO} (${i}/4) [ ${tmp_file} ] checksum verified successfully."
+            ((i++))
+        done
+    fi
+
+    sync && echo ""
+}
+
+# Backup the currently running kernel
+backup_kernel() {
+    echo -e "${STEPS} Backing up the current kernel..."
+
+    [[ -d "${backup_path}" ]] || mkdir -p ${backup_path}
+    rm -rf ${backup_path}/${current_kernel}
+
+    # Keep the latest 3 kernel backups and delete the others.
+    backup_kernel_list=()
+    while IFS= read -r -d '' line; do
+        backup_kernel_list+=("$(basename "${line#* }")")
+    done < <(find "${backup_path}" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\0' 2>/dev/null | sort -zrn)
+
+    if [[ "${#backup_kernel_list[@]}" -ge "3" ]]; then
+        for ((i = 2; i < ${#backup_kernel_list[@]}; i++)); do
+            rm -rf "${backup_path}/${backup_kernel_list[$i]}"
+        done
+    fi
+
+    # Identify the current kernel files
+    mkdir -p ${backup_path}/${current_kernel}
+
+    # Ensure a half-written backup directory is removed if any subsequent step fails.
+    backup_cleanup_target="${backup_path}/${current_kernel}"
+    trap '[[ -n "${backup_cleanup_target}" ]] && rm -rf "${backup_cleanup_target}"' EXIT
+
+    # Create temporary file directory
+    kernel_tmp_path="$(mktemp -d)"
+    cd ${kernel_tmp_path}
+
+    # 1. Pack the boot-*.tar.gz file
+    rm -rf *
+    # Avoid passing the literal glob to [ cp ] when no matching files exist.
+    boot_files=(/boot/*-${kernel_uname})
+    if [[ -e "${boot_files[0]}" ]]; then
+        cp -rf "${boot_files[@]}" -t . || error_msg "(1/4) Failed to copy [ /boot/*-${kernel_uname} ] files."
+    else
+        error_msg "(1/4) No [ /boot/*-${kernel_uname} ] files found to back up."
+    fi
+    rm -rf dtb*
+    chmod +x *
+    tar -czf boot-${kernel_uname}.tar.gz *
+    mv -f *.tar.gz ${backup_path}/${current_kernel}
+    [[ "${?}" -ne "0" ]] && error_msg "(1/4) Failed to move [ boot-${kernel_uname}.tar.gz ] files."
+    echo -e "${INFO} (1/4) Backup of [ boot-${kernel_uname}.tar.gz ] succeeded."
+
+    # 2. Pack the dtb-*.tar.gz file
+    rm -rf *
+    cp -rf /boot/dtb/${PLATFORM}/* -t .
+    [[ "${?}" -ne "0" ]] && error_msg "(2/4) Failed to copy [ /boot/dtb/${PLATFORM}/* ] files."
+    tar -czf dtb-${PLATFORM}-${kernel_uname}.tar.gz *
+    mv -f *.tar.gz ${backup_path}/${current_kernel}
+    [[ "${?}" -ne "0" ]] && error_msg "(2/4) Failed to move [ dtb-${PLATFORM}-${kernel_uname}.tar.gz ] files."
+    echo -e "${INFO} (2/4) Backup of [ dtb-${PLATFORM}-${kernel_uname}.tar.gz ] succeeded."
+
+    # 3. Pack the modules-*.tar.gz file
+    rm -rf *
+    cp -rf /usr/lib/modules/${kernel_uname} -t .
+    [[ "${?}" -ne "0" ]] && error_msg "(3/4) Failed to copy [ /usr/lib/modules/${kernel_uname} ] files."
+    tar -czf modules-${kernel_uname}.tar.gz *
+    mv -f *.tar.gz ${backup_path}/${current_kernel}
+    [[ "${?}" -ne "0" ]] && error_msg "(3/4) Failed to move [ modules-${kernel_uname}.tar.gz ] files."
+    echo -e "${INFO} (3/4) Backup of [ modules-${kernel_uname}.tar.gz ] succeeded."
+
+    # 4. Pack the header-*.tar.gz file, header file is optional
+    if [[ -d "/usr/src/linux-headers-${kernel_uname}" ]]; then
+        rm -rf *
+        cp -rf /usr/src/linux-headers-${kernel_uname}/* -t .
+        [[ "${?}" -ne "0" ]] && error_msg "(4/4) Failed to copy [ /usr/src/linux-headers-${kernel_uname}/* ] files."
+        tar -czf header-${kernel_uname}.tar.gz *
+        mv -f *.tar.gz ${backup_path}/${current_kernel}
+        [[ "${?}" -ne "0" ]] && error_msg "(4/4) Failed to move [ header-${kernel_uname}.tar.gz ] files."
+        echo -e "${INFO} (4/4) Backup of [ header-${kernel_uname}.tar.gz ] succeeded."
+    else
+        echo -e "${PROMPT} (4/4) [ /usr/src/linux-headers-${kernel_uname} ] folder does not exist, skip backup."
+    fi
+
+    # Add sha256sum integrity verification file
+    cd ${backup_path}/${current_kernel}
+    sha256sum *.tar.gz >sha256sums 2>/dev/null || true
+    echo -e "${INFO} [ sha256sums ] file has been generated."
+    echo -e "${INFO} Current kernel backup path: [ ${backup_path}/${current_kernel} ]."
+
+    # Backup completed successfully; disable the cleanup trap.
+    trap - EXIT
+    backup_cleanup_target=""
+
+    sync && echo ""
+}
+
+backup_fdtfile() {
+    # Check if the dtb backup directory exists, if not, create it
+    [[ -d "${backup_path}/dtb" ]] || mkdir -p ${backup_path}/dtb
+
+    # Backup the current DTB file
+    [[ -f "/boot/dtb/${PLATFORM}/${FDTFILE}" ]] && {
+        cp -f /boot/dtb/${PLATFORM}/${FDTFILE} ${backup_path}/dtb/
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to backup the DTB file."
+        echo -e "${INFO} DTB file backed up to [ ${backup_path}/dtb/${FDTFILE} ]."
+    }
+}
+
+restore_fdtfile() {
+    # Restore the DTB file if the backup exists and the current one is missing
+    if [[ -f "${backup_path}/dtb/${FDTFILE}" && ! -f "/boot/dtb/${PLATFORM}/${FDTFILE}" ]]; then
+        cp -f ${backup_path}/dtb/${FDTFILE} /boot/dtb/${PLATFORM}/
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to restore the DTB file."
+        echo -e "${INFO} DTB file has been restored from backup."
+    elif [[ -f "/boot/dtb/${PLATFORM}/${FDTFILE}" ]]; then
+        echo -e "${INFO} The new kernel already includes the required DTB file, skipping restoration."
+    fi
+}
+
+# Install the kernel from .deb packages
+update_deb_kernel() {
+    cd ${kernel_path}
+    echo -e "${STEPS} Installing kernel from .deb packages..."
+
+    # Check if the kernel package is in deb format
+    [[ "${download_type}" == "deb" ]] || error_msg "The kernel package is not in deb format."
+
+    # Backup the current DTB files
+    backup_fdtfile
+
+    # Identify the .deb files to install
+    local n="0"
+    local install_files=""
+    for prefix in "${kernel_deb_list[@]}"; do
+        local f="$(ls ${prefix}_*.deb 2>/dev/null | head -n 1)"
+        if [[ -n "${f}" ]]; then
+            ((n++))
+            install_files="${install_files} ./${f}"
+        else
+            error_msg "Kernel .deb package not found: [ ${prefix}_*.deb ]."
+        fi
+    done
+
+    # Install the .deb kernel packages
+    if [[ -n "${install_files}" ]]; then
+        # Install packages one by one
+        local i="1"
+        install_failed=0
+        for pkg in ${install_files}; do
+            # Install the package and capture the output log for error analysis if installation fails
+            pkg_log="$(apt-get install -y --reinstall --allow-downgrades "${pkg}" 2>&1)"
+
+            # Check the installation result
+            if [[ "${?}" -eq "0" ]]; then
+                echo -e "${INFO} (${i}/${n}) Installation of [ ${pkg#./} ] succeeded."
+            else
+                echo -e "${PROMPT} (${i}/${n}) Installation of [ ${pkg#./} ] failed. Error details:"
+                # Display the last 5 lines of the log to provide context on the failure without overwhelming the user
+                echo "${pkg_log}" | tail -n 5
+                install_failed=1
+            fi
+            ((i++))
+        done
+
+        # If any package installation failed, attempt to fix broken dependencies
+        if [[ "${install_failed}" -ne "0" ]]; then
+            echo -e "${INFO} Attempting to fix broken package dependencies..."
+
+            # First, try to fix broken dependencies which might be causing the installation failure
+            apt-get install -f -y >/dev/null 2>&1
+            # Then, try to reinstall the kernel packages again to ensure they are properly installed
+            apt-get install -y --reinstall --allow-downgrades ${install_files} >/dev/null 2>&1
+            # Finally, verify the installation status of the kernel packages
+            if [[ "${?}" -eq "0" ]]; then
+                echo -e "${INFO} Package dependencies fixed and verified successfully."
+            else
+                error_msg "Failed to fix package dependencies. Packages may be corrupted."
+            fi
+        fi
+    else
+        error_msg "No kernel .deb packages found for installation."
+    fi
+
+    # Update release file
+    sed -i "s|^KERNEL_VERSION=.*|KERNEL_VERSION='${kernel_base}'|g" ${ophub_release_file}
+    sed -i "s|^DOWNLOAD_TYPE=.*|DOWNLOAD_TYPE='${download_type}'|g" ${ophub_release_file}
+    sed -i "s|^KERNEL_SIGNATURE=.*|KERNEL_SIGNATURE='${kernel_signature}'|g" ${ophub_release_file}
+
+    # Restore the DTB files if necessary
+    restore_fdtfile
+
+    # Delete kernel temporary files
+    rm -rf ${kernel_save_path}/*
+
+    sync && echo ""
+}
+
+# Install the kernel from .tar.gz packages
+update_tar_kernel() {
+    cd ${kernel_path}
+    echo -e "${STEPS} Installing kernel from .tar.gz packages..."
+
+    # Check if the kernel package is in tar.gz format
+    [[ "${download_type}" == "tar" ]] || error_msg "The kernel package is not in tar.gz format."
+
+    # Verify all required tarballs exist before touching the live system, so that a
+    # missing/corrupt download cannot leave the device with no kernel installed at all.
+    for prefix in "${kernel_tar_list[@]}"; do
+        # header is optional, skip it during this pre-check
+        [[ "${prefix}" == "header" ]] && continue
+        [[ -s "${kernel_path}/${prefix}-${kernel_name}.tar.gz" ]] || error_msg "Missing required package [ ${prefix}-${kernel_name}.tar.gz ]."
+    done
+
+    # Backup the current DTB files
+    backup_fdtfile
+
+    # Extract the boot files to a staging directory
+    boot_stage="$(mktemp -d)"
+    tar -mxzf boot-${kernel_name}.tar.gz -C "${boot_stage}" || {
+        rm -rf "${boot_stage}"
+        error_msg "Failed to extract [ boot-${kernel_name}.tar.gz ]."
+    }
+    [[ "$(ls "${boot_stage}"/*${kernel_name}* 2>/dev/null | wc -l)" -ge "4" ]] || {
+        rm -rf "${boot_stage}"
+        error_msg "The staged /boot files are missing."
+    }
+
+    # Delete the current kernel files
+    rm -f /boot/config-* /boot/initrd.img-* /boot/System.map-* /boot/uInitrd-* /boot/vmlinuz-*
+    rm -rf /boot/uInitrd /boot/Image /boot/zImage /boot/dtb-*
+
+    # 01. For /boot five files
+    cp -rf "${boot_stage}"/. /boot/ || {
+        rm -rf "${boot_stage}"
+        error_msg "Failed to copy staged /boot files into /boot."
+    }
+    rm -rf "${boot_stage}"
+    [[ "${PLATFORM}" == "amlogic" ]] && (cd /boot && cp -f uInitrd-${kernel_name} uInitrd && cp -f vmlinuz-${kernel_name} zImage)
+    [[ "${PLATFORM}" == "rockchip" ]] && (cd /boot && ln -sf uInitrd-${kernel_name} uInitrd && ln -sf vmlinuz-${kernel_name} Image)
+    [[ "${PLATFORM}" == "allwinner" ]] && (cd /boot && cp -f uInitrd-${kernel_name} uInitrd && cp -f vmlinuz-${kernel_name} Image)
+    # wxy-oect: MODEL_ID numbers r306 and r307, require special handling of uInitrd
+    [[ "${MODEL_ID}" =~ ^(r306|r307)$ ]] && (cd /boot && ln -sf initrd.img-${kernel_name} uInitrd)
+    [[ "$(ls /boot/*${kernel_name}* -l 2>/dev/null | grep "^-" | wc -l)" -ge "4" ]] || error_msg "The /boot files is missing."
+    echo -e "${INFO} (1/4) Unpacking [ boot-${kernel_name}.tar.gz ] succeeded."
+
+    # 02. For /boot/dtb/${PLATFORM}/*
+    [[ -d "/boot/dtb/${PLATFORM}" ]] || mkdir -p /boot/dtb/${PLATFORM}
+    tar -mxzf dtb-${PLATFORM}-${kernel_name}.tar.gz -C /boot/dtb/${PLATFORM}
+    [[ "${PLATFORM}" == "rockchip" ]] && ln -sf dtb /boot/dtb-${kernel_name}
+    [[ "$(ls /boot/dtb/${PLATFORM} -l 2>/dev/null | grep "^-" | wc -l)" -ge "2" ]] || error_msg "/boot/dtb/${PLATFORM} files is missing."
+    echo -e "${INFO} (2/4) Unpacking [ dtb-${PLATFORM}-${kernel_name}.tar.gz ] succeeded."
+
+    # 03. For /usr/src/linux-headers-${kernel_name}, header file is optional
+    if [[ -f "header-${kernel_name}.tar.gz" ]]; then
+        header_path="linux-headers-${kernel_name}"
+        rm -rf /usr/src/linux-headers-* && mkdir -p "/usr/src/${header_path}"
+        tar -mxzf header-${kernel_name}.tar.gz -C /usr/src/${header_path}
+        [[ -d "/usr/src/${header_path}/include" ]] || error_msg "/usr/src/${header_path}/include folder is missing."
+        echo -e "${INFO} (3/4) Unpacking [ header-${kernel_name}.tar.gz ] succeeded."
+    else
+        echo -e "${PROMPT} (3/4) [ header-${kernel_name}.tar.gz ] file does not exist, skip unpacking."
+    fi
+
+    # 04. For /usr/lib/modules/${kernel_name}
+    # Extract first to a staging directory so that an extraction failure cannot leave
+    # the system without any kernel modules installed.
+    modules_stage="$(mktemp -d)"
+    tar -mxzf modules-${kernel_name}.tar.gz -C "${modules_stage}" || {
+        rm -rf "${modules_stage}"
+        error_msg "Failed to extract [ modules-${kernel_name}.tar.gz ]."
+    }
+    [[ -d "${modules_stage}/${kernel_name}" ]] || {
+        rm -rf "${modules_stage}"
+        error_msg "/usr/lib/modules/${kernel_name} kernel folder is missing."
+    }
+    rm -rf /usr/lib/modules/*
+    mv "${modules_stage}/${kernel_name}" /usr/lib/modules/
+    rm -rf "${modules_stage}"
+    [[ -n "${header_path}" ]] && (cd /usr/lib/modules/${kernel_name}/ && rm -f build source && ln -sf /usr/src/${header_path} build)
+    echo -e "${INFO} (4/4) Unpacking [ modules-${kernel_name}.tar.gz ] succeeded."
+
+    # Update release file
+    sed -i "s|^KERNEL_VERSION=.*|KERNEL_VERSION='${kernel_base}'|g" ${ophub_release_file}
+    sed -i "s|^DOWNLOAD_TYPE=.*|DOWNLOAD_TYPE='${download_type}'|g" ${ophub_release_file}
+    sed -i "s|^KERNEL_SIGNATURE=.*|KERNEL_SIGNATURE='${kernel_signature}'|g" ${ophub_release_file}
+
+    # Restore the DTB files if necessary
+    restore_fdtfile
+
+    # Delete kernel temporary files
+    rm -rf ${kernel_save_path}/*
+
+    sync && echo ""
+}
+
+# Update the U-Boot bootloader
+update_uboot() {
+    echo -e "${STEPS} Updating U-Boot bootloader..."
+
+    # With TEXT_OFFSET patch is [ 0108 ], without TEXT_OFFSET patch is [ 0000 ] and need to ues [ UBOOT_OVERLOAD ] file.
+    need_overload="yes"
+    # Prefer the vmlinuz file matching the freshly installed kernel; fall back to the most recently modified vmlinuz.
+    vmlinuz_file_name="$(ls -1 /boot/vmlinuz-*${kernel_signature} 2>/dev/null | head -n 1)"
+    [[ -z "${vmlinuz_file_name}" ]] && vmlinuz_file_name="$(ls -1t /boot/vmlinuz-* 2>/dev/null | head -n 1)"
+    [[ -n "${vmlinuz_file_name}" && "$(hexdump -n 15 -x "${vmlinuz_file_name}" 2>/dev/null | head -n 1 | awk '{print $7}')" == "0108" ]] && need_overload="no"
+
+    # Copy u-boot.ext and u-boot.emmc
+    if [[ "${need_overload}" == "yes" && -f "/boot/${UBOOT_OVERLOAD}" ]]; then
+        echo -e "${INFO} Copy u-boot: [ /boot/${UBOOT_OVERLOAD} ]"
+        run_on_emmc="$(lsblk -l -o NAME | grep -oE "^${DISK_NAME}boot0")"
+        [[ ! -f "/boot/u-boot.ext" ]] && cp -f /boot/${UBOOT_OVERLOAD} /boot/u-boot.ext
+        [[ ! -f "/boot/u-boot.emmc" && -n "${run_on_emmc}" ]] && cp -f /boot/u-boot.ext /boot/u-boot.emmc
+        chmod +x /boot/u-boot.*
+    elif [[ "${need_overload}" == "yes" && ! -f "/boot/${UBOOT_OVERLOAD}" ]]; then
+        echo -e "${PROMPT} The [ /boot/${UBOOT_OVERLOAD} ] file is required but missing."
+    else
+        echo -e "${INFO} No need for overload file, skip copying."
+    fi
+
+    # Write mainline u-boot
+    if [[ "${auto_mainline_uboot}" == "yes" ]]; then
+        echo -e "${INFO} Write Mainline u-boot: [ ${MAINLINE_UBOOT} ]"
+        dd if="${MAINLINE_UBOOT}" of="/dev/${DISK_NAME}" conv=fsync bs=1 count=444 2>/dev/null
+        dd if="${MAINLINE_UBOOT}" of="/dev/${DISK_NAME}" conv=fsync bs=512 skip=1 seek=1 2>/dev/null
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to write bootloader using [ dd ]."
+    else
+        echo -e "${INFO} Mainline U-Boot not enabled, skipping."
+    fi
+
+    sync && echo ""
+}
+
+# Adjust initrd and ramdisk address for Amlogic devices
+update_initrd_addr() {
+    echo -e "${STEPS} Checking initrd and ramdisk addresses..."
+
+    # Check if the file exists for emmc_autoscript.cmd and emmc_autoscript
+    initrd_addr_file="/boot/emmc_autoscript.cmd"
+    initrd_addr_mkimage_file="/boot/emmc_autoscript"
+    if [[ -f "${initrd_addr_file}" ]]; then
+        # Get the initrd_addr value
+        initrd_addr_value="$(grep 'setenv initrd_addr' ${initrd_addr_file} | awk '{print $3}')"
+        [[ -z "${initrd_addr_value}" ]] && error_msg "Failed to query [ initrd_addr ] value from [ ${initrd_addr_file} ]."
+
+        # Check if the initrd_addr value is 0x15000000
+        [[ "${initrd_addr_value}" != "0x15000000" ]] && {
+            echo -e "${INFO} The [ initrd_addr ] value is [ ${initrd_addr_value} ], need to adjust."
+
+            # Adjust the initrd_addr value to 0x15000000
+            sed -i "s|^setenv initrd_addr.*|setenv initrd_addr 0x15000000|g" ${initrd_addr_file}
+            [[ "${?}" -ne "0" ]] && error_msg "Failed to adjust [ initrd_addr ] value in [ ${initrd_addr_file} ]."
+            echo -e "${INFO} Adjust [ initrd_addr ] value to [ 0x15000000 ] succeeded."
+
+            # Create [ emmc_autoscript ] file
+            sudo rm -f ${initrd_addr_mkimage_file}
+            sudo mkimage -C none -A arm -T script -d ${initrd_addr_file} ${initrd_addr_mkimage_file} >/dev/null
+            [[ "${?}" -ne "0" ]] && error_msg "Failed to create [ ${initrd_addr_mkimage_file} ] file."
+            echo -e "${INFO} Create [ ${initrd_addr_mkimage_file} ] file succeeded."
+        }
+    else
+        error_msg "The [ ${initrd_addr_file} ] file is missing, stop updating."
+    fi
+
+    # Check if the file exists for s905_autoscript.cmd and s905_autoscript
+    ramdisk_addr_file="/boot/s905_autoscript.cmd"
+    ramdisk_addr_mkimage_file="/boot/s905_autoscript"
+    if [[ -f "${ramdisk_addr_file}" ]]; then
+        # Get the ramdisk_addr_r value
+        ramdisk_addr_value="$(grep 'setenv ramdisk_addr_r' ${ramdisk_addr_file} | awk '{print $3}')"
+        [[ -z "${ramdisk_addr_value}" ]] && error_msg "Failed to query [ initrd_addr ] value from [ ${ramdisk_addr_file} ]."
+
+        # Check if the ramdisk_addr_r value is 0x15000000
+        [[ "${ramdisk_addr_value}" != "0x15000000" ]] && {
+            echo -e "${INFO} The [ ramdisk_addr_r ] value is [ ${ramdisk_addr_value} ], need to adjust."
+
+            # Adjust the ramdisk_addr_r value to 0x15000000
+            sed -i "s|^setenv ramdisk_addr_r.*|setenv ramdisk_addr_r 0x15000000|g" ${ramdisk_addr_file}
+            [[ "${?}" -ne "0" ]] && error_msg "Failed to adjust [ ramdisk_addr_r ] value in [ ${ramdisk_addr_file} ]."
+            echo -e "${INFO} Adjust [ ramdisk_addr_r ] value to [ 0x15000000 ] succeeded."
+
+            # Create [ s905_autoscript ] file
+            sudo rm -f ${ramdisk_addr_mkimage_file}
+            sudo mkimage -C none -A arm -T script -d ${ramdisk_addr_file} ${ramdisk_addr_mkimage_file} >/dev/null
+            [[ "${?}" -ne "0" ]] && error_msg "Failed to create [ ${ramdisk_addr_mkimage_file} ] file."
+            echo -e "${INFO} Create [ ${ramdisk_addr_mkimage_file} ] file succeeded."
+        }
+    fi
+
+    # Check if the file exists for boot.ini
+    boot_ini_file="/boot/boot.ini"
+    if [[ -f "${boot_ini_file}" ]]; then
+        # Get the initrd_addr value
+        boot_ini_addr_value="$(grep 'setenv initrd_addr' ${boot_ini_file} | awk '{print $3}')"
+        [[ -z "${boot_ini_addr_value}" ]] && error_msg "Failed to query [ initrd_addr ] value from [ ${boot_ini_file} ]."
+
+        # Check if the initrd_addr value is 0x15000000
+        [[ "${boot_ini_addr_value}" != "0x15000000" ]] && {
+            echo -e "${INFO} The [ initrd_addr ] value is [ ${boot_ini_addr_value} ], need to adjust."
+            sed -i "s|^setenv initrd_addr.*|setenv initrd_addr 0x15000000|g" ${boot_ini_file}
+            [[ "${?}" -ne "0" ]] && error_msg "Failed to adjust [ initrd_addr ] value in [ ${boot_ini_file} ]."
+            echo -e "${INFO} Adjust [ initrd_addr ] value to [ 0x15000000 ] succeeded."
+        }
+    else
+        error_msg "The [ ${boot_ini_file} ] file is missing, stop updating."
+    fi
+
+    # Check if the file exists for boot-emmc.ini
+    boot_emmc_ini_file="/boot/boot-emmc.ini"
+    if [[ -f "${boot_emmc_ini_file}" ]]; then
+        # Get the initrd_addr value
+        boot_emmc_ini_addr_value="$(grep 'setenv initrd_addr' ${boot_emmc_ini_file} | awk '{print $3}')"
+        [[ -z "${boot_emmc_ini_addr_value}" ]] && error_msg "Failed to query [ initrd_addr ] value from [ ${boot_emmc_ini_file} ]."
+
+        # Check if the initrd_addr value is 0x15000000
+        [[ "${boot_emmc_ini_addr_value}" != "0x15000000" ]] && {
+            echo -e "${INFO} The [ initrd_addr ] value is [ ${boot_emmc_ini_addr_value} ], need to adjust."
+            sed -i "s|^setenv initrd_addr.*|setenv initrd_addr 0x15000000|g" ${boot_emmc_ini_file}
+            [[ "${?}" -ne "0" ]] && error_msg "Failed to adjust [ initrd_addr ] value in [ ${boot_emmc_ini_file} ]."
+            echo -e "${INFO} Adjust [ initrd_addr ] value to [ 0x15000000 ] succeeded."
+        }
+    fi
+
+    echo -e "${INFO} All address checks completed."
+    sync && echo ""
+}
+
+# Update the Armbian OS version string
+update_os_version() {
+    echo -e "${STEPS} Updating Armbian OS version..."
+
+    # Get the latest Armbian OS version
+    os_version="$(
+        curl -fsSL -m 15 \
+            https://github.com/armbian/build/tags |
+            grep -oE 'Link\">v.*</a>' |
+            grep -oE '[2-9][0-9]\.[0-9]{1,2}\.[0-9]{1,2}' |
+            sort -urV | head -n 1
+    )"
+
+    # Update the Armbian OS version
+    if [[ ${?} -eq 0 && -n "${os_version}" ]]; then
+        echo -e "${INFO} The latest Armbian OS version: [ ${os_version} ]"
+        sed -i "s|^VERSION=.*|VERSION=\"${os_version}\"|g" ${armbian_image_file} ${armbian_release_file}
+        sed -i "s|^REVISION=.*|REVISION=\"${os_version}\"|g" ${armbian_image_file} ${armbian_release_file}
+    else
+        echo -e "${PROMPT} Failed to query the latest Armbian OS version. Skipping update."
+    fi
+
+    sync && echo ""
+}
+
+# Rescue and restore the kernel to a target disk
+sos_kernel() {
+    echo -e "${STEPS} Starting kernel rescue..."
+
+    # Check the current system running disk
+    check_disk
+    # Supports specifying disks, such as: [ armbian-update -s mmcblk1 ]
+    box_disk="${2}"
+
+    if [[ -n "${box_disk}" ]]; then
+        # Format the disk names
+        box_disk="${box_disk//\/dev\//}"
+
+        # Check if the disk exists
+        [[ -b "/dev/${box_disk}" ]] || error_msg "The specified disk [ ${box_disk} ] does not exist."
+
+        # Check if the specified disk is the same as the current system disk
+        [[ "${box_disk}" == "${DISK_NAME}" ]] && error_msg "The specified disk [ ${box_disk} ] is the same as the current system disk [ ${DISK_NAME} ]."
+
+        echo -e "${INFO} The device name of the specified disk: [ ${box_disk} ]"
+    else
+        # Find emmc disk, first find emmc containing boot0 partition
+        box_disk="$(lsblk -l -o NAME | grep -oE '(mmcblk[0-9]?|nvme[0-9]?n[0-9]?|[hsv]d[a-z])' | grep -vE ^${DISK_NAME} | sort -u | head -n 1)"
+
+        # Check if disk exists
+        [[ -z "${box_disk}" ]] && error_msg "Unable to locate the target disk for rescue."
+
+        echo -e "${INFO} The device name of the target rescue disk: [ ${box_disk} ]"
+    fi
+
+    rescue_disk="/dev/${box_disk}"
+    echo -e "${INFO} Armbian is running on [ /dev/${DISK_NAME} ]. Target rescue disk: [ ${rescue_disk} ]."
+
+    # Create a temporary mount directory
+    umount -f ${rescue_path}/bootfs 2>/dev/null
+    umount -f ${rescue_path}/rootfs 2>/dev/null
+    rm -rf ${rescue_path} 2>/dev/null
+    mkdir -p ${rescue_path}/{bootfs/,rootfs/} && sync
+    [[ "${?}" -ne "0" ]] && error_msg "Failed to create temporary mount directory [ ${rescue_path} ]."
+
+    # Mount eMMC to USB
+    [[ "${box_disk}" =~ ^([hsv]d[a-z]) ]] && PARTITION_NAME="" || PARTITION_NAME="p"
+    mount ${rescue_disk}${PARTITION_NAME}1 ${rescue_path}/bootfs
+    [[ "${?}" -ne "0" ]] && error_msg "mount ${rescue_disk}${PARTITION_NAME}1 failed!"
+    mount ${rescue_disk}${PARTITION_NAME}2 ${rescue_path}/rootfs
+    [[ "${?}" -ne "0" ]] && error_msg "mount ${rescue_disk}${PARTITION_NAME}2 failed!"
+
+    # Identify the current system kernel files
+    system_kernel="$(uname -r)"
+
+    # 01. For /boot files
+    if [[ -d "${rescue_path}/bootfs" ]]; then
+        cd ${rescue_path}/bootfs
+        rm -rf config-* initrd.img-* System.map-* vmlinuz-* uInitrd* *Image dtb* u-boot.ext u-boot.emmc
+        [[ -f "/boot/u-boot.ext" ]] && {
+            cp -f /boot/u-boot.ext -t .
+            cp -f /boot/u-boot.ext u-boot.emmc
+            chmod +x u-boot.ext u-boot.emmc
+        }
+        cp -rf /boot/{*-${system_kernel},uInitrd,*Image,dtb} -t .
+        [[ "${?}" -ne "0" ]] && error_msg "(1/3) [ boot ] kernel files rescue failed."
+        echo -e "${INFO} (1/3) [ boot ] kernel files rescue succeeded."
+
+        # Adjust the initrd_addr value to 0x15000000
+        initrd_addr_file="emmc_autoscript.cmd"
+        initrd_addr_mkimage_file="emmc_autoscript"
+        [[ -f "${initrd_addr_file}" ]] && {
+            sed -i "s|^setenv initrd_addr.*|setenv initrd_addr 0x15000000|g" ${initrd_addr_file}
+            sudo rm -f ${initrd_addr_mkimage_file}
+            sudo mkimage -C none -A arm -T script -d ${initrd_addr_file} ${initrd_addr_mkimage_file} >/dev/null
+        }
+
+        # Adjust the ramdisk_addr_r value to 0x15000000
+        ramdisk_addr_file="s905_autoscript.cmd"
+        ramdisk_addr_mkimage_file="s905_autoscript"
+        [[ -f "${ramdisk_addr_file}" ]] && {
+            sed -i "s|^setenv ramdisk_addr_r.*|setenv ramdisk_addr_r 0x15000000|g" ${ramdisk_addr_file}
+            sudo rm -f ${ramdisk_addr_mkimage_file}
+            sudo mkimage -C none -A arm -T script -d ${ramdisk_addr_file} ${ramdisk_addr_mkimage_file} >/dev/null
+        }
+
+        # Adjust the initrd_addr value to 0x15000000
+        [[ -f "boot.ini" ]] && sed -i "s|^setenv initrd_addr.*|setenv initrd_addr 0x15000000|g" boot.ini
+        [[ -f "boot-emmc.ini" ]] && sed -i "s|^setenv initrd_addr.*|setenv initrd_addr 0x15000000|g" boot-emmc.ini
+    else
+        error_msg "(1/3) The [ ${rescue_path}/bootfs ] folder does not exist, stop rescuing."
+    fi
+
+    # 02. For /usr/lib/modules/${system_kernel}
+    if [[ -d "${rescue_path}/rootfs/usr/lib/modules" ]]; then
+        cd ${rescue_path}/rootfs/usr/lib/modules
+        rm -rf *
+        cp -rf /usr/lib/modules/${system_kernel} -t .
+        [[ "${?}" -ne "0" ]] && error_msg "(2/3) [ modules ] kernel files rescue failed."
+        echo -e "${INFO} (2/3) [ modules ] kernel files rescue succeeded."
+    else
+        error_msg "(2/3) The [ ${rescue_path}/rootfs/usr/lib/modules ] folder does not exist, stop rescuing."
+    fi
+
+    # 03. For /usr/src/linux-headers-${system_kernel}
+    if [[ -d "/usr/src/linux-headers-${system_kernel}" ]]; then
+        cd ${rescue_path}/rootfs/usr/src
+        rm -rf linux-headers-*
+        cp -rf /usr/src/linux-headers-${system_kernel} -t .
+        [[ "${?}" -ne "0" ]] && error_msg "(3/3) [ headers ] kernel files rescue failed."
+        echo -e "${INFO} (3/3) [ headers ] kernel files rescue succeeded."
+    else
+        echo -e "${PROMPT} (3/3) [ /usr/src/linux-headers-${system_kernel} ] folder does not exist, skip rescue."
+    fi
+
+    # Unmount the emmc partition
+    cd ${rescue_path}
+    umount -f ${rescue_path}/bootfs 2>/dev/null
+    umount -f ${rescue_path}/rootfs 2>/dev/null
+
+    sync && echo ""
+}
+
+# Display help information
+# prettytable (single_border_style): https://github.com/jazzband/prettytable/blob/main/src/prettytable/prettytable.py#L1358
+help_info() {
+    clear
+    cat <<EOF
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  Example: armbian-update -k 5.15.50 -u stable                                                                                   │
+  ├───────────┬───────────────┬─────────────────────────────────────┬───────────────────────────────────────────────────────────────┤
+  │  Optional │ Default       │ Value                               │ Description                                                   │
+  ├───────────┼───────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────┤
+  │  -r       │ ophub/kernel  │ <owner>/<repo>                      │ Set the repository for downloading kernels from github.com    │
+  │  -u       │ <KERNEL_TAGS> │ stable/flippy/beta/rk3588/rk35xx    │ Set the tags suffix of the kernel used                        │
+  │  -k       │ latest        │ kernel-version                      │ Set the kernel version                                        │
+  │  -b       │ yes           │ yes/no                              │ Automatically backup the current system kernel                │
+  │  -d       │ deb           │ tar/deb                             │ Set the download type for the kernel                          │
+  │  -m       │ no            │ yes/no                              │ Use Mainline u-boot                                           │
+  │  -s       │ None          │ None/mmcblkX/nvmeXnX/sdX            │ [SOS] Restore the system kernel of eMMC/NVMe/sdX disk         │
+  └───────────┴───────────────┴─────────────────────────────────────┴───────────────────────────────────────────────────────────────┘
+EOF
+    exit 0
+}
+
+# Check script permission
+[[ "$(id -u)" == "0" ]] || error_msg "Please run this script as root: [ sudo $0 ]"
+echo -e "${STEPS} Welcome to the Armbian Kernel Update Tool."
+
+# Detect backup-only invocation: exactly two args [ -b yes ] in any order is not supported,
+# but a single "-b yes" pair without other options should run the backup-only path.
+backup_only="no"
+if [[ "${#}" -eq 2 && "${1}" == "-b" && "${2}" == "yes" ]]; then
+    backup_only="yes"
+fi
+
+# Execute relevant functions based on the options
+if [[ "${@}" =~ ^-s(\s)* ]]; then
+    # Start rescuing the kernel
+    sos_kernel "${@}"
+
+    # Kernel restore successful
+    sync && sleep 3
+    echo -e "${SUCCESS} Kernel rescue completed successfully. Please remove the disk and restart the Armbian system."
+elif [[ "${backup_only}" == "yes" ]]; then
+    # Backup current kernel
+    init_var "${@}"
+    backup_kernel
+
+    # Kernel backup successful
+    sync && sleep 3
+    echo -e "${SUCCESS} Kernel backup completed successfully."
+elif [[ "${1}" == "-h" || "${1}" == "--help" ]]; then
+    # Display help information
+    help_info
+else
+    # Start updating the kernel
+    check_depends
+    init_var "${@}"
+    search_kernel
+    [[ "${local_found}" == "no" ]] && download_kernel
+    check_kernel
+    [[ "${KERNEL_BACKUP}" != "no" ]] && backup_kernel
+    [[ "${download_type}" == "deb" ]] && update_deb_kernel || update_tar_kernel
+    [[ "${PLATFORM}" == "amlogic" ]] && {
+        update_uboot
+        update_initrd_addr
+    }
+    update_os_version
+
+    # Kernel update successful
+    sync && sleep 3
+    echo -e "${SUCCESS} Kernel update completed successfully. Rebooting the system..."
+    reboot
+fi

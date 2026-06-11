@@ -1,0 +1,200 @@
+#!/bin/bash
+#===========================================================================
+#
+# This file is licensed under the terms of the GNU General Public
+# License version 2. This program is licensed "as is" without any
+# warranty of any kind, whether express or implied.
+#
+# This file is a part of the Rebuild Armbian
+# https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Function: Install and manage Docker on Armbian
+# Copyright (C) 2021- https://github.com/unifreq/openwrt_packit
+# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Usage              : Command
+# Install Docker     : armbian-docker
+# Update  Docker     : armbian-docker update
+# Remove  Docker     : armbian-docker remove
+#
+#========================= Set default parameters ==========================
+#
+# Get custom firmware information
+ophub_release_file="/etc/ophub-release"
+#
+# Set font color
+STEPS="[\033[95m STEPS \033[0m]"
+INFO="[\033[94m INFO \033[0m]"
+SUCCESS="[\033[92m SUCCESS \033[0m]"
+OPTIONS="[\033[93m OPTIONS \033[0m]"
+ERROR="[\033[91m ERROR \033[0m]"
+#
+#===========================================================================
+
+# Encountered a serious error, abort the script execution
+error_msg() {
+    echo -e "${ERROR} ${1}"
+    exit 1
+}
+
+# Check system release information
+check_release() {
+    source "${ophub_release_file}"
+    VERSION_CODEID="${VERSION_CODEID}"     # ubuntu          -  debian
+    VERSION_CODENAME="${VERSION_CODENAME}" # resolute/noble  -  trixie/bookworm
+    if [[ -z "${VERSION_CODEID}" ]]; then
+        echo -ne "${OPTIONS} Please Input VERSION_CODEID Name [ubuntu/debian]: "
+        read VERSION_CODEID
+        VERSION_CODEID="${VERSION_CODEID}"
+    fi
+    if [[ -z "${VERSION_CODENAME}" ]]; then
+        echo -ne "${OPTIONS} Please Input VERSION_CODENAME Name [resolute/noble/trixie/bookworm]: "
+        read VERSION_CODENAME
+        VERSION_CODENAME="${VERSION_CODENAME}"
+    fi
+    echo -e "${INFO} VERSION_CODEID: [ ${VERSION_CODEID} ]"
+    echo -e "${INFO} VERSION_CODENAME: [ ${VERSION_CODENAME} ]"
+}
+
+# Select Docker installation source mirror
+select_source() {
+    echo -e "${STEPS} Select Docker download source..."
+    cat <<EOF
+-----------------------------------------------
+  ID  SOURCE
+-----------------------------------------------
+  1   docker.com (default)
+  2   aliyun.com
+  3   ustc.edu.cn
+  4   tencent.com
+-----------------------------------------------
+EOF
+    echo -ne "${OPTIONS} Please Input ID (1/2/3/4): "
+    read source_id
+    DOCKER_SOURCE="https://download.docker.com/linux"
+    if [[ "${source_id}" -eq "2" ]]; then
+        DOCKER_SOURCE="https://mirrors.aliyun.com/docker-ce/linux"
+    elif [[ "${source_id}" -eq "3" ]]; then
+        DOCKER_SOURCE="https://mirrors.ustc.edu.cn/docker-ce/linux"
+    elif [[ "${source_id}" -eq "4" ]]; then
+        DOCKER_SOURCE="https://mirrors.cloud.tencent.com/docker-ce/linux"
+    fi
+}
+
+# Install Docker engine and dependencies
+docker_install() {
+    echo -e "${STEPS} Initializing Docker installation environment..."
+
+    # Check release info
+    check_release
+    select_source
+
+    # Install the docker package
+    sudo apt-get update
+    sudo apt-get remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc
+    sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+
+    # Install GPG certificate
+    rm -f /usr/share/keyrings/docker-archive-keyring.gpg
+    # sudo curl -fsSL https://download.docker.com/linux/${VERSION_CODEID}/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    sudo curl -fsSL ${DOCKER_SOURCE}/${VERSION_CODEID}/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+    # Add software source information
+    rm -f /etc/apt/sources.list.d/docker.list
+    # echo "deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/${VERSION_CODEID} ${VERSION_CODENAME} stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    echo "deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] ${DOCKER_SOURCE}/${VERSION_CODEID} ${VERSION_CODENAME} stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+
+    echo -e "${STEPS} Installing Docker packages..."
+    sudo apt-get update
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    echo -e "${STEPS} Configuring Docker registry mirrors..."
+    [[ -d "/etc/docker" ]] || mkdir -p /etc/docker
+    if [[ "${source_id}" -ne "1" ]]; then
+        # Docker registry mirrors for China
+        sudo cat >/etc/docker/daemon.json <<EOF
+{
+  "bip": "172.31.0.1/24",
+  "data-root": "/var/lib/docker/",
+  "log-level": "warn",
+  "log-driver": "json-file",
+  "log-opts": {
+     "max-size": "10m",
+     "max-file": "5"
+   },
+  "registry-mirrors": [
+     "https://mirror.baidubce.com/",
+     "https://hub-mirror.c.163.com"
+   ]
+}
+EOF
+    else
+        # Docker official registry
+        sudo cat >/etc/docker/daemon.json <<EOF
+{
+  "bip": "172.31.0.1/24",
+  "data-root": "/var/lib/docker/",
+  "log-level": "warn",
+  "log-driver": "json-file",
+  "log-opts": {
+     "max-size": "10m",
+     "max-file": "5"
+   }
+}
+EOF
+    fi
+
+    sync
+    sudo systemctl daemon-reload
+    sudo systemctl restart docker
+
+    # Allow the current user to run Docker commands without sudo
+    sudo usermod -a -G docker $USER 2>/dev/null
+
+    sync && sleep 3
+    echo -e "${SUCCESS} Docker installed successfully."
+}
+
+# Update Docker packages
+docker_update() {
+    echo -e "${STEPS} Updating Docker packages..."
+
+    # Update the docker package
+    sudo apt-get update
+    sudo apt-get upgrade -y
+    sudo apt-get dist-upgrade -y
+    sudo apt-get --purge autoremove -y
+    sudo apt-get autoclean -y
+
+    echo -e "${SUCCESS} Docker updated successfully."
+    exit 0
+}
+
+# Remove Docker and clean up
+docker_remove() {
+    echo -e "${STEPS} Removing Docker..."
+
+    # Remove the docker package
+    sudo apt-get update
+    sudo apt-get remove --purge -y docker-ce docker-ce-cli containerd.io docker-compose* docker-ce-*
+    sudo apt-get --purge autoremove -y
+    sudo apt-get autoclean -y
+    #
+    sudo rm -rf /etc/docker 2>/dev/null
+    sudo rm -rf /var/lib/docker 2>/dev/null
+    sudo rm -rf /var/run/docker.sock 2>/dev/null
+
+    echo -e "${SUCCESS} Docker removed successfully."
+    exit 0
+}
+
+echo -e "${INFO} Welcome to the Docker Management Tool."
+# Check script permission
+[[ "$(id -u)" == "0" ]] || error_msg "Please run this script as root: [ sudo $0 ]"
+
+# Execute script assist functions
+case "${1}" in
+    update) docker_update ;;
+    remove) docker_remove ;;
+    *)      docker_install ;;
+esac

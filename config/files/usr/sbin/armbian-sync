@@ -1,0 +1,170 @@
+#!/bin/bash
+#==========================================================================
+#
+# This file is licensed under the terms of the GNU General Public
+# License version 2. This program is licensed "as is" without any
+# warranty of any kind, whether express or implied.
+#
+# This file is a part of the Rebuild Armbian
+# https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Description: Synchronize all service scripts from the repository
+# Copyright (C) 2022- https://github.com/unifreq/openwrt_packit
+# Copyright (C) 2022- https://github.com/ophub/amlogic-s9xxx-armbian
+#
+# Command: armbian-sync
+#
+#============================= Functions list =============================
+#
+# error_msg       : Output error message
+# check_release   : Check the config file
+# check_depends   : Check dependencies
+# sync_config     : Synchronize all service scripts
+#
+#==========================================================================
+#
+# Armbian firmware config info record file
+ophub_release_file="/etc/ophub-release"
+# The script files download repository
+script_repo="https://github.com/ophub/amlogic-s9xxx-armbian.git"
+script_dir="build-armbian/armbian-files"
+# Operation instruction and service storage path
+sbin_path="/usr/sbin"
+# Software service storage path
+share_path="/usr/share/ophub"
+# Openvfd service storage path
+openvfd_path="/usr/share/openvfd"
+#
+# Set font color
+STEPS="[\033[95m STEPS \033[0m]"
+INFO="[\033[94m INFO \033[0m]"
+SUCCESS="[\033[92m SUCCESS \033[0m]"
+OPTIONS="[\033[93m OPTIONS \033[0m]"
+ERROR="[\033[91m ERROR \033[0m]"
+#
+#==========================================================================
+
+# Show error message
+error_msg() {
+    echo -e "${ERROR} ${1}"
+    exit 1
+}
+
+# Check the release configuration file
+check_release() {
+    # Check release file
+    [[ -f "${ophub_release_file}" ]] || error_msg "Missing release file: [ ${ophub_release_file} ]"
+
+    # Get values
+    source "${ophub_release_file}"
+    PLATFORM="${PLATFORM}"
+    FDTFILE="${FDTFILE}"
+
+    # Auto-detect platform for early devices that lack the PLATFORM parameter
+    [[ -z "${PLATFORM}" && -n "${FDTFILE}" ]] && {
+        [[ ${FDTFILE:0:5} == "meson" ]] && PLATFORM="amlogic" || PLATFORM="rockchip"
+        echo "PLATFORM='${PLATFORM}'" >>${ophub_release_file}
+    }
+
+    echo -e "${INFO} Armbian PLATFORM: [ ${PLATFORM} ]"
+}
+
+# Check and install required dependencies
+check_depends() {
+    # Check the necessary dependencies for apt install
+    is_dpkg="0"
+    dpkg_packages=("git" "tar" "coreutils")
+    i="1"
+    for package in ${dpkg_packages[*]}; do
+        [[ -n "$(dpkg -l | awk '{print $2}' | grep -w "^${package}$" 2>/dev/null)" ]] || is_dpkg="1"
+        ((i++))
+    done
+    # Install missing packages
+    if [[ "${is_dpkg}" -eq "1" ]]; then
+        echo -e "${STEPS} Installing required dependencies..."
+        sudo apt-get update
+        sudo apt-get install -y ${dpkg_packages[*]}
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to install dependencies."
+    fi
+}
+
+# Synchronize all service scripts
+sync_config() {
+    echo -e "${STEPS} Start syncing all service scripts..."
+
+    # Download the latest scripts from the repository
+    echo -e "${INFO} Fetching latest scripts from repository..."
+    git_tmp_path="$(mktemp -d)"
+    # Ensure tmp dir is removed on any exit path (success / error / Ctrl-C)
+    trap '[[ -n "${git_tmp_path}" && -d "${git_tmp_path}" ]] && rm -rf "${git_tmp_path}" 2>/dev/null' EXIT INT TERM
+
+    cd ${git_tmp_path}
+    git init --quiet
+    git remote add origin ${script_repo}
+    git config core.sparseCheckout true
+    # Network tuning to survive flaky links
+    git config http.postBuffer 524288000
+    git config http.lowSpeedLimit 1024
+    git config http.lowSpeedTime 30
+    echo "${script_dir}/*" >>.git/info/sparse-checkout
+
+    # Retry git pull up to 3 times with exponential backoff (5s -> 10s -> 20s)
+    pull_ok="0"
+    pull_delay="5"
+    for pull_try in 1 2 3; do
+        if timeout 180 git pull --quiet --depth=1 origin main; then
+            pull_ok="1"
+            break
+        fi
+        if [[ "${pull_try}" -lt "3" ]]; then
+            echo -e "${INFO} git pull failed (attempt ${pull_try}/3), retrying in ${pull_delay}s..."
+            sleep "${pull_delay}"
+            pull_delay=$((pull_delay * 2))
+        fi
+    done
+    [[ "${pull_ok}" -ne "1" ]] && error_msg "Failed to download scripts from [ ${script_repo} ]."
+
+    # Update system command and service scripts
+    echo -e "${STEPS} Syncing system command and service scripts..."
+    [[ -d "${sbin_path}" ]] || mkdir -p ${sbin_path}
+    cp -af --no-preserve=ownership ${git_tmp_path}/${script_dir}/common-files${sbin_path}/* ${sbin_path}
+    [[ "${?}" -ne "0" ]] && error_msg "Failed to sync common [ ${sbin_path} ] scripts."
+    chmod +x ${sbin_path}/armbian-*
+
+    # Update software management scripts
+    echo -e "${STEPS} Syncing software management scripts..."
+    [[ -d "${share_path}" ]] || mkdir -p ${share_path}
+    cp -af --no-preserve=ownership ${git_tmp_path}/${script_dir}/common-files${share_path}/* ${share_path}
+    [[ "${?}" -ne "0" ]] && error_msg "Failed to sync common [ ${share_path} ] scripts."
+    find ${share_path} -type f -name '*.sh' -exec chmod +x {} \;
+
+    # Update Amlogic platform specific scripts
+    [[ "${PLATFORM}" == "amlogic" ]] && {
+        # Update Amlogic platform command and service scripts
+        echo -e "${STEPS} Syncing Amlogic platform-specific scripts..."
+        cp -af --no-preserve=ownership ${git_tmp_path}/${script_dir}/platform-files/amlogic/rootfs${sbin_path}/* ${sbin_path}
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to sync Amlogic [ ${sbin_path} ] scripts."
+        chmod +x ${sbin_path}/armbian-*
+
+        # Update OpenVFD LED display service scripts
+        echo -e "${STEPS} Syncing Amlogic OpenVFD service scripts..."
+        [[ -d "${openvfd_path}" ]] || mkdir -p ${openvfd_path}
+        cp -af --no-preserve=ownership ${git_tmp_path}/${script_dir}/platform-files/amlogic/rootfs${openvfd_path}/* ${openvfd_path}
+        [[ "${?}" -ne "0" ]] && error_msg "Failed to sync Amlogic [ ${openvfd_path} ] scripts."
+        chmod +x ${openvfd_path}/vfdservice
+    }
+
+    # Clean up temporary files
+    rm -rf ${git_tmp_path} 2>/dev/null
+
+    sync && sleep 3
+    echo -e "${SUCCESS} All service scripts synchronized successfully."
+    exit 0
+}
+
+# Check the release configuration file
+check_release
+# Check and install required dependencies
+check_depends
+# Synchronize all service scripts
+sync_config
