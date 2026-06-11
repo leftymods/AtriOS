@@ -167,7 +167,7 @@ function kernel_prepare_bare_repo_decide_shallow_or_full() {
 	if [[ ${ask_for_user_confirmation} -eq 1 && -t 0 ]]; then # -t 0 means stdin is a terminal
 		echo "--------------------------------------------------------------------------------------------------------------------" >&2
 		display_alert "Warning: no Kernel bare tree exists for version ${KERNEL_MAJOR_MINOR} - about to start downloading." "" "wrn"
-		display_alert "Armbian is going to use a '${decision}' git tree, which is around" "${estimated_dl_size_mib}MiB" ""
+		display_alert "AtriOS is going to use a '${decision}' git tree, which is around" "${estimated_dl_size_mib}MiB" ""
 		display_alert "This was decided due to" "${decision_why}" ""
 		display_alert "Benefits of using a '${decision}' git tree" "${benefits}" "info"
 		display_alert "Cons of using a '${decision}' git tree" "${cons}" "wrn"
@@ -209,9 +209,9 @@ function kernel_prepare_bare_repo_from_oras_gitball() {
 			run_host_command_logged mkdir -p "${kernel_git_bare_tree}"
 			run_host_command_logged git init "${kernel_git_bare_tree}"
 			run_host_command_logged git -C "${kernel_git_bare_tree}" remote add origin "${KERNELSOURCE}"
-			declare fetch_ref="${KERNELBRANCH#branch:}"
+			declare fetch_ref="${KERNELBRANCH##*:}"
 			display_alert "Fetching custom kernel into bare tree" "${KERNELSOURCE} ref: ${fetch_ref}" "info"
-			run_host_command_logged git -C "${kernel_git_bare_tree}" fetch --depth=1 origin "${fetch_ref}:refs/heads/${fetch_ref}"
+			run_host_command_logged git -C "${kernel_git_bare_tree}" fetch --depth=1 origin "${fetch_ref}"
 			run_host_command_logged touch "${kernel_git_bare_tree_done_marker}"
 			display_alert "Custom kernel bare tree ready" "${kernel_git_bare_tree}" "info"
 			return 0
