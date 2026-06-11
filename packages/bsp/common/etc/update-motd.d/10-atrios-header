@@ -104,7 +104,7 @@ fi
 
 # Use git-based build number for AtriOSvN format
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
-printf ' \e[1;92m%s\e[0;92mv%s\e[0m for %s running Armbian Linux \e[1;92m%s\e[0m\n' \
+printf ' \e[1;92m%s\e[0;92mv%s\e[0m for %s running Linux \e[1;92m%s\e[0m\n' \
 	"${VENDOR}" "${BUILD_NUMBER}" "${BOARD_NAME}" "${KERNELID}"
 
 # --- Hardware support status ---
