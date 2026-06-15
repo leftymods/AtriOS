@@ -49,10 +49,10 @@ function do_main_configuration() {
 
 	[[ -z $VENDORCOLOR ]] && VENDORCOLOR="247;16;0"                           # RGB values for MOTD logo
 	[[ -z $VENDORURL ]] && VENDORURL="https://duckduckgo.com/"
-	[[ -z $VENDORSUPPORT ]] && VENDORSUPPORT="https://community.AtriOS.com/"
+	[[ -z $VENDORSUPPORT ]] && VENDORSUPPORT="https://github.com/leftymods/CoreOS"
 	[[ -z $VENDORPRIVACY ]] && VENDORPRIVACY="https://duckduckgo.com/"
 	[[ -z $VENDORBUGS ]] && VENDORBUGS="https://AtriOS.atlassian.net/"
-	[[ -z $VENDORDOCS ]] && VENDORDOCS="https://docs.AtriOS.com/"
+	[[ -z $VENDORDOCS ]] && VENDORDOCS="https://github.com/leftymods/CoreOS"
 	[[ -z $VENDORLOGO ]] && VENDORLOGO="atrios-logo"
 	[[ -z $ROOTPWD ]] && ROOTPWD="1234"                                       # Must be changed @first login
 	[[ -z $MAINTAINER ]] && MAINTAINER="John Doe"                             # deb signature

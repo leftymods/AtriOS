@@ -16,7 +16,7 @@ function artifact_full_firmware_prepare_version() {
 	artifact_version="undetermined"        # outer scope
 	artifact_version_reason="undetermined" # outer scope
 
-	local AtriOS_FIRMWARE_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/armbian/firmware"}"
+	local AtriOS_FIRMWARE_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/leftymods/firmware"}"
 	local AtriOS_FIRMWARE_BRANCH="branch:${AtriOS_FIRMWARE_GIT_BRANCH:-"master"}"
 
 	debug_var AtriOS_FIRMWARE_SOURCE
