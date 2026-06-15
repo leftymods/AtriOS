@@ -15,14 +15,14 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("download-debs")
 
 
-def download_using_armbian(exec_cmd: list[str], params: dict, counter: int, total: int):
+def download_using_atrios(exec_cmd: list[str], params: dict, counter: int, total: int):
 	result = None
 	logs = []
 	try:
@@ -45,14 +45,14 @@ def download_using_armbian(exec_cmd: list[str], params: dict, counter: int, tota
 		)
 	except subprocess.CalledProcessError as e:
 		# decode utf8 manually, universal_newlines messes up bash encoding
-		logs = armbian_utils.parse_log_lines_from_stderr(e.stderr)
+		logs = atrios_utils.parse_log_lines_from_stderr(e.stderr)
 		log.error(
 			f"Error calling Armbian command: {' '.join(exec_cmd)} Error details: params: {params} - return code: {e.returncode} - stderr: {'; '.join(logs)}")
 		return {"in": params, "logs": logs, "download_ok": False}
 
 	if result is not None:
 		if result.stderr:
-			logs = armbian_utils.parse_log_lines_from_stderr(result.stderr)
+			logs = atrios_utils.parse_log_lines_from_stderr(result.stderr)
 
 	if counter % 10 == 0:
 		log.info(f"Processed {counter} / {total} download invocations.")
@@ -72,7 +72,7 @@ debs_output_dir = sys.argv[2]
 with open(debs_info_json_path) as f:
 	artifact_debs = json.load(f)
 
-if armbian_utils.get_from_env("ARMBIAN_RUNNING_IN_CONTAINER") == "yes":
+if atrios_utils.get_from_env("ATRIOS_RUNNING_IN_CONTAINER") == "yes":
 	log.warning("Not running in a container. download-debs might fail. Run this in a Docker-capable machine.")
 
 # use double the number of cpu cores, but not more than 16
@@ -110,8 +110,8 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor
 	every_future = []
 	for invocation in missing_invocations:
 		counter += 1
-		cmds = [(armbian_utils.find_armbian_src_path()["compile_sh_full_path"])] + invocation
-		future = executor.submit(download_using_armbian, cmds, {"i": invocation}, counter, total)
+		cmds = [(atrios_utils.find_atrios_src_path()["compile_sh_full_path"])] + invocation
+		future = executor.submit(download_using_atrios, cmds, {"i": invocation}, counter, total)
 		every_future.append(future)
 
 	log.info(f"Submitted {len(every_future)} download jobs to the parallel executor. Waiting for them to finish...")

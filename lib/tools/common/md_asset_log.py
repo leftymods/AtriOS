@@ -9,11 +9,11 @@
 #
 import logging
 
-from . import armbian_utils as armbian_utils
+from . import atrios_utils as armbian_utils
 
 log: logging.Logger = logging.getLogger("md_asset_log")
 
-ASSET_LOG_BASE = armbian_utils.get_from_env("ASSET_LOG_BASE")
+ASSET_LOG_BASE = atrios_utils.get_from_env("ASSET_LOG_BASE")
 
 
 def write_md_asset_log(file: str, contents: str):

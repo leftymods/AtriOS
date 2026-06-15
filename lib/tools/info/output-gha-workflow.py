@@ -13,11 +13,11 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 from common import gha
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("output-gha-matrix")
 
 
@@ -154,7 +154,7 @@ for artifact_id in info["artifacts"]:
 		runs_on = ["self-hosted", "Linux", "alfa"]
 
 	inputs = artifact['in']['original_inputs']
-	cmds = (["artifact"] + armbian_utils.map_to_armbian_params(inputs["vars"], True) + inputs["configs"])
+	cmds = (["artifact"] + atrios_utils.map_to_atrios_params(inputs["vars"], True) + inputs["configs"])
 	invocation = " ".join(cmds)
 
 	item = {"desc": desc, "runs_on": runs_on, "invocation": invocation}
@@ -195,7 +195,7 @@ for image_id in info["images"]:
 		runs_on = ["self-hosted", "Linux", f"image-{image_arch}"]
 
 	inputs = image['in']
-	cmds = (armbian_utils.map_to_armbian_params(inputs["vars"], True) + inputs["configs"])  # image build is "build" command, omitted here
+	cmds = (atrios_utils.map_to_atrios_params(inputs["vars"], True) + inputs["configs"])  # image build is "build" command, omitted here
 	invocation = " ".join(cmds)
 
 	iJob: ImageJob = ImageJob(f"image-{image_id}", f"{desc}")
@@ -214,7 +214,7 @@ for image_id in info["images"]:
 	wfFactory.add_job(iJob)
 
 # Convert gha_workflow to YAML
-gha_workflow_yaml = armbian_utils.to_yaml(wfFactory.render_yaml())
+gha_workflow_yaml = atrios_utils.to_yaml(wfFactory.render_yaml())
 
 # Write the YAML the target file
 with open(sys.argv[2], "w") as f:

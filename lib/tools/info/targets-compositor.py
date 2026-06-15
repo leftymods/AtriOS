@@ -14,10 +14,10 @@ import yaml
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("targets-compositor")
 
 # if targets.yaml is not present, process the board inventory:
@@ -230,7 +230,7 @@ for target_name in targets["targets"]:
 			#       skip-arches: [loong64, riscv64]
 			# Drops board entries whose ARCH matches skip-arches, or
 			# doesn't match only-arches. Board ARCH comes from the
-			# board/family conf (see armbian_utils.armbian_get_all_boards_inventory).
+			# board/family conf (see atrios_utils.atrios_get_all_boards_inventory).
 			# userspace inventory has its own internal arch filtering
 			# via the `arches:` key and is not touched here.
 			if key != "userspace" and isinstance(cfg, dict):

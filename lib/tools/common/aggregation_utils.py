@@ -11,7 +11,7 @@ import fnmatch
 import logging
 import os
 
-from . import armbian_utils as armbian_utils
+from . import atrios_utils as atrios_utils
 
 log: logging.Logger = logging.getLogger("aggregation_utils")
 
@@ -149,9 +149,9 @@ def remove_common_path_from_refs(merged):
 
 # Let's produce a list from the environment variables, complete with the references.
 def parse_env_for_list(env_name, fixed_ref=None):
-	env_list = armbian_utils.parse_env_for_tokens(env_name)
+	env_list = atrios_utils.parse_env_for_tokens(env_name)
 	if fixed_ref is None:
-		refs = armbian_utils.parse_env_for_tokens(env_name + "_REFS")
+		refs = atrios_utils.parse_env_for_tokens(env_name + "_REFS")
 		# Sanity check: the number of refs should be the same as the number of items in the list.
 		if len(env_list) != len(refs):
 			raise Exception(f"Expected {len(env_list)} refs for {env_name}, got {len(refs)}")

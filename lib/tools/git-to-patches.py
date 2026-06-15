@@ -12,24 +12,24 @@ import os.path
 # Let's use GitPython to query and manipulate the git repo
 from git import Repo, GitCmdObjectDB
 
-import common.armbian_utils as armbian_utils
+import common.atrios_utils as atrios_utils
 import common.patching_utils as patching_utils
 
 # Show the environment variables we've been called with
-armbian_utils.show_incoming_environment()
+atrios_utils.show_incoming_environment()
 
 # Parse env vars.
-SRC = armbian_utils.get_from_env_or_bomb("SRC")
-GIT_WORK_DIR = armbian_utils.get_from_env_or_bomb("GIT_WORK_DIR")
-GIT_BRANCH = armbian_utils.get_from_env_or_bomb("GIT_BRANCH")
-GIT_TARGET_REPLACE = armbian_utils.get_from_env("GIT_TARGET_REPLACE")
-GIT_TARGET_SEARCH = armbian_utils.get_from_env("GIT_TARGET_SEARCH")
+SRC = atrios_utils.get_from_env_or_bomb("SRC")
+GIT_WORK_DIR = atrios_utils.get_from_env_or_bomb("GIT_WORK_DIR")
+GIT_BRANCH = atrios_utils.get_from_env_or_bomb("GIT_BRANCH")
+GIT_TARGET_REPLACE = atrios_utils.get_from_env("GIT_TARGET_REPLACE")
+GIT_TARGET_SEARCH = atrios_utils.get_from_env("GIT_TARGET_SEARCH")
 
 git_repo = Repo(GIT_WORK_DIR, odbt=GitCmdObjectDB)
 
 
-BASE_GIT_REVISION = armbian_utils.get_from_env("BASE_GIT_REVISION")
-BASE_GIT_TAG = armbian_utils.get_from_env("BASE_GIT_TAG")
+BASE_GIT_REVISION = atrios_utils.get_from_env("BASE_GIT_REVISION")
+BASE_GIT_TAG = atrios_utils.get_from_env("BASE_GIT_TAG")
 if BASE_GIT_REVISION is None:
 	if BASE_GIT_TAG is None:
 		raise Exception("BASE_GIT_REVISION or BASE_GIT_TAG must be set")

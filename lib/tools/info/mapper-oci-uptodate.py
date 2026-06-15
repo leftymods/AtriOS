@@ -17,18 +17,18 @@ import oras.logger
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("mapper-oci-up-to-date")
 
 # Extra logging for ORAS library
-oras.logger.setup_logger(quiet=(not armbian_utils.is_debug()), debug=(armbian_utils.is_debug()))
+oras.logger.setup_logger(quiet=(not atrios_utils.is_debug()), debug=(atrios_utils.is_debug()))
 
 # Prepare Armbian cache
-armbian_paths = armbian_utils.find_armbian_src_path()
-cache_dir = armbian_paths["armbian_src_path"] + "/cache"
+atrios_paths = atrios_utils.find_atrios_src_path()
+cache_dir = atrios_paths["atrios_src_path"] + "/cache"
 oci_cache_dir_positive = cache_dir + "/oci/positive"
 os.makedirs(oci_cache_dir_positive, exist_ok=True)
 oci_cache_dir_positive = os.path.abspath(oci_cache_dir_positive)

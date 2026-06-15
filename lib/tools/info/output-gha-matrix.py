@@ -13,11 +13,11 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 from common import gha
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("output-gha-matrix")
 
 
@@ -75,14 +75,14 @@ def generate_matrix_images(info) -> list[dict]:
 	for image_id in info["images"]:
 		image = info["images"][image_id]
 
-		if armbian_utils.get_from_env("IMAGES_ONLY_OUTDATED_ARTIFACTS") == "yes":
+		if atrios_utils.get_from_env("IMAGES_ONLY_OUTDATED_ARTIFACTS") == "yes":
 			log.info(f"IMAGES_ONLY_OUTDATED_ARTIFACTS is set: outdated artifacts: {image['outdated_artifacts_count']} for image {image_id}")
 			skip = image["outdated_artifacts_count"] == 0
 			if skip:
 				log.warning(f"Skipping image {image_id} because it has no outdated artifacts")
 				continue
 
-		if armbian_utils.get_from_env("SKIP_IMAGES") == "yes":
+		if atrios_utils.get_from_env("SKIP_IMAGES") == "yes":
 			log.warning(f"Skipping image {image_id} because SKIP_IMAGES=yes")
 			continue
 
@@ -93,7 +93,7 @@ def generate_matrix_images(info) -> list[dict]:
 		image_arch = image['out']['ARCH']
 		runs_on = resolve_gha_runner_tags_via_pipeline_gha_config(inputs, "image", image_arch)
 
-		cmds = (armbian_utils.map_to_armbian_params(inputs["vars"], True) + inputs["configs"])  # image build is "build" command, omitted here
+		cmds = (atrios_utils.map_to_atrios_params(inputs["vars"], True) + inputs["configs"])  # image build is "build" command, omitted here
 		invocation = " ".join(cmds)
 
 		item = {"desc": desc, "runs_on": runs_on, "invocation": invocation}
@@ -124,7 +124,7 @@ def generate_matrix_artifacts(info):
 
 		runs_on = resolve_gha_runner_tags_via_pipeline_gha_config(inputs, artifact_name, artifact_arch)
 
-		cmds = (["artifact"] + armbian_utils.map_to_armbian_params(inputs["vars"], True) + inputs["configs"])
+		cmds = (["artifact"] + atrios_utils.map_to_atrios_params(inputs["vars"], True) + inputs["configs"])
 		invocation = " ".join(cmds)
 
 		item = {"desc": desc, "runs_on": runs_on, "invocation": invocation}

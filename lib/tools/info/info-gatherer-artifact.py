@@ -13,10 +13,10 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("info-gatherer-artifact")
 
 # read the targets.json file passed as first argument as a json object
@@ -32,6 +32,6 @@ for target in targets:
 	one_artifact["configs"] = (target["original_inputs"]["configs"])
 	artifacts.append(one_artifact)
 
-every_info = armbian_utils.gather_json_output_from_armbian("artifact-config-dump-json", artifacts)
+every_info = atrios_utils.gather_json_output_from_atrios("artifact-config-dump-json", artifacts)
 
 print(json.dumps(every_info, indent=4, sort_keys=True))

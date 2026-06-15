@@ -12,12 +12,12 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("board-inventory")
 
-all = armbian_utils.armbian_get_all_boards_inventory()
+all = atrios_utils.atrios_get_all_boards_inventory()
 log.info(f"Inventoried {len(all)} boards vs branch combinations.")
 print(json.dumps(all, indent=4, sort_keys=True))

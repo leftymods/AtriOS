@@ -27,7 +27,7 @@ REGEX_WHITESPACE_LINEBREAK_COMMA_SEMICOLON = r"[\s,;\n]+"
 
 ARMBIAN_BOARD_CONFIG_REGEX_GENERIC = r"^(?!\s)(?:[export |declare \-g]?)+([A-Z0-9_]+)=(?:'|\")(.*)(?:'|\")"
 
-log: logging.Logger = logging.getLogger("armbian_utils")
+log: logging.Logger = logging.getLogger("atrios_utils")
 
 
 def parse_env_for_tokens(env_name):
@@ -121,7 +121,7 @@ def to_yaml(gha_workflow):
 
 # I've to read the first line from the board file, that's the hardware description in a pound comment.
 # Also, 'KERNEL_TARGET="legacy,current,edge"' which we need to parse.
-def armbian_parse_board_file_for_static_info(board_file, board_id, core_or_userpatched):
+def atrios_parse_board_file_for_static_info(board_file, board_id, core_or_userpatched):
 	file_handle = open(board_file, 'r')
 	file_lines = file_handle.readlines()
 	file_handle.close()
@@ -184,7 +184,7 @@ def armbian_parse_board_file_for_static_info(board_file, board_id, core_or_userp
 	return ret
 
 
-def armbian_get_all_boards_list(boards_path):
+def atrios_get_all_boards_list(boards_path):
 	ret = {}
 	for file in glob.glob(boards_path + "/*.*"):
 		stem = Path(file).stem
@@ -193,22 +193,22 @@ def armbian_get_all_boards_list(boards_path):
 	return ret
 
 
-def find_armbian_src_path():
+def find_atrios_src_path():
 	# Find the location of compile.sh, relative to this Python script.
 	this_script_full_path = os.path.realpath(__file__)
 	log.debug(f"Real path to this script: '{this_script_full_path}'")
 
-	armbian_src_path = os.path.realpath(os.path.join(os.path.dirname(this_script_full_path), "..", "..", ".."))
-	log.debug(f"Real path to Armbian SRC '{armbian_src_path}'")
+	atrios_src_path = os.path.realpath(os.path.join(os.path.dirname(this_script_full_path), "..", "..", ".."))
+	log.debug(f"Real path to AtriOS SRC '{atrios_src_path}'")
 
-	compile_sh_full_path = os.path.realpath(os.path.join(armbian_src_path, "compile.sh"))
+	compile_sh_full_path = os.path.realpath(os.path.join(atrios_src_path, "compile.sh"))
 	log.debug(f"Real path to compile.sh '{compile_sh_full_path}'")
 
 	# Make sure it exists
 	if not os.path.exists(compile_sh_full_path):
 		raise Exception("Can't find compile.sh")
 
-	core_boards_path = os.path.realpath(os.path.join(armbian_src_path, "config", "boards"))
+	core_boards_path = os.path.realpath(os.path.join(atrios_src_path, "config", "boards"))
 	log.debug(f"Real path to core boards '{core_boards_path}'")
 
 	# Make sure it exists
@@ -216,18 +216,18 @@ def find_armbian_src_path():
 		raise Exception("Can't find config/boards")
 
 	# userspace stuff
-	core_distributions_path = os.path.realpath(os.path.join(armbian_src_path, "config", "distributions"))
+	core_distributions_path = os.path.realpath(os.path.join(atrios_src_path, "config", "distributions"))
 	log.debug(f"Real path to core distributions '{core_distributions_path}'")
 	# Make sure it exists
 	if not os.path.exists(core_distributions_path):
 		raise Exception("Can't find config/distributions")
 
 	# Desktop YAMLs live in an external repo (armbian/configng) that is
-	# fetched on demand into cache/sources/armbian-configng. If the cache
+	# fetched on demand into cache/sources/atrios-configng. If the cache
 	# is present, expose the YAML directory and parser path; otherwise
 	# the desktop inventory will come back empty (see
 	# get_desktop_inventory_for_distro).
-	configng_cache_dir = os.path.realpath(os.path.join(armbian_src_path, "cache", "sources", "armbian-configng"))
+	configng_cache_dir = os.path.realpath(os.path.join(atrios_src_path, "cache", "sources", "atrios-configng"))
 	configng_yaml_dir = os.path.join(configng_cache_dir, "tools", "modules", "desktops", "yaml")
 	configng_parser = os.path.join(configng_cache_dir, "tools", "modules", "desktops", "scripts", "parse_desktop_yaml.py")
 	if os.path.isdir(configng_yaml_dir) and os.path.isfile(configng_parser):
@@ -237,12 +237,12 @@ def find_armbian_src_path():
 		configng_yaml_dir = None
 		configng_parser = None
 
-	userpatches_boards_path = os.path.realpath(os.path.join(armbian_src_path, "userpatches", "config", "boards"))
+	userpatches_boards_path = os.path.realpath(os.path.join(atrios_src_path, "userpatches", "config", "boards"))
 	log.debug(f"Real path to userpatches boards '{userpatches_boards_path}'")
 	has_userpatches_path = os.path.exists(userpatches_boards_path)
 
 	return {
-		"armbian_src_path": armbian_src_path, "compile_sh_full_path": compile_sh_full_path, "core_boards_path": core_boards_path,
+		"atrios_src_path": atrios_src_path, "compile_sh_full_path": compile_sh_full_path, "core_boards_path": core_boards_path,
 		"core_distributions_path": core_distributions_path,
 		"configng_yaml_dir": configng_yaml_dir, "configng_parser": configng_parser,
 		"userpatches_boards_path": userpatches_boards_path, "has_userpatches_path": has_userpatches_path
@@ -326,8 +326,8 @@ def get_desktop_inventory_for_distro(distro, armbian_paths):
 	return ret
 
 
-def armbian_get_all_userspace_inventory():
-	armbian_paths = find_armbian_src_path()
+def atrios_get_all_userspace_inventory():
+	armbian_paths = find_atrios_src_path()
 	distros_path = armbian_paths["core_distributions_path"]
 	all_distros = []
 	# find and loop over every directory in distros_path, including symlinks
@@ -360,7 +360,7 @@ def armbian_get_all_userspace_inventory():
 _family_arch_cache: dict = {}
 
 
-def armbian_get_arch_for_family(family_name, armbian_src_path):
+def atrios_get_arch_for_family(family_name, atrios_src_path):
 	"""Return the ARCH declared by config/sources/families/<family>.conf
 	(after resolving any `source` includes), or None if the file or the
 	ARCH declaration is missing. Result is cached per family."""
@@ -368,7 +368,7 @@ def armbian_get_arch_for_family(family_name, armbian_src_path):
 		return None
 	if family_name in _family_arch_cache:
 		return _family_arch_cache[family_name]
-	family_file = os.path.join(armbian_src_path, "config", "sources", "families", f"{family_name}.conf")
+	family_file = os.path.join(atrios_src_path, "config", "sources", "families", f"{family_name}.conf")
 	arch = None
 	if os.path.isfile(family_file):
 		# Set ARCH via the EXIT trap so we still capture it even if the
@@ -392,14 +392,14 @@ def armbian_get_arch_for_family(family_name, armbian_src_path):
 	return arch
 
 
-def armbian_get_all_boards_inventory():
-	armbian_paths = find_armbian_src_path()
-	core_boards = armbian_get_all_boards_list(armbian_paths["core_boards_path"])
+def atrios_get_all_boards_inventory():
+	armbian_paths = find_atrios_src_path()
+	core_boards = atrios_get_all_boards_list(armbian_paths["core_boards_path"])
 
 	# first, gather the board_info for every core board. if any fail, stop.
 	info_for_board = {}
 	for board in core_boards.keys():
-		board_info = armbian_parse_board_file_for_static_info(core_boards[board], board, "core")
+		board_info = atrios_parse_board_file_for_static_info(core_boards[board], board, "core")
 		# Core boards must have the KERNEL_TARGET defined.
 		if "BOARD_POSSIBLE_BRANCHES" not in board_info:
 			raise Exception(f"Core board '{board}' must have KERNEL_TARGET defined")
@@ -407,9 +407,9 @@ def armbian_get_all_boards_inventory():
 
 	# Now go for the userpatched boards. Those can be all-new, or they can be patches to existing boards.
 	if armbian_paths["has_userpatches_path"]:
-		userpatched_boards = armbian_get_all_boards_list(armbian_paths["userpatches_boards_path"])
+		userpatched_boards = atrios_get_all_boards_list(armbian_paths["userpatches_boards_path"])
 		for uboard_name in userpatched_boards.keys():
-			uboard = armbian_parse_board_file_for_static_info(userpatched_boards[uboard_name], uboard_name, "userpatched")
+			uboard = atrios_parse_board_file_for_static_info(userpatched_boards[uboard_name], uboard_name, "userpatched")
 			is_new_board = not (uboard_name in info_for_board)
 			if is_new_board:
 				log.debug(f"Userpatched Board {uboard_name} is new")
@@ -434,7 +434,7 @@ def armbian_get_all_boards_inventory():
 		arch = top_vars.get("ARCH")
 		if not arch:
 			family = top_vars.get("BOARDFAMILY")
-			arch = armbian_get_arch_for_family(family, armbian_paths["armbian_src_path"])
+			arch = atrios_get_arch_for_family(family, armbian_paths["atrios_src_path"])
 			if arch:
 				top_vars["ARCH"] = arch
 		if arch:
@@ -445,7 +445,7 @@ def armbian_get_all_boards_inventory():
 	return info_for_board
 
 
-def map_to_armbian_params(map_params, quote_params=False) -> list[str]:
+def map_to_atrios_params(map_params, quote_params=False) -> list[str]:
 	ret = []
 	for param in map_params:
 		ret.append(param + "=" + map_params[param])
@@ -454,7 +454,7 @@ def map_to_armbian_params(map_params, quote_params=False) -> list[str]:
 	return ret
 
 
-def armbian_run_command_and_parse_json_from_stdout(exec_cmd: list[str], params: dict):
+def atrios_run_command_and_parse_json_from_stdout(exec_cmd: list[str], params: dict):
 	result = None
 	logs = []
 	try:
@@ -532,8 +532,8 @@ def parse_log_lines_from_stderr(lines_stderr: str):
 	return result
 
 
-def gather_json_output_from_armbian(command: str, targets: list[dict]):
-	armbian_paths = find_armbian_src_path()
+def gather_json_output_from_atrios(command: str, targets: list[dict]):
+	armbian_paths = find_atrios_src_path()
 	# now loop over gathered infos
 	every_info = []
 	use_parallel: bool = True
@@ -571,8 +571,8 @@ def get_info_for_one_build(armbian_paths: dict[str, str], command: str, params: 
 	try:
 		try:
 			sh: str = armbian_paths["compile_sh_full_path"]
-			cmds: list[str] = ([sh] + [command] + map_to_armbian_params(params["vars"]) + params["configs"])
-			parsed = armbian_run_command_and_parse_json_from_stdout(cmds, params)
+			cmds: list[str] = ([sh] + [command] + map_to_atrios_params(params["vars"]) + params["configs"])
+			parsed = atrios_run_command_and_parse_json_from_stdout(cmds, params)
 			return parsed
 		except BaseException as e:
 			log.error(f"Failed get info for build '{command}' '{params}': '{e}'", exc_info=True)

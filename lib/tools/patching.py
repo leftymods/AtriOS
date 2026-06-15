@@ -17,7 +17,7 @@ from git import GitCmdObjectDB
 from git import InvalidGitRepositoryError
 from git import Repo
 
-import common.armbian_utils as armbian_utils
+import common.atrios_utils as atrios_utils
 import common.dt_makefile_patcher as dt_makefile_patcher
 import common.patching_utils as patching_utils
 from common.md_asset_log import SummarizedMarkdownWriter
@@ -25,11 +25,11 @@ from common.md_asset_log import get_gh_pages_workflow_script
 from common.patching_config import PatchingConfig
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("patching")
 
 # Show the environment variables we've been called with
-armbian_utils.show_incoming_environment()
+atrios_utils.show_incoming_environment()
 
 # @TODO: test that "patch --version" is >= 2.7.6 using a subprocess and parsing the output.
 
@@ -38,17 +38,17 @@ CONST_CONFIG_YAML_FILE: str = '0000.patching_config.yaml'
 
 # Let's start by reading environment variables.
 # Those are always needed, and we should bomb if they're not set.
-SRC = armbian_utils.get_from_env_or_bomb("SRC")
-PATCH_TYPE = armbian_utils.get_from_env_or_bomb("PATCH_TYPE")
-PATCH_DIRS_TO_APPLY = armbian_utils.parse_env_for_tokens("PATCH_DIRS_TO_APPLY")
-APPLY_PATCHES = armbian_utils.get_from_env("APPLY_PATCHES")
-PATCHES_TO_GIT = armbian_utils.get_from_env("PATCHES_TO_GIT")
-REWRITE_PATCHES = armbian_utils.get_from_env("REWRITE_PATCHES")
-REWRITE_PATCHES_NEEDING_REBASE = armbian_utils.get_from_env("REWRITE_PATCHES_NEEDING_REBASE")
-SPLIT_PATCHES = armbian_utils.get_from_env("SPLIT_PATCHES")
-ALLOW_RECREATE_EXISTING_FILES = armbian_utils.get_from_env("ALLOW_RECREATE_EXISTING_FILES")
-GIT_ARCHEOLOGY = armbian_utils.get_from_env("GIT_ARCHEOLOGY")
-FAST_ARCHEOLOGY = armbian_utils.get_from_env("FAST_ARCHEOLOGY")
+SRC = atrios_utils.get_from_env_or_bomb("SRC")
+PATCH_TYPE = atrios_utils.get_from_env_or_bomb("PATCH_TYPE")
+PATCH_DIRS_TO_APPLY = atrios_utils.parse_env_for_tokens("PATCH_DIRS_TO_APPLY")
+APPLY_PATCHES = atrios_utils.get_from_env("APPLY_PATCHES")
+PATCHES_TO_GIT = atrios_utils.get_from_env("PATCHES_TO_GIT")
+REWRITE_PATCHES = atrios_utils.get_from_env("REWRITE_PATCHES")
+REWRITE_PATCHES_NEEDING_REBASE = atrios_utils.get_from_env("REWRITE_PATCHES_NEEDING_REBASE")
+SPLIT_PATCHES = atrios_utils.get_from_env("SPLIT_PATCHES")
+ALLOW_RECREATE_EXISTING_FILES = atrios_utils.get_from_env("ALLOW_RECREATE_EXISTING_FILES")
+GIT_ARCHEOLOGY = atrios_utils.get_from_env("GIT_ARCHEOLOGY")
+FAST_ARCHEOLOGY = atrios_utils.get_from_env("FAST_ARCHEOLOGY")
 apply_patches = APPLY_PATCHES == "yes"
 apply_patches_to_git = PATCHES_TO_GIT == "yes"
 git_archeology = GIT_ARCHEOLOGY == "yes"
@@ -62,10 +62,10 @@ apply_options = {
 }
 
 # Those are optional.
-GIT_WORK_DIR = armbian_utils.get_from_env("GIT_WORK_DIR")
-BOARD = armbian_utils.get_from_env("BOARD")
-TARGET = armbian_utils.get_from_env("TARGET")
-USERPATCHES_PATH = armbian_utils.get_from_env("USERPATCHES_PATH")
+GIT_WORK_DIR = atrios_utils.get_from_env("GIT_WORK_DIR")
+BOARD = atrios_utils.get_from_env("BOARD")
+TARGET = atrios_utils.get_from_env("TARGET")
+USERPATCHES_PATH = atrios_utils.get_from_env("USERPATCHES_PATH")
 
 # The exit exception, if any.
 exit_with_exception: "Exception | None" = None
@@ -122,8 +122,8 @@ for root_type in CONST_ROOT_TYPES_CONFIG_ORDER:
 pconfig: PatchingConfig = PatchingConfig(all_yaml_config_files)
 
 PATCH_FILES_FIRST: list[patching_utils.PatchFileInDir] = []
-EXTRA_PATCH_FILES_FIRST: list[str] = armbian_utils.parse_env_for_tokens("EXTRA_PATCH_FILES_FIRST")
-EXTRA_PATCH_HASHES_FIRST: list[str] = armbian_utils.parse_env_for_tokens("EXTRA_PATCH_HASHES_FIRST")
+EXTRA_PATCH_FILES_FIRST: list[str] = atrios_utils.parse_env_for_tokens("EXTRA_PATCH_FILES_FIRST")
+EXTRA_PATCH_HASHES_FIRST: list[str] = atrios_utils.parse_env_for_tokens("EXTRA_PATCH_HASHES_FIRST")
 
 for patch_file in EXTRA_PATCH_FILES_FIRST:
 	# if the file does not exist, bomb.
@@ -262,9 +262,9 @@ if apply_patches:
 	GIT_WORK_DIR_REL_SRC = os.path.relpath(GIT_WORK_DIR, SRC)
 	log.debug(f"Git status of '{GIT_WORK_DIR_REL_SRC}': '{status}'.")
 
-	BRANCH_FOR_PATCHES = armbian_utils.get_from_env_or_bomb("BRANCH_FOR_PATCHES")
-	BASE_GIT_REVISION = armbian_utils.get_from_env("BASE_GIT_REVISION")
-	BASE_GIT_TAG = armbian_utils.get_from_env("BASE_GIT_TAG")
+	BRANCH_FOR_PATCHES = atrios_utils.get_from_env_or_bomb("BRANCH_FOR_PATCHES")
+	BASE_GIT_REVISION = atrios_utils.get_from_env("BASE_GIT_REVISION")
+	BASE_GIT_TAG = atrios_utils.get_from_env("BASE_GIT_TAG")
 	if BASE_GIT_REVISION is None:
 		if BASE_GIT_TAG is None:
 			raise Exception("BASE_GIT_REVISION or BASE_GIT_TAG must be set")

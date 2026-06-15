@@ -13,10 +13,10 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("repo-reprepro")
 
 # This is called like this:
@@ -31,7 +31,7 @@ reprepro_conf_options_fn = os.path.join(reprepro_conf_output_dir, f"options")
 reprepro_output_script_fn = os.path.join(reprepro_script_output_dir, f"reprepro.sh")
 
 # From the environment...
-gpg_keyid = armbian_utils.get_from_env("REPO_GPG_KEYID")
+gpg_keyid = atrios_utils.get_from_env("REPO_GPG_KEYID")
 
 # read the json file
 with open(debs_info_json_path) as f:

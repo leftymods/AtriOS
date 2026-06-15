@@ -19,36 +19,36 @@ import logging
 import os
 
 import common.aggregation_utils as util
-import common.armbian_utils as armbian_utils
+import common.atrios_utils as atrios_utils
 from common.md_asset_log import SummarizedMarkdownWriter
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("aggregation")
 
 # Read SRC from the environment, treat it.
-armbian_build_directory = armbian_utils.get_from_env_or_bomb("SRC")
+armbian_build_directory = atrios_utils.get_from_env_or_bomb("SRC")
 if not os.path.isdir(armbian_build_directory):
 	raise Exception("SRC is not a directory")
 
 # OUTPUT from the environment, treat it.
-output_file = armbian_utils.get_from_env_or_bomb("OUTPUT")
+output_file = atrios_utils.get_from_env_or_bomb("OUTPUT")
 with open(output_file, "w") as bash:
 	bash.write("")
 
-BUILD_DESKTOP = armbian_utils.yes_or_no_or_bomb(armbian_utils.get_from_env_or_bomb("BUILD_DESKTOP"))
-BUILD_MINIMAL = armbian_utils.yes_or_no_or_bomb(armbian_utils.get_from_env_or_bomb("BUILD_MINIMAL"))
+BUILD_DESKTOP = atrios_utils.yes_or_no_or_bomb(atrios_utils.get_from_env_or_bomb("BUILD_DESKTOP"))
+BUILD_MINIMAL = atrios_utils.yes_or_no_or_bomb(atrios_utils.get_from_env_or_bomb("BUILD_MINIMAL"))
 INCLUDE_EXTERNAL_PACKAGES = True
-ARCH = armbian_utils.get_from_env_or_bomb("ARCH")
-DESKTOP_ENVIRONMENT = armbian_utils.get_from_env("DESKTOP_ENVIRONMENT")
-DESKTOP_TIER = armbian_utils.get_from_env("DESKTOP_TIER")
-RELEASE = armbian_utils.get_from_env_or_bomb("RELEASE")  # "kinetic"
-USERPATCHES_PATH = armbian_utils.get_from_env_or_bomb("USERPATCHES_PATH")
+ARCH = atrios_utils.get_from_env_or_bomb("ARCH")
+DESKTOP_ENVIRONMENT = atrios_utils.get_from_env("DESKTOP_ENVIRONMENT")
+DESKTOP_TIER = atrios_utils.get_from_env("DESKTOP_TIER")
+RELEASE = atrios_utils.get_from_env_or_bomb("RELEASE")  # "kinetic"
+USERPATCHES_PATH = atrios_utils.get_from_env_or_bomb("USERPATCHES_PATH")
 
 # Show the environment
-armbian_utils.show_incoming_environment()
+atrios_utils.show_incoming_environment()
 
-util.SELECTED_CONFIGURATION = armbian_utils.get_from_env_or_bomb("SELECTED_CONFIGURATION")  # "cli_standard"
+util.SELECTED_CONFIGURATION = atrios_utils.get_from_env_or_bomb("SELECTED_CONFIGURATION")  # "cli_standard"
 util.SRC = armbian_build_directory
 
 util.AGGREGATION_SEARCH_ROOT_ABSOLUTE_DIRS = [

@@ -7,14 +7,14 @@ import oras.logger
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("mapper-oci-up-to-date")
 
 # Extra logging for ORAS library
-oras.logger.setup_logger(quiet=(not armbian_utils.is_debug()), debug=(armbian_utils.is_debug()))
+oras.logger.setup_logger(quiet=(not atrios_utils.is_debug()), debug=(atrios_utils.is_debug()))
 
 client = oras.client.OrasClient(insecure=False)
 log.info(f"OCI client version: {client.version()}")

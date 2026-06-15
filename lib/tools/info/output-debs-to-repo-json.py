@@ -13,10 +13,10 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("output-debs-to-repo-json")
 
 
@@ -92,7 +92,7 @@ def generate_deb_summary(info):
 
 		inputs = artifact["in"]["original_inputs"]
 		# get the invocation, in array format. "what do I run to download the debs" for this artifact. args are NOT quoted.
-		invocation = (["download-artifact"] + armbian_utils.map_to_armbian_params(inputs["vars"], False) + inputs["configs"])
+		invocation = (["download-artifact"] + atrios_utils.map_to_atrios_params(inputs["vars"], False) + inputs["configs"])
 
 		item = {
 			"id": artifact_id, "desc": desc,

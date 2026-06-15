@@ -14,17 +14,17 @@
 
 import logging
 
-import common.armbian_utils as armbian_utils
+import common.atrios_utils as atrios_utils
 import common.dt_makefile_patcher as dt_makefile_patcher
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("patching")
 
 # Show the environment variables we've been called with
-armbian_utils.show_incoming_environment()
+atrios_utils.show_incoming_environment()
 
-GIT_WORK_DIR = armbian_utils.get_from_env("GIT_WORK_DIR", "/Volumes/LinuxDev/mainline-kernel-3rd-party-rebase")
-DT_REL_DIR = armbian_utils.get_from_env("DT_REL_DIR", "arch/arm64/boot/dts/amlogic")
+GIT_WORK_DIR = atrios_utils.get_from_env("GIT_WORK_DIR", "/Volumes/LinuxDev/mainline-kernel-3rd-party-rebase")
+DT_REL_DIR = atrios_utils.get_from_env("DT_REL_DIR", "arch/arm64/boot/dts/amlogic")
 
 dt_makefile_patcher.auto_patch_dt_makefile(GIT_WORK_DIR, DT_REL_DIR)

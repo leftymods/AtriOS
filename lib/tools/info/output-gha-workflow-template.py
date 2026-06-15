@@ -13,12 +13,12 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common import armbian_utils
+from common import atrios_utils
 from jinja2 import Environment
 from jinja2 import StrictUndefined
 
 # Prepare logging
-armbian_utils.setup_logging()
+atrios_utils.setup_logging()
 log: logging.Logger = logging.getLogger("output-gha-workflow-template")
 
 # Parse cmdline
