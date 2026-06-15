@@ -120,7 +120,7 @@ function userpatch_create() {
 		"-1" "HEAD" "--stdout"
 		"--unified=5"    # force 5 lines of diff context
 		"--keep-subject" # do not add a prefix to the subject "[PATCH] "
-		'--signature' "'Created with AtriOS build tools https://github.com/AtriOS/build'"
+		'--signature' "'Created with AtriOS build tools https://github.com/leftymods/CoreOS'"
 		'--stat=120'            # 'wider' stat output; default is 80
 		'--stat-graph-width=10' # shorten the diffgraph graph part, it's too long
 		"--zero-commit"         # Output an all-zero hash in each patch’s From header instead of the hash of the commit.

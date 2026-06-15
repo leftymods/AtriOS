@@ -14,7 +14,7 @@
 function fingerprint_image() {
 	cat <<- EOF > "${1}"
 		---------------------------------------------------------------------------
-		Generated with AtriOS(tm) build framework https://github.com/AtriOS/build
+		Generated with AtriOS(tm) build framework https://github.com/leftymods/CoreOS
 		---------------------------------------------------------------------------
 		Vendor:         ${VENDOR}
 		Revision:       $REVISION

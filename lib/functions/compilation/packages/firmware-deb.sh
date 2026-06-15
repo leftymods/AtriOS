@@ -18,7 +18,7 @@ function compile_firmware() {
 	declare fw_dir="atrios-firmware${FULL}"
 	mkdir -p "${fw_temp_dir}/${fw_dir}/lib/firmware"
 
-	local AtriOS_FIRMWARE_GIT_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/AtriOS/firmware"}"
+	local AtriOS_FIRMWARE_GIT_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/armbian/firmware"}"
 	local AtriOS_FIRMWARE_GIT_BRANCH="${AtriOS_FIRMWARE_GIT_BRANCH:-"master"}"
 
 	# Fetch AtriOS firmware from git.

@@ -434,7 +434,7 @@ driver_rtl8852bs() {
 
 		display_alert "Adding" "Wireless drivers for Realtek 8852BS SDIO chipset ${rtl8852bs_ver}" "info"
 
-		fetch_from_repo "$GITHUB_SOURCE/AtriOS/wifi-rtl8852bs" "rtl8852bs" "${rtl8852bs_ver}" "yes" # https://github.com/AtriOS/wifi-rtl8852bs
+		fetch_from_repo "$GITHUB_SOURCE/AtriOS/wifi-rtl8852bs" "rtl8852bs" "${rtl8852bs_ver}" "yes" # https://github.com/armbian/wifi-rtl8852bs
 		cd "$kerneldir" || exit
 		rm -rf "$kerneldir/drivers/net/wireless/realtek/rtl8852bs"
 		mkdir -p "$kerneldir/drivers/net/wireless/realtek/rtl8852bs/"
@@ -753,7 +753,7 @@ driver_rtl8723DS() {
 
 		display_alert "Adding" "Wireless drivers for Realtek 8723DS chipsets ${rtl8723dsver}" "info"
 
-		fetch_from_repo "$GITHUB_SOURCE/AtriOS/rtl8723ds" "rtl8723ds" "${rtl8723dsver}" "yes" # https://github.com/AtriOS/rtl8723ds
+		fetch_from_repo "$GITHUB_SOURCE/AtriOS/rtl8723ds" "rtl8723ds" "${rtl8723dsver}" "yes" # https://github.com/armbian/rtl8723ds
 		cd "$kerneldir" || exit
 		rm -rf "$kerneldir/drivers/net/wireless/rtl8723ds"
 		mkdir -p "$kerneldir/drivers/net/wireless/rtl8723ds/"
