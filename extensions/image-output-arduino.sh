@@ -4,13 +4,13 @@
 function post_family_config__fetch_qcombin() {
 	[[ "${CONFIG_DEFS_ONLY}" == "yes" ]] && return 0 # skip fetch during config-dump-json (no $HOME, no network needed)
 	display_alert "Fetching qcombin" "${BOARD}" "info"
-	fetch_from_repo "https://github.com/armbian/qcombin" "qcombin" "branch:main"
+	fetch_from_repo "https://github.com/AtriOS/qcombin" "qcombin" "branch:main"
 }
 
 declare -g ARDUINO_ROOTFS_LOOP=""
 declare -g ARDUINO_ROOTFS_MOUNT=""
 
-# Convert standard Armbian image into a QDL-flashable archive for Arduino UNO Q
+# Convert standard AtriOS image into a QDL-flashable archive for Arduino UNO Q
 function post_build_image__900_convert_to_arduino_img() {
 	[[ -z $version ]] && exit_with_error "version is not set"
 

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function maybe_make_clean_uboot() {
 	if [[ $CLEAN_LEVEL == *make-uboot* ]]; then
@@ -131,8 +131,8 @@ function compile_uboot_target() {
 		# $BOOTDELAY can be set in board family config, ensure autoboot can be stopped even if set to 0
 		[[ $BOOTDELAY == 0 ]] && echo -e "CONFIG_ZERO_BOOTDELAY_CHECK=y" >> .config
 		[[ -n $BOOTDELAY ]] && sed -i "s/^CONFIG_BOOTDELAY=.*/CONFIG_BOOTDELAY=${BOOTDELAY}/" .config || [[ -f .config ]] && echo "CONFIG_BOOTDELAY=${BOOTDELAY}" >> .config
-		# armbian specifics u-boot settings; configure the version so UART boot logs show exactly what's in there
-		[[ -f .config ]] && sed -i "s/CONFIG_LOCALVERSION=\"\"/CONFIG_LOCALVERSION=\"_armbian-${artifact_version}\"/g" .config
+		# AtriOS specifics u-boot settings; configure the version so UART boot logs show exactly what's in there
+		[[ -f .config ]] && sed -i "s/CONFIG_LOCALVERSION=\"\"/CONFIG_LOCALVERSION=\"_AtriOS-${artifact_version}\"/g" .config
 		[[ -f .config ]] && sed -i 's/CONFIG_LOCALVERSION_AUTO=.*/# CONFIG_LOCALVERSION_AUTO is not set/g' .config
 	else
 		display_alert "scripts/config found" "u-boot ${version} $BOOTCONFIG ${target_make}" "debug"
@@ -149,9 +149,9 @@ function compile_uboot_target() {
 			run_host_command_logged scripts/config --set-val CONFIG_BOOTDELAY "${BOOTDELAY}"
 		fi
 
-		# Include Armbian version so UART bootlogs are drastically more useful
+		# Include AtriOS version so UART bootlogs are drastically more useful
 		run_host_command_logged ./scripts/config --disable "LOCALVERSION_AUTO"
-		run_host_command_logged ./scripts/config --set-str "LOCALVERSION" "_armbian-${artifact_version}" # crazy quotes!
+		run_host_command_logged ./scripts/config --set-str "LOCALVERSION" "_AtriOS-${artifact_version}" # crazy quotes!
 	fi
 
 	if [[ "${UBOOT_DEBUGGING}" == "yes" ]]; then
@@ -244,7 +244,7 @@ function compile_uboot_target() {
 		"CFLAGS='${uboot_cflags}'"
 		"KCFLAGS='${uboot_cflags}'"
 		"CCACHE_BASEDIR=$(pwd)"
-		"PYTHONPATH=\"${PYTHON3_INFO[MODULES_PATH]}:${PYTHONPATH}\"" # Insert the pip modules downloaded by Armbian into PYTHONPATH (needed e.g. for pyelftools)
+		"PYTHONPATH=\"${PYTHON3_INFO[MODULES_PATH]}:${PYTHONPATH}\"" # Insert the pip modules downloaded by AtriOS into PYTHONPATH (needed e.g. for pyelftools)
 	)
 
 	# Pass the ccache directories explicitly, since we'll run under "env -i"
@@ -259,7 +259,7 @@ function compile_uboot_target() {
 	cross_compile="CROSS_COMPILE=\"${CCACHE:+$CCACHE }$UBOOT_COMPILER\""
 	# When UBOOT_TOOLCHAIN2 is set, the board's uboot_custom_postprocess handles compilers;
 	# pass a harmless dummy env var since empty make parameters cause errors
-	[[ -n $UBOOT_TOOLCHAIN2 ]] && cross_compile="ARMBIAN=foe"
+	[[ -n $UBOOT_TOOLCHAIN2 ]] && cross_compile="AtriOS=foe"
 
 	call_extension_method "uboot_make_config" <<- 'UBOOT_MAKE_CONFIG'
 		*Hook to customize u-boot make environment*
@@ -494,7 +494,7 @@ function compile_uboot() {
 
 	# declare -f on non-defined function does not do anything (but exits with errors, so ignore them with "|| true")
 	cat <<- EOF > "${uboottempdir}/usr/lib/u-boot/platform_install.sh"
-		# Armbian u-boot install script for linux-u-boot-${BOARD}-${BRANCH} ${artifact_version}
+		# AtriOS u-boot install script for linux-u-boot-${BOARD}-${BRANCH} ${artifact_version}
 		# This file provides functions for deploying u-boot to a block device.
 		DIR=/usr/lib/$uboot_name
 		$(declare -f write_uboot_platform || true)
@@ -544,9 +544,9 @@ function compile_uboot() {
 		Maintainer: $MAINTAINER <$MAINTAINERMAIL>
 		Section: kernel
 		Priority: optional
-		Provides: armbian-u-boot
-		Replaces: armbian-u-boot
-		Conflicts: armbian-u-boot, u-boot-sunxi
+		Provides: atrios-u-boot
+		Replaces: atrios-u-boot
+		Conflicts: atrios-u-boot, u-boot-sunxi
 		Description: Das U-Boot for ${BOARD}
 		 ${artifact_version_reason:-"${version}"}
 	EOF
@@ -569,7 +569,7 @@ function compile_uboot() {
 }
 
 function uboot_postinst_base() {
-	# Source the armbian-release information file
+	# Source the atrios-release information file
 	# shellcheck source=/dev/null
 	[ -f /etc/atrios-release ] && . /etc/atrios-release
 	# shellcheck source=/dev/null

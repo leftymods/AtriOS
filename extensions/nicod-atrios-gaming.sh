@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
-# Creates a launcher script for NicoD's armbian-gaming project.
+# Creates a launcher script for NicoD's AtriOS-gaming project.
 # Script will clone (or pull if already cloned) from NicoD's repo and run his script.
 
 function extension_prepare_config__800_nicod_launcher() {
@@ -13,22 +13,22 @@ function extension_prepare_config__800_nicod_launcher() {
 }
 
 function pre_customize_image__add_nicod_launcher() {
-	display_alert "Adding NicoD's armbian-gaming launcher" "${EXTENSION}" "info"
+	display_alert "Adding NicoD's AtriOS-gaming launcher" "${EXTENSION}" "info"
 
 	local launcher_dir="${SDCARD}/usr/local/bin"
-	local launcher_file="${launcher_dir}/nicod-armbian-gaming"
+	local launcher_file="${launcher_dir}/nicod-atrios-gaming"
 	run_host_command_logged mkdir -pv "${launcher_dir}"
 
 	cat <<- 'NICOD_GAMING_LAUNCHER_SCRIPT' > "${launcher_file}"
 		#!/usr/bin/env bash
-		if [[ ! -d ~/armbian-gaming ]]; then
-			git clone https://github.com/NicoD-SBC/armbian-gaming.git ~/armbian-gaming
+		if [[ ! -d ~/AtriOS-gaming ]]; then
+			git clone https://github.com/NicoD-SBC/AtriOS-gaming.git ~/AtriOS-gaming
 		fi
-		cd ~/armbian-gaming
+		cd ~/AtriOS-gaming
 		git pull || true
-		bash armbian-gaming.sh "$@"
+		bash AtriOS-gaming.sh "$@"
 	NICOD_GAMING_LAUNCHER_SCRIPT
 
 	run_host_command_logged chmod -v +x "${launcher_file}"
-	display_alert "Added NicoD's armbian-gaming launcher" "${EXTENSION}" "info"
+	display_alert "Added NicoD's AtriOS-gaming launcher" "${EXTENSION}" "info"
 }

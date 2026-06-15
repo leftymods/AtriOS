@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 #!/usr/bin/env bash
 
@@ -22,16 +22,16 @@ function interactive_config_prepare_terminal() {
 	# We'll use this title on all menus
 	declare current_year
 	current_year=$(date +%Y)
-	declare -g -r backtitle="Armbian Linux build framework, https://www.armbian.com | (c) 2025-2026 leftymods "
-	declare -A -g ARMBIAN_INTERACTIVE_CONFIGS=() # An associative array of all interactive configurations
+	declare -g -r backtitle="AtriOS Linux build framework, https://www.AtriOS.com | (c) 2025-2026 leftymods "
+	declare -A -g AtriOS_INTERACTIVE_CONFIGS=() # An associative array of all interactive configurations
 }
 
-# Set config variable and ARMBIAN_INTERACTIVE_CONFIGS in a consistent way
+# Set config variable and AtriOS_INTERACTIVE_CONFIGS in a consistent way
 # $1: variable name
 # $2: variable value
 function set_interactive_config_value() {
 	declare -g "${1}=${2}"
-	ARMBIAN_INTERACTIVE_CONFIGS["${1}"]="${2}"
+	AtriOS_INTERACTIVE_CONFIGS["${1}"]="${2}"
 }
 
 function interactive_finish() {
@@ -51,7 +51,7 @@ function interactive_config_ask_kernel_configure() {
 	[[ -n ${KERNEL_CONFIGURE} ]] && return 0
 	options+=("no" "Do not change the kernel configuration")
 	options+=("yes" "Show a kernel configuration menu before compilation")
-	#options+=("prebuilt" "Use precompiled packages (maintained hardware only)") # @TODO armbian-next does not support this, I think.
+	#options+=("prebuilt" "Use precompiled packages (maintained hardware only)") # @TODO atrios-build does not support this, I think.
 	dialog_if_terminal_set_vars --title "Choose an option" --backtitle "$backtitle" --no-tags --menu "Select the kernel configuration" $TTY_Y $TTY_X $((TTY_Y - 8)) "${options[@]}"
 	set_interactive_config_value KERNEL_CONFIGURE "${DIALOG_RESULT}"
 	[[ ${DIALOG_EXIT_CODE} != 0 ]] && exit_with_error "You cancelled interactive during kernel configuration" "Build cancelled"
@@ -362,7 +362,7 @@ function interactive_config_ask_desktop_build() {
 
 	[[ -n ${BUILD_DESKTOP} ]] && return 0
 
-	# read distribution support status which is written to the armbian-release file
+	# read distribution support status which is written to the atrios-release file
 	set_distribution_status
 	options=()
 	options+=("no" "Image with console interface (server)")

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 add_apt_sources() {
 	# AGGREGATED_APT_SOURCES and AGGREGATED_APT_SOURCES_DICT are pre-resolved by aggregation.py

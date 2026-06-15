@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
-# Shared versioning logic for Armbian mainline kernels.
+# Shared versioning logic for AtriOS mainline kernels.
 function mainline_kernel_decide_version__upstream_release_candidate_number() {
 	[[ -n "${KERNELBRANCH}" ]] && return 0           # if already set, don't touch it; that way other hooks can run in any order
 	if [[ "${KERNEL_MAJOR_MINOR}" == "7.1" ]]; then # @TODO: roll over to next MAJOR.MINOR and MAJOR.MINOR-rc1 when it is released

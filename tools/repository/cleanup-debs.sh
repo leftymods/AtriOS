@@ -2,10 +2,10 @@
 #
 # cleanup-debs.sh
 #
-# Recursively clean Armbian Debian package artifacts.
+# Recursively clean AtriOS Debian package artifacts.
 #
 # This script scans the given directory (and all subdirectories) for
-# Debian packages whose filenames start with `armbian-` and end with `.deb`.
+# Debian packages whose filenames start with `AtriOS-` and end with `.deb`.
 #
 # For each logical package base (the part of the filename before the first
 # underscore), it keeps only the newest version as determined by
@@ -13,21 +13,21 @@
 #
 # Key properties:
 #   - Operates recursively on all subfolders
-#   - Affects ONLY files matching `armbian-*.deb`
+#   - Affects ONLY files matching `AtriOS-*.deb`
 #   - Keeps the most recent version per package base
 #   - Uses proper Debian version comparison (not lexical sorting)
 #   - Safe by default: dry-run mode enabled unless DRYRUN=0 is set
 #
 # Usage:
-#   ./armbian-deb-cleanup.sh /path/to/repository
+#   ./AtriOS-deb-cleanup.sh /path/to/repository
 #
 # To actually delete files:
-#   DRYRUN=0 ./armbian-deb-cleanup.sh /path/to/repository
+#   DRYRUN=0 ./AtriOS-deb-cleanup.sh /path/to/repository
 #
 # Notes:
 #   - If the same package exists in multiple subdirectories, only the newest
 #     version is kept globally (not per directory).
-#   - Files not matching `armbian-*.deb` are ignored.
+#   - Files not matching `AtriOS-*.deb` are ignored.
 #
 set -euo pipefail
 
@@ -38,12 +38,12 @@ shopt -s nullglob
 
 declare -A best_ver best_file
 
-# Extract base + version from armbian-*.deb
+# Extract base + version from AtriOS-*.deb
 extract_base_ver() {
   local f="$1" bn base ver
   bn="$(basename -- "$f")"
 
-  [[ "$bn" == armbian-*.deb ]] || return 1
+  [[ "$bn" == AtriOS-*.deb ]] || return 1
 
   base="${bn%%_*}"                 # before first underscore
   ver="${bn#*_}"; ver="${ver%%_*}" # between first and second underscore
@@ -65,16 +65,16 @@ while IFS= read -r -d '' f; do
       best_file["$base"]="$f"
     fi
   fi
-done < <(find "$ROOT" -type f -name 'armbian-*.deb' -print0)
+done < <(find "$ROOT" -type f -name 'AtriOS-*.deb' -print0)
 
-echo "Keeping newest armbian-* package per base (recursive):"
+echo "Keeping newest AtriOS-* package per base (recursive):"
 for base in "${!best_file[@]}"; do
   echo "  $base -> ${best_ver[$base]} ($(basename -- "${best_file[$base]}"))"
 done
 echo
 
 # Second pass: remove older versions
-echo "Removing older armbian-* packages:"
+echo "Removing older AtriOS-* packages:"
 while IFS= read -r -d '' f; do
   read -r base ver < <(extract_base_ver "$f") || continue
   if [[ "${best_file[$base]}" != "$f" ]]; then
@@ -85,7 +85,7 @@ while IFS= read -r -d '' f; do
       echo "  rm -f -- $f"
     fi
   fi
-done < <(find "$ROOT" -type f -name 'armbian-*.deb' -print0)
+done < <(find "$ROOT" -type f -name 'AtriOS-*.deb' -print0)
 
 if [[ "$DRYRUN" == "1" ]]; then
   echo

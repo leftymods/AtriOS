@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Common start/end build functions. Used by the default build and others
 
@@ -125,18 +125,18 @@ function produce_repeat_args_array() {
 	# Make it easy to repeat build by displaying build options used. Prepare array.
 	declare -a -g repeat_args=("./compile.sh")
 
-	# Parse ARMBIAN_HIDE_REPEAT_PARAMS which is a space separated list of parameters to hide.
+	# Parse AtriOS_HIDE_REPEAT_PARAMS which is a space separated list of parameters to hide.
 	# It is created by produce_relaunch_parameters() in utils-cli.sh
 	declare -a params_to_hide=()
-	if [[ -n "${ARMBIAN_HIDE_REPEAT_PARAMS}" ]]; then
-		IFS=' ' read -r -a params_to_hide <<< "${ARMBIAN_HIDE_REPEAT_PARAMS}"
+	if [[ -n "${AtriOS_HIDE_REPEAT_PARAMS}" ]]; then
+		IFS=' ' read -r -a params_to_hide <<< "${AtriOS_HIDE_REPEAT_PARAMS}"
 	fi
 	display_alert "Hiding parameters from repeat build options" "${params_to_hide[*]}" "debug"
 
-	repeat_args+=("${ARMBIAN_NON_PARAM_ARGS[@]}") # Add all non-param arguments to repeat_args. This already includes any config files passed.
+	repeat_args+=("${AtriOS_NON_PARAM_ARGS[@]}") # Add all non-param arguments to repeat_args. This already includes any config files passed.
 	declare -A repeat_params=()                   # Dict to store param values.
 
-	for param_name in "${!ARMBIAN_PARSED_CMDLINE_PARAMS[@]}"; do # original params, but skip the hidden; those were automatically added by re-launcher
+	for param_name in "${!AtriOS_PARSED_CMDLINE_PARAMS[@]}"; do # original params, but skip the hidden; those were automatically added by re-launcher
 		# if param_name is in params_to_hide, skip it. Test by looping through params_to_hide.
 		for param_to_hide in "${params_to_hide[@]}"; do
 			if [[ "${param_name}" == "${param_to_hide}" ]]; then
@@ -145,12 +145,12 @@ function produce_repeat_args_array() {
 			fi
 		done
 
-		repeat_params+=(["${param_name}"]="${ARMBIAN_PARSED_CMDLINE_PARAMS[${param_name}]}")
+		repeat_params+=(["${param_name}"]="${AtriOS_PARSED_CMDLINE_PARAMS[${param_name}]}")
 		display_alert "Added repeat parameter" "'${param_name}'" "debug"
 	done
 
-	for param_name in "${!ARMBIAN_INTERACTIVE_CONFIGS[@]}"; do # add params produced during interactive configuration
-		repeat_params+=(["${param_name}"]="${ARMBIAN_INTERACTIVE_CONFIGS[${param_name}]}")
+	for param_name in "${!AtriOS_INTERACTIVE_CONFIGS[@]}"; do # add params produced during interactive configuration
+		repeat_params+=(["${param_name}"]="${AtriOS_INTERACTIVE_CONFIGS[${param_name}]}")
 		display_alert "Added repeat parameter from interactive config" "'${param_name}'" "debug"
 	done
 

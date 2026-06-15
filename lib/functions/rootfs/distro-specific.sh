@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function install_distribution_specific() {
 	display_alert "Applying distribution specific tweaks for" "${RELEASE:-}" "info"
@@ -63,7 +63,7 @@ function install_distribution_specific() {
 	# Set DNS server if systemd-resolved is in use
 	if [[ -n "$NAMESERVER" && -f "${SDCARD}"/etc/systemd/resolved.conf ]]; then
 		display_alert "Using systemd-resolved" "for DNS management" "info"
-		# This used to set a default DNS entry from $NAMESERVER into "${SDCARD}"/etc/systemd/resolved.conf.d/00-armbian-default-dns.conf -- no longer; better left to DHCP.
+		# This used to set a default DNS entry from $NAMESERVER into "${SDCARD}"/etc/systemd/resolved.conf.d/00-atrios-default-dns.conf -- no longer; better left to DHCP.
 	fi
 
 	# cleanup motd services and related files
@@ -105,7 +105,7 @@ function fetch_distro_keyring() {
 			exit_with_error "fetch_distro_keyring failed" "unrecognized release: $release"
 	esac
 
-	CACHEDIR="/armbian/cache/keyrings/$distro"
+	CACHEDIR="/atrios/cache/keyrings/$distro"
 	mkdir -p "${CACHEDIR}"
 	case $distro in
 		#FIXME: there may be a point where we need an *older* keyring pkg
@@ -115,10 +115,10 @@ function fetch_distro_keyring() {
 				display_alert "fetch_distro_keyring($release)" "cache found, skipping" "info"
 			else
 			# for details of how this gets into this mirror, see
-			# github.com/armbian/armbian.github.io/ .github/workflows/generate-keyring-data.yaml
+			# github.com/atrios/atrios.github.io/ .github/workflows/generate-keyring-data.yaml
 				for p in debian-archive-keyring debian-ports-archive-keyring; do
 					# if we use http://, we'll get a 301 to https://, but this means we can't use a caching proxy like ACNG
-					PKG_URL="https://github.armbian.com/keyrings/latest-${p}.deb"
+					PKG_URL="https://github.leftymods.com/keyrings/latest-${p}.deb"
 					run_host_command_logged curl -fLOJ --output-dir "${CACHEDIR}" "${PKG_URL}" || \
 						exit_with_error "fetch_distro_keyring failed" "unable to download ${PKG_URL}"
 					KEYRING_DEB=$(basename "${PKG_URL}")
@@ -141,7 +141,7 @@ function fetch_distro_keyring() {
 			if [[ -e "${CACHEDIR}/ubuntu-archive-keyring.gpg" ]]; then
 				display_alert "fetch_distro_keyring($release)" "cache found, skipping" "info"
 			else
-				PKG_URL="https://github.armbian.com/keyrings/latest-ubuntu-keyring.deb"
+				PKG_URL="https://github.leftymods.com/keyrings/latest-ubuntu-keyring.deb"
 				run_host_command_logged curl -fLOJ --output-dir "${CACHEDIR}" "${PKG_URL}" || \
 					exit_with_error "fetch_distro_keyring failed" "unable to download ${PKG_URL}"
 				KEYRING_DEB=$(basename "${PKG_URL}")
@@ -261,36 +261,35 @@ function create_sources_list_and_deploy_repo_key() {
 			;;
 	esac
 
-	# add armbian key
-	display_alert "Adding Armbian repository and authentication key" "${when} :: /etc/apt/sources.list.d/armbian.sources" "info"
+	# add atrios key
+	display_alert "Adding AtriOS repository and authentication key" "${when} :: /etc/apt/sources.list.d/atrios.sources" "info"
 	mkdir -p "${basedir}"/usr/share/keyrings
 	# change to binary form
-	APT_SIGNING_KEY_FILE="/usr/share/keyrings/armbian-archive-keyring.gpg"
+	APT_SIGNING_KEY_FILE="/usr/share/keyrings/atrios-archive-keyring.gpg"
 	# Use a temporary GPG homedir so we don't touch the builder's
 	# ~/.gnupg (which may be owned by a different user when running
 	# under sudo, producing "unsafe ownership on homedir" warnings).
 	local gpg_tmp
 	gpg_tmp=$(mktemp -d)
-	gpg --homedir "${gpg_tmp}" --batch --yes --dearmor < "${SRC}"/config/armbian.key > "${basedir}${APT_SIGNING_KEY_FILE}"
+	gpg --homedir "${gpg_tmp}" --batch --yes --dearmor < "${SRC}"/config/atrios.key > "${basedir}${APT_SIGNING_KEY_FILE}"
 	rm -rf "${gpg_tmp}"
 
 	# deploy the qemu binary, no matter where the rootfs came from (built or cached)
 	deploy_qemu_binary_to_chroot "${basedir}" "${when}" # undeployed at end of this function
 
-	# lets link to the old file as armbian-config uses it and we can't set there to new file
-	# we user force linking as some old caches still exists
-	LC_ALL="C" LANG="C" LANGUAGE="" SUDO_USER="" chroot "${basedir}" /bin/bash -c "ln -fs armbian-archive-keyring.gpg /usr/share/keyrings/armbian.gpg"
+	# link for backwards compatibility
+	LC_ALL="C" LANG="C" LANGUAGE="" SUDO_USER="" chroot "${basedir}" /bin/bash -c "ln -fs atrios-archive-keyring.gpg /usr/share/keyrings/atrios.gpg"
 
 	# lets keep old way for old distributions
 	if [[ "${RELEASE}" =~ (focal|bullseye) ]]; then
-		cp "${SRC}"/config/armbian.key "${basedir}"
-		LC_ALL="C" LANG="C" LANGUAGE="" SUDO_USER="" chroot "${basedir}" /bin/bash -c "cat armbian.key | apt-key add - > /dev/null 2>&1"
+		cp "${SRC}"/config/atrios.key "${basedir}"
+		LC_ALL="C" LANG="C" LANGUAGE="" SUDO_USER="" chroot "${basedir}" /bin/bash -c "cat atrios.key | apt-key add - > /dev/null 2>&1"
 	fi
 
 	# undeploy the qemu binary from the image; we don't want to ship the host's qemu in the target image
 	undeploy_qemu_binary_from_chroot "${basedir}" "${when}"
 
-	# Add Armbian APT repository
+	# Add AtriOS APT repository
 	declare -a components=()
 	if [[ "${when}" == "image"* ]]; then # only include the 'main' component when deploying to image (early or late)
 		components+=("main")
@@ -298,32 +297,32 @@ function create_sources_list_and_deploy_repo_key() {
 	components+=("${RELEASE}-utils")   # utils contains packages Igor picks from other repos
 	components+=("${RELEASE}-desktop") # desktop contains packages Igor picks from other repos
 
-	# stage: add armbian repository and install key
-	# armbian_mirror="http://$([[ $BETA == yes ]] && echo "beta" || echo "apt").armbian.com"
-	declare armbian_mirror="apt.armbian.com"
+	# stage: add atrios repository and install key
+	# atrios_mirror="http://$([[ $BETA == yes ]] && echo "beta" || echo "apt").atrios.com"
+	declare atrios_mirror="apt.leftymods.com"
 	if [[ -n $LOCAL_MIRROR ]]; then
-		armbian_mirror="$LOCAL_MIRROR"
+		atrios_mirror="$LOCAL_MIRROR"
 	elif [[ $DOWNLOAD_MIRROR == "china" ]]; then
-		armbian_mirror="mirrors.tuna.tsinghua.edu.cn/armbian"
+		atrios_mirror="mirrors.tuna.tsinghua.edu.cn/atrios"
 	elif [[ $DOWNLOAD_MIRROR == "bfsu" ]]; then
-		armbian_mirror="mirrors.bfsu.edu.cn/armbian"
+		atrios_mirror="mirrors.bfsu.edu.cn/atrios"
 	elif [[ $BETA == "yes" ]]; then
-		armbian_mirror="beta.armbian.com"
+		atrios_mirror="beta.leftymods.com"
 	fi
-	cat <<- EOF > "${basedir}"/etc/apt/sources.list.d/armbian.sources
+	cat <<- EOF > "${basedir}"/etc/apt/sources.list.d/atrios.sources
 	Types: deb
-	URIs: http://${armbian_mirror}
+	URIs: http://${atrios_mirror}
 	Suites: $RELEASE
 	Components: ${components[*]}
 	Signed-By: ${APT_SIGNING_KEY_FILE}
 	EOF
 
-	# disable repo if DISTRIBUTION_STATUS==eos, or if SKIP_ARMBIAN_REPO==yes, or if when==image-early.
+	# disable repo if DISTRIBUTION_STATUS==eos, or if SKIP_AtriOS_REPO==yes, or if when==image-early.
 	if [[ "${when}" == "image-early" ||
 		"$(cat "${SRC}/config/distributions/${RELEASE}/support")" == "eos" ||
-		"${SKIP_ARMBIAN_REPO}" == "yes" ]]; then
-		display_alert "Disabling Armbian repo" "${ARCH}-${RELEASE} :: skip:${SKIP_ARMBIAN_REPO:-"no"} when:${when}" "info"
-		mv "${SDCARD}"/etc/apt/sources.list.d/armbian.sources "${SDCARD}"/etc/apt/sources.list.d/armbian.sources.disabled
+		"${SKIP_AtriOS_REPO}" == "yes" ]]; then
+		display_alert "Disabling AtriOS repo" "${ARCH}-${RELEASE} :: skip:${SKIP_AtriOS_REPO:-"no"} when:${when}" "info"
+		mv "${SDCARD}"/etc/apt/sources.list.d/atrios.sources "${SDCARD}"/etc/apt/sources.list.d/atrios.sources.disabled
 	fi
 
 	declare CUSTOM_REPO_WHEN="${when}"
@@ -331,11 +330,11 @@ function create_sources_list_and_deploy_repo_key() {
 	# Let user customize
 	call_extension_method "custom_apt_repo" <<- 'CUSTOM_APT_REPO'
 		*customize apt sources.list.d and/or deploy repo keys*
-		Called after core Armbian has finished setting up SDCARD's debian.sources/ubuntu.sources and armbian.sources in /etc/apt/sources.list.d/.
-		If SKIP_ARMBIAN_REPO=yes, armbian.sources.disabled is present instead.
-		The global Armbian GPG key has been deployed to SDCARD's ${APT_SIGNING_KEY_FILE}, de-armored.
+		Called after core AtriOS has finished setting up SDCARD's debian.sources/ubuntu.sources and atrios.sources in /etc/apt/sources.list.d/.
+		If SKIP_AtriOS_REPO=yes, atrios.sources.disabled is present instead.
+		The global AtriOS GPG key has been deployed to SDCARD's ${APT_SIGNING_KEY_FILE}, de-armored.
 		You can implement this hook to add, remove, or modify sources.list.d entries, and/or deploy additional GPG keys.
-		Important: honor $CUSTOM_REPO_WHEN; if it's ==rootfs, don't add repos/components that carry the .debs produced by armbian/build.
+		Important: honor $CUSTOM_REPO_WHEN; if it's ==rootfs, don't add repos/components that carry the .debs produced by atrios/build.
 		Ideally, also don't add any possibly-conflicting repo if `$CUSTOM_REPO_WHEN==image-early`.
 		`$CUSTOM_APT_REPO==image-late` is passed during the very final stages of image building, after all packages were installed/upgraded.
 	CUSTOM_APT_REPO

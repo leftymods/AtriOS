@@ -5,7 +5,7 @@
 # Copyright (c) 2013-2023 leftymods 
 #
 # This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# https://github.com/leftymods/CoreOS/
 
 
 
@@ -28,7 +28,7 @@ grep -q "[[:space:]]" <<< "${SRC}" && {
 # Sanity check.
 if [[ ! -f "${SRC}"/lib/single.sh ]]; then
 	echo "Error: missing build directory structure"
-	echo "Please clone the full repository https://github.com/armbian/build/"
+	echo "Please clone the full repository https://github.com/leftymods/CoreOS/"
 	exit 255
 fi
 

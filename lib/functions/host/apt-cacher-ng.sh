@@ -4,20 +4,20 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Management of apt-cacher-ng aka acng
 
 function acng_configure_and_restart_acng() {
-	if ! armbian_is_host_running_systemd; then return 0; fi # do nothing if host is not running systemd
+	if ! AtriOS_is_host_running_systemd; then return 0; fi # do nothing if host is not running systemd
 	[[ "${MANAGE_ACNG}" != "yes" ]] && return 0             # don't if told not to. NO_something=yes is very confusing, but kept for historical reasons
 
 	display_alert "Preparing acng configuration" "apt-cacher-ng" "info"
 
 	run_host_command_logged systemctl stop apt-cacher-ng || true # ignore errors, it might already be stopped.
 
-	[[ ! -f /etc/apt-cacher-ng/acng.conf.orig.pre.armbian ]] && cp /etc/apt-cacher-ng/acng.conf /etc/apt-cacher-ng/acng.conf.orig.pre.armbian
+	[[ ! -f /etc/apt-cacher-ng/acng.conf.orig.pre.AtriOS ]] && cp /etc/apt-cacher-ng/acng.conf /etc/apt-cacher-ng/acng.conf.orig.pre.AtriOS
 
 	cat <<- ACNG_CONFIG > /etc/apt-cacher-ng/acng.conf
 		CacheDir: ${APT_CACHER_NG_CACHE_DIR:-/var/cache/apt-cacher-ng}

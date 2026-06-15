@@ -99,7 +99,7 @@ echo "done."
 
 echo -n "Edit init config..."
 sed -e "s/\(rootdev=UUID\)\([[:graph:]]\)*/rootdev=LABEL=ROOT_EMMC/gi" \
- -i "$DIR_INSTALL/armbianEnv.txt"
+ -i "$DIR_INSTALL/atriosEnv.txt"
 echo "done."
 
 rm $DIR_INSTALL/s9*

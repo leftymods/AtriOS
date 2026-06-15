@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # The whole of this is Copyright (c) 2025-2026 leftymods
 # This file is licensed under the terms of the GNU General Public
@@ -133,7 +133,7 @@ function dump_extension_method_sources_body() {
 # what this does is a lot of bash mumbo-jumbo to find all board-,family-,config- or user-defined hook points.
 # the meat of this is 'compgen -A function', which is bash builtin that lists all defined functions.
 # it will then compose a full hook point (function) that calls all the implementing hooks.
-# this centralized function will then be called by the regular Armbian build system, which is oblivious to how
+# this centralized function will then be called by the regular AtriOS build system, which is oblivious to how
 # it came to be. (although it is encouraged to call hook points via call_extension_method() above)
 # to avoid hard coding the list of hook-points (eg: user_config, image_tweaks_pre_customize, etc) we use
 # a marker in the function names, namely "__" (two underscores) to determine the hook point.
@@ -253,7 +253,7 @@ function initialize_extension_manager() {
 		hook_points_counter=$((hook_points_counter + 1))
 
 		# determine the variables we'll pass to the hook function during execution.
-		# this helps the extension author create extensions that are portable between userpatches and official Armbian.
+		# this helps the extension author create extensions that are portable between userpatches and official AtriOS.
 		# shellcheck disable=SC2089
 		local common_function_vars="HOOK_POINT=\"${hook_point}\""
 

@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (c) 2013-2023 Igor Pecovnik, igor@armbian.com
+# Copyright (c) 2013-2023 Igor Pecovnik, igor@AtriOS.com
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 #
 enable_extension "sunxi-tools"
 declare -g ARCH=arm64
@@ -42,7 +42,7 @@ KERNELPATCHDIR="archive/sunxi-${KERNEL_MAJOR_MINOR}"
 family_tweaks() {
 	# execute specific tweaks function if present
 	[[ $(type -t family_tweaks_s) == function ]] && family_tweaks_s
-	cp $SRC/packages/blobs/splash/armbian-u-boot-24.bmp $SDCARD/boot/boot.bmp
+	cp $SRC/packages/blobs/splash/atrios-u-boot-24.bmp $SDCARD/boot/boot.bmp
 }
 
 write_uboot_platform() {

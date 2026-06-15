@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 declare -g -A STORED_CONFIG_VARS=()
@@ -51,5 +51,5 @@ function track_general_config_variables() {
 	array_values="yes" track_config_variables "${1}" KERNEL_DRIVERS_SKIP
 	track_config_variables "${1}" BOOTSOURCE BOOTSOURCEDIR BOOTBRANCH BOOTPATCHDIR BOOTDIR BOOTCONFIG BOOTBRANCH_BOARD BOOTPATCHDIR_BOARD
 	track_config_variables "${1}" ATF_COMPILE ATF_COMPILER ATFSOURCE ATFSOURCEDIR ATFDIR ATFBRANCH CRUSTSOURCEDIR CRUSTDIR CRUSTBRANCH LINUXSOURCEDIR KERNEL_COMPILER UBOOT_COMPILER
-	track_config_variables "${1}" NETWORKING_STACK SKIP_ARMBIAN_REPO
+	track_config_variables "${1}" NETWORKING_STACK SKIP_AtriOS_REPO
 }

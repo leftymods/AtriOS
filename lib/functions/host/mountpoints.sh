@@ -4,14 +4,14 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
-function prepare_armbian_mountpoints_description_dict() {
-	# array for the generic armbian 'volumes' and their paths.
+function prepare_AtriOS_mountpoints_description_dict() {
+	# array for the generic AtriOS 'volumes' and their paths.
 	# bash dicts do NOT keep their insertion order, instead "hash order", which is a bit better than random for our purposes.
 	# keep an array with the correct order, unfortunately
-	declare -g -a ARMBIAN_MOUNTPOINTS_ARRAY=(
+	declare -g -a AtriOS_MOUNTPOINTS_ARRAY=(
 		".tmp"
 		"output" "output/images" "output/debs" "output/logs"
 		"cache"
@@ -27,7 +27,7 @@ function prepare_armbian_mountpoints_description_dict() {
 		"cache/patch"
 	)
 
-	declare -A -g ARMBIAN_MOUNTPOINTS_DESC_DICT=(
+	declare -A -g AtriOS_MOUNTPOINTS_DESC_DICT=(
 		[".tmp"]="docker_kind_linux=anonymous docker_kind_darwin=anonymous" # tmpfs, discard, anonymous; whatever you wanna call  it. It just needs to be 100% local to the container, and there's very little value in being able to look at it from the host.
 		["output"]="docker_kind_linux=bind docker_kind_darwin=bind"         # catch-all output. specific subdirs are mounted below. it's a bind mount by default on both Linux and Darwin.
 		["output/images"]="docker_kind_linux=bind docker_kind_darwin=bind"  # 99% of users want this as the result of their build, no matter if it's slow or not. bind on both.
@@ -49,7 +49,7 @@ function prepare_armbian_mountpoints_description_dict() {
 
 	# These, if found, will be removed on `dockerpurge` and other cleanups.
 	# They "used to be" used by the build system, but no longer.
-	declare -g -a ARMBIAN_MOUNTPOINTS_DEPRECATED=(
+	declare -g -a AtriOS_MOUNTPOINTS_DEPRECATED=(
 		"cache/gitballs"
 		"cache/sources/kernel"
 		"cache/sources/linux-kernel"
@@ -57,32 +57,32 @@ function prepare_armbian_mountpoints_description_dict() {
 	)
 }
 
-function loop_over_armbian_mountpoints() {
-	prepare_armbian_mountpoints_description_dict
+function loop_over_AtriOS_mountpoints() {
+	prepare_AtriOS_mountpoints_description_dict
 	# loop over all mountpoints and call the function passed as first argument
 	: "${1:?loop_over_mountpoints needs a function as first argument}"
 	local func="$1"
 	shift
 	local mountpoint
-	for mountpoint in "${ARMBIAN_MOUNTPOINTS_ARRAY[@]}"; do
+	for mountpoint in "${AtriOS_MOUNTPOINTS_ARRAY[@]}"; do
 		# call func passing the key and the values as arguments
-		local values="${ARMBIAN_MOUNTPOINTS_DESC_DICT[$mountpoint]}"
+		local values="${AtriOS_MOUNTPOINTS_DESC_DICT[$mountpoint]}"
 		eval "$values"
 
 		# This is contrived. Would be easier to just eval (and use Linux/Darwin instead of linux/darwin)
 		declare docker_kind="unknown"
-		case "${DOCKER_ARMBIAN_HOST_OS_UNAME}" in
+		case "${DOCKER_AtriOS_HOST_OS_UNAME}" in
 			Linux)
-				# shellcheck disable=SC2154 # defined during loop_over_armbian_mountpoints
+				# shellcheck disable=SC2154 # defined during loop_over_AtriOS_mountpoints
 				docker_kind="${docker_kind_linux}"
 				;;
 
 			Darwin)
-				# shellcheck disable=SC2154 # defined during loop_over_armbian_mountpoints
+				# shellcheck disable=SC2154 # defined during loop_over_AtriOS_mountpoints
 				docker_kind="${docker_kind_darwin}"
 				;;
 			*)
-				display_alert "Unsupported host OS" "${DOCKER_ARMBIAN_HOST_OS_UNAME} - cant map mountpoint to Docker volume" "warn"
+				display_alert "Unsupported host OS" "${DOCKER_AtriOS_HOST_OS_UNAME} - cant map mountpoint to Docker volume" "warn"
 				;;
 		esac
 

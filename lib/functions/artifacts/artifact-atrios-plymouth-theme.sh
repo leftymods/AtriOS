@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function artifact_atrios-plymouth-theme_config_dump() {
 	# artifact_input_variables: None, for atrios-plymouth-theme.
@@ -22,7 +22,7 @@ function artifact_atrios-plymouth-theme_prepare_version() {
 
 	# get the hashes of the lib/ bash sources involved...
 	declare hash_files="undetermined"
-	calculate_hash_for_bash_deb_artifact "compilation/packages/atrios-plymouth-theme-deb.sh" "${SRC}/packages/plymouth-theme-armbian/armbian.plymouth"
+	calculate_hash_for_bash_deb_artifact "compilation/packages/atrios-plymouth-theme-deb.sh" "${SRC}/packages/plymouth-theme-AtriOS/AtriOS.plymouth"
 	declare bash_hash="${hash_files}"
 	declare bash_hash_short="${bash_hash:0:${short_hash_size}}"
 
@@ -30,7 +30,7 @@ function artifact_atrios-plymouth-theme_prepare_version() {
 	artifact_version="${fake_unchanging_base_version}-B${bash_hash_short}"
 
 	declare -a reasons=(
-		"Armbian atrios-plymouth-theme"
+		"AtriOS atrios-plymouth-theme"
 		"framework bash hash \"${bash_hash}\""
 	)
 
@@ -51,7 +51,7 @@ function artifact_atrios-plymouth-theme_build_from_sources() {
 }
 
 function artifact_atrios-plymouth-theme_cli_adapter_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -62,7 +62,7 @@ function artifact_atrios-plymouth-theme_cli_adapter_config_prep() {
 }
 
 function artifact_atrios-plymouth-theme_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/armbian/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
 }
 
 function artifact_atrios-plymouth-theme_is_available_in_local_cache() {

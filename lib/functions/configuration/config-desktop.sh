@@ -4,15 +4,15 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Interactive desktop configuration: DE selection + tier selection.
-# Desktop packages are installed by armbian-config's module_desktops
+# Desktop packages are installed by atrios-config's module_desktops
 # at image-build time (see distro-agnostic.sh). This file collects
 # the two user-facing choices: which DE and which tier.
 #
-# The available DEs are queried from armbian-config's YAML-driven
+# The available DEs are queried from atrios-config's YAML-driven
 # desktop definitions. The configng repo is cloned into cache/sources/
 # via the build framework's standard fetch_from_repo, then the
 # standalone Python parser runs on the host (no chroot, no root).
@@ -21,7 +21,7 @@
 #   DESKTOP_ENVIRONMENT   — xfce, gnome, kde-plasma, mate, cinnamon, ...
 #   DESKTOP_TIER          — minimal, mid, full
 #
-# Legacy variables (removed — armbian-config YAML tiers subsume them):
+# Legacy variables (removed — atrios-config YAML tiers subsume them):
 #   DESKTOP_ENVIRONMENT_CONFIG_NAME
 #   DESKTOP_APPGROUPS_SELECTED
 
@@ -30,7 +30,7 @@ function interactive_desktop_main_configuration() {
 
 	display_alert "desktop-config" "DESKTOP_ENVIRONMENT entry: ${DESKTOP_ENVIRONMENT}" "debug"
 
-	# Refresh the armbian-configng clone on EVERY desktop build,
+	# Refresh the atrios-configng clone on EVERY desktop build,
 	# regardless of whether DESKTOP_ENVIRONMENT was pre-set. The
 	# clone feeds two downstream consumers:
 	#
@@ -48,15 +48,15 @@ function interactive_desktop_main_configuration() {
 	# happily cache-hit a pre-configng-change rootfs. Hoisting the
 	# fetch up here makes the clone authoritative for every
 	# BUILD_DESKTOP=yes invocation.
-	fetch_from_repo "https://github.com/armbian/configng" "armbian-configng" "branch:main"
+	fetch_from_repo "https://github.com/leftymods/configng" "atrios-configng" "branch:main"
 
-	local configng_dir="${SRC}/cache/sources/armbian-configng"
+	local configng_dir="${SRC}/cache/sources/atrios-configng"
 	local yaml_dir="${configng_dir}/tools/modules/desktops/yaml"
 	local parser="${configng_dir}/tools/modules/desktops/scripts/parse_desktop_yaml.py"
 
 	if [[ ! -f "${parser}" ]]; then
 		exit_with_error "Desktop parser not found at ${parser}" \
-			"armbian-config clone may be incomplete"
+			"atrios-config clone may be incomplete"
 	fi
 
 	# --- DE selection ---
@@ -68,7 +68,7 @@ function interactive_desktop_main_configuration() {
 		#   EXPERT:  `status: supported` + `status: community` (CSC)
 		# `status: unsupported` DEs are never offered from the build
 		# dialog — they're vendor-specific (e.g. bianbu on riscv64)
-		# and only reachable via `armbian-config --api` on a running
+		# and only reachable via `atrios-config --api` on a running
 		# system, not baked into an image.
 		local status_filter="supported"
 		[[ "${EXPERT}" == "yes" ]] && status_filter="supported,community"
@@ -120,7 +120,7 @@ for de in json.load(sys.stdin):
 		fi
 
 		dialog_menu "Choose a desktop environment" "$backtitle" \
-			"Select the default desktop environment to bundle with this image.\nDocs: https://docs.armbian.com/Developer-Guide_Desktops/" \
+			"Select the default desktop environment to bundle with this image.\nDocs: https://docs.AtriOS.com/Developer-Guide_Desktops/" \
 			"${options[@]}"
 		set_interactive_config_value DESKTOP_ENVIRONMENT "${DIALOG_MENU_RESULT}"
 
@@ -152,7 +152,7 @@ for de in json.load(sys.stdin):
 			"full" "Office, creative, dev tools (~2.5 GB)"
 		)
 		dialog_menu "Choose desktop tier" "$backtitle" \
-			"Select which package set to install with this desktop.\nTiers can be upgraded or downgraded at any time\nusing armbian-config on the running system.\nDocs: https://docs.armbian.com/Developer-Guide_Desktops/" \
+			"Select which package set to install with this desktop.\nTiers can be upgraded or downgraded at any time\nusing atrios-config on the running system.\nDocs: https://docs.AtriOS.com/Developer-Guide_Desktops/" \
 			"${options[@]}"
 		set_interactive_config_value DESKTOP_TIER "${DIALOG_MENU_RESULT}"
 

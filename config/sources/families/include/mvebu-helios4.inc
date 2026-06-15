@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (c) 2013-2023 Igor Pecovnik, igor@armbian.com
+# Copyright (c) 2013-2023 Igor Pecovnik, igor@AtriOS.com
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 #
 case $BRANCH in
 
@@ -62,7 +62,7 @@ family_tweaks_bsp() {
 	### Other tweaks
 
 	# add custom motd default conf file
-	install -m 644 $SRC/packages/bsp/mvebu/helios4/armbian-motd $destination/etc/default/
+	install -m 644 $SRC/packages/bsp/mvebu/helios4/AtriOS-motd $destination/etc/default/
 
 	# create modules file
 	if [[ $BRANCH == dev && -n $MODULES_EDGE ]]; then

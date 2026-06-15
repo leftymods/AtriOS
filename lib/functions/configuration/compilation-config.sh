@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function prepare_compilation_vars() {
 	#  moved from config: rpardini: ccache belongs in compilation, not config. I think.
@@ -34,7 +34,7 @@ function prepare_compilation_vars() {
 	CTHREADS="-j$((CPUS + CPUS / 2))"
 
 	# If CPUTHREADS is defined and a valid positive integer allow user to override CTHREADS
-	# This is useful for limiting Armbian build to a specific number of threads, e.g. for build servers
+	# This is useful for limiting AtriOS build to a specific number of threads, e.g. for build servers
 	if [[ "$CPUTHREADS" =~ ^[1-9][0-9]*$ ]]; then
     	CTHREADS="-j$CPUTHREADS"
 		echo "Using user-defined thread count: $CTHREADS"

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function shellcheck_debian_control_scripts() {
 	declare SEVERITY="${SEVERITY:-"critical"}"
@@ -51,7 +51,7 @@ function run_tool_shellcheck() {
 	# Default version
 	SHELLCHECK_VERSION=${SHELLCHECK_VERSION:-0.11.0} # https://github.com/koalaman/shellcheck/releases
 
-	declare non_cache_dir="/armbian-tools/shellcheck" # To deploy/reuse cached SHELLCHECK in a Docker image.
+	declare non_cache_dir="/atrios-tools/shellcheck" # To deploy/reuse cached SHELLCHECK in a Docker image.
 
 	if [[ -z "${DIR_SHELLCHECK}" ]]; then
 		display_alert "DIR_SHELLCHECK is not set, using default" "SHELLCHECK" "debug"

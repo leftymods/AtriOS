@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 #############################################################################################################
 # @TODO: called by no-one, yet.
@@ -79,7 +79,7 @@ function is_docker_ready_to_go() {
 	# 0) NOT ALREADY UNDER DOCKER.
 	# 1) can find the `docker` command in the path, via command -v
 	# 2) can run `docker info` without errors
-	if [[ "${ARMBIAN_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+	if [[ "${ATRIOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
 		display_alert "Can't use Docker" "Actually ALREADY UNDER DOCKER!" "debug"
 		return 1
 	fi
@@ -104,11 +104,11 @@ function cli_handle_docker() {
 	display_alert "Handling" "docker" "info"
 	exit 0
 
-	# Purge Armbian Docker images
+	# Purge AtriOS Docker images
 	if [[ "${1}" == dockerpurge && -f /etc/debian_version ]]; then
-		display_alert "Purging Armbian Docker containers" "" "wrn"
-		docker container ls -a | grep armbian | awk '{print $1}' | xargs docker container rm &> /dev/null
-		docker image ls | grep armbian | awk '{print $3}' | xargs docker image rm &> /dev/null
+		display_alert "Purging AtriOS Docker containers" "" "wrn"
+		docker container ls -a | grep atrios | awk '{print $1}' | xargs docker container rm &> /dev/null
+		docker image ls | grep atrios | awk '{print $3}' | xargs docker image rm &> /dev/null
 		# removes "dockerpurge" from $1, thus $2 becomes $1
 		shift
 		set -- "docker" "$@"
@@ -127,24 +127,24 @@ function cli_handle_docker() {
 function docker_cli_prepare() {
 	# @TODO: Make sure we can access docker, on Linux; gotta be part of 'docker' group: grep -q "$(whoami)" <(getent group docker)
 
-	declare -g DOCKER_ARMBIAN_INITIAL_IMAGE_TAG="armbian.local.only/armbian-build:initial"
-	# declare -g DOCKER_ARMBIAN_BASE_IMAGE="${DOCKER_ARMBIAN_BASE_IMAGE:-"debian:trixie"}"
-	# declare -g DOCKER_ARMBIAN_BASE_IMAGE="${DOCKER_ARMBIAN_BASE_IMAGE:-"debian:bookworm"}"
-	# declare -g DOCKER_ARMBIAN_BASE_IMAGE="${DOCKER_ARMBIAN_BASE_IMAGE:-"debian:sid"}"
-	declare -g DOCKER_ARMBIAN_BASE_IMAGE="${DOCKER_ARMBIAN_BASE_IMAGE:-"ubuntu:noble"}"
-	declare -g DOCKER_ARMBIAN_TARGET_PATH="${DOCKER_ARMBIAN_TARGET_PATH:-"/armbian"}"
+	declare -g DOCKER_ATRIOS_INITIAL_IMAGE_TAG="atrios.local.only/atrios-build:initial"
+	# declare -g DOCKER_ATRIOS_BASE_IMAGE="${DOCKER_ATRIOS_BASE_IMAGE:-"debian:trixie"}"
+	# declare -g DOCKER_ATRIOS_BASE_IMAGE="${DOCKER_ATRIOS_BASE_IMAGE:-"debian:bookworm"}"
+	# declare -g DOCKER_ATRIOS_BASE_IMAGE="${DOCKER_ATRIOS_BASE_IMAGE:-"debian:sid"}"
+	declare -g DOCKER_ATRIOS_BASE_IMAGE="${DOCKER_ATRIOS_BASE_IMAGE:-"ubuntu:noble"}"
+	declare -g DOCKER_ATRIOS_TARGET_PATH="${DOCKER_ATRIOS_TARGET_PATH:-"/atrios"}"
 
-	declare wanted_os_tag="${DOCKER_ARMBIAN_BASE_IMAGE%%:*}"
-	declare -g DOCKER_WANTED_RELEASE="${DOCKER_ARMBIAN_BASE_IMAGE##*:}"
+	declare wanted_os_tag="${DOCKER_ATRIOS_BASE_IMAGE%%:*}"
+	declare -g DOCKER_WANTED_RELEASE="${DOCKER_ATRIOS_BASE_IMAGE##*:}"
 
-	# Store the "from scratch" image. Will be used if Armbian image is not available, for a "from scratch" build.
-	declare -g DOCKER_ARMBIAN_BASE_IMAGE_SCRATCH="${DOCKER_ARMBIAN_BASE_IMAGE}"
+	# Store the "from scratch" image. Will be used if AtriOS image is not available, for a "from scratch" build.
+	declare -g DOCKER_ATRIOS_BASE_IMAGE_SCRATCH="${DOCKER_ATRIOS_BASE_IMAGE}"
 
 	# If we're NOT building the public, official image, then USE the public, official image as base.
 	# IMPORTANT: This has to match the naming scheme for tag the is used in the GitHub actions workflow.
-	if [[ "${DOCKERFILE_USE_ARMBIAN_IMAGE_AS_BASE}" != "no" && "${DOCKER_SIMULATE_CLEAN}" != "yes" ]]; then
-		DOCKER_ARMBIAN_BASE_IMAGE="${DOCKER_ARMBIAN_BASE_COORDINATE_PREFIX:-"ghcr.io/armbian/docker-armbian-build:armbian-"}${wanted_os_tag}-${DOCKER_WANTED_RELEASE}-latest"
-		display_alert "Using prebuilt Armbian image as base for '${wanted_os_tag}-${DOCKER_WANTED_RELEASE}'" "DOCKER_ARMBIAN_BASE_IMAGE: ${DOCKER_ARMBIAN_BASE_IMAGE}" "info"
+	if [[ "${DOCKERFILE_USE_ATRIOS_IMAGE_AS_BASE}" != "no" && "${DOCKER_SIMULATE_CLEAN}" != "yes" ]]; then
+		DOCKER_ATRIOS_BASE_IMAGE="${DOCKER_ATRIOS_BASE_COORDINATE_PREFIX:-"ghcr.io/leftymods/docker-atrios-build:atrios-"}${wanted_os_tag}-${DOCKER_WANTED_RELEASE}-latest"
+		display_alert "Using prebuilt AtriOS image as base for '${wanted_os_tag}-${DOCKER_WANTED_RELEASE}'" "DOCKER_ATRIOS_BASE_IMAGE: ${DOCKER_ATRIOS_BASE_IMAGE}" "info"
 	fi
 
 	#############################################################################################################
@@ -196,9 +196,9 @@ function docker_cli_prepare() {
 	DOCKER_SERVER_OS="$(echo "${DOCKER_INFO}" | grep -i -e "Operating System:" | cut -d ":" -f 2 | xargs echo -n)"
 	display_alert "Docker Server OS" "${DOCKER_SERVER_OS}" "debug"
 
-	declare -g DOCKER_ARMBIAN_HOST_OS_UNAME
-	DOCKER_ARMBIAN_HOST_OS_UNAME="$(uname)"
-	display_alert "Local uname" "${DOCKER_ARMBIAN_HOST_OS_UNAME}" "debug"
+	declare -g DOCKER_ATRIOS_HOST_OS_UNAME
+	DOCKER_ATRIOS_HOST_OS_UNAME="$(uname)"
+	display_alert "Local uname" "${DOCKER_ATRIOS_HOST_OS_UNAME}" "debug"
 
 	DOCKER_BUILDX_VERSION="$(echo "${DOCKER_INFO}" | grep -i -e "buildx:" | cut -d ":" -f 2 | xargs echo -n)"
 	display_alert "Docker Buildx version" "${DOCKER_BUILDX_VERSION}" "debug"
@@ -216,7 +216,7 @@ function docker_cli_prepare() {
 
 	# Gymnastics: under Darwin, Docker Desktop and Rancher Desktop in dockerd mode behave differently.
 	declare -g DOCKER_SERVER_REQUIRES_LOOP_HACKS=yes DOCKER_SERVER_USE_STATIC_LOOPS=no
-	if [[ "${DOCKER_ARMBIAN_HOST_OS_UNAME}" == "Darwin" ]]; then
+	if [[ "${DOCKER_ATRIOS_HOST_OS_UNAME}" == "Darwin" ]]; then
 		case "${DOCKER_SERVER_NAME_HOST}" in
 			lima-rancher-desktop)
 				display_alert "Detected Rancher Desktop" "due to lima-rancher-desktop; EXPERIMENTAL" "warn"
@@ -238,11 +238,11 @@ function docker_cli_prepare() {
 	if [[ "${DOCKER_PASS_GIT}" == "yes" ]]; then
 		display_alert "git/docker:" "adding static copy of .git to Dockerfile" "info"
 		docker_un_ignore_dot_git="!.git"
-		docker_include_dot_git_dir="COPY .git ${DOCKER_ARMBIAN_TARGET_PATH}/.git"
+		docker_include_dot_git_dir="COPY .git ${DOCKER_ATRIOS_TARGET_PATH}/.git"
 	fi
 
 	# Info summary message. Thank you, GitHub Co-pilot!
-	display_alert "Docker info" "Docker ${DOCKER_SERVER_VERSION} Kernel:${DOCKER_SERVER_KERNEL_VERSION} RAM:${DOCKER_SERVER_TOTAL_RAM} CPUs:${DOCKER_SERVER_CPUS} OS:'${DOCKER_SERVER_OS}' hostname '${DOCKER_SERVER_NAME_HOST}' under '${DOCKER_ARMBIAN_HOST_OS_UNAME}' - buildx:${DOCKER_HAS_BUILDX} - loop-hacks:${DOCKER_SERVER_REQUIRES_LOOP_HACKS} static-loops:${DOCKER_SERVER_USE_STATIC_LOOPS}" "sysinfo"
+	display_alert "Docker info" "Docker ${DOCKER_SERVER_VERSION} Kernel:${DOCKER_SERVER_KERNEL_VERSION} RAM:${DOCKER_SERVER_TOTAL_RAM} CPUs:${DOCKER_SERVER_CPUS} OS:'${DOCKER_SERVER_OS}' hostname '${DOCKER_SERVER_NAME_HOST}' under '${DOCKER_ATRIOS_HOST_OS_UNAME}' - buildx:${DOCKER_HAS_BUILDX} - loop-hacks:${DOCKER_SERVER_REQUIRES_LOOP_HACKS} static-loops:${DOCKER_SERVER_USE_STATIC_LOOPS}" "sysinfo"
 }
 
 function docker_cli_prepare_dockerfile() {
@@ -291,37 +291,37 @@ function docker_cli_prepare_dockerfile() {
 	display_alert "Pre-game host dependencies for host_release '${DOCKER_WANTED_RELEASE}'" "${host_dependencies[*]}" "debug"
 
 	# This includes apt install equivalent to install_host_dependencies()
-	display_alert "Creating" "Dockerfile; FROM ${DOCKER_ARMBIAN_BASE_IMAGE}" "info"
+	display_alert "Creating" "Dockerfile; FROM ${DOCKER_ATRIOS_BASE_IMAGE}" "info"
 
 	declare c="" # Nothing; commands will run.
 	if [[ "${DOCKER_SIMULATE_CLEAN}" == "yes" ]]; then
 		display_alert "Simulating" "clean build, due to DOCKER_SIMULATE_CLEAN=yes -- this is wasteful and slow and only for debugging" "warn"
 		c="## Disabled by DOCKER_SIMULATE_CLEAN #" # Add comment to simulate clean env
-	elif [[ "${DOCKER_SKIP_UPDATE}" == "yes" && "${DOCKERFILE_USE_ARMBIAN_IMAGE_AS_BASE}" != "no" ]]; then
-		display_alert "Skipping Docker updates" "make sure base image '${DOCKER_ARMBIAN_BASE_IMAGE}' is up-to-date" "" "info"
+	elif [[ "${DOCKER_SKIP_UPDATE}" == "yes" && "${DOCKERFILE_USE_ATRIOS_IMAGE_AS_BASE}" != "no" ]]; then
+		display_alert "Skipping Docker updates" "make sure base image '${DOCKER_ATRIOS_BASE_IMAGE}' is up-to-date" "" "info"
 		c="## Disabled by DOCKER_SKIP_UPDATE # " # Add comment to simulate clean env
 	fi
 
 	declare c_req="# " # Nothing; commands will run.
-	if [[ "${DOCKERFILE_USE_ARMBIAN_IMAGE_AS_BASE}" == "no" ]]; then
-		display_alert "Dockerfile build will include tooling/requirements" "due to DOCKERFILE_USE_ARMBIAN_IMAGE_AS_BASE=no" "info"
+	if [[ "${DOCKERFILE_USE_ATRIOS_IMAGE_AS_BASE}" == "no" ]]; then
+		display_alert "Dockerfile build will include tooling/requirements" "due to DOCKERFILE_USE_ATRIOS_IMAGE_AS_BASE=no" "info"
 		c_req=""
 	fi
 
 	cat <<- INITIAL_DOCKERFILE > "${SRC}"/Dockerfile
-		${c}# PLEASE DO NOT MODIFY THIS FILE. IT IS AUTOGENERATED AND WILL BE OVERWRITTEN. Please don't build this Dockerfile yourself either. Use Armbian ./compile.sh instead.
-		FROM ${DOCKER_ARMBIAN_BASE_IMAGE}
-		${c}# PLEASE DO NOT MODIFY THIS FILE. IT IS AUTOGENERATED AND WILL BE OVERWRITTEN. Please don't build this Dockerfile yourself either. Use Armbian ./compile.sh instead.
+		${c}# PLEASE DO NOT MODIFY THIS FILE. IT IS AUTOGENERATED AND WILL BE OVERWRITTEN. Please don't build this Dockerfile yourself either. Use AtriOS ./compile.sh instead.
+		FROM ${DOCKER_ATRIOS_BASE_IMAGE}
+		${c}# PLEASE DO NOT MODIFY THIS FILE. IT IS AUTOGENERATED AND WILL BE OVERWRITTEN. Please don't build this Dockerfile yourself either. Use AtriOS ./compile.sh instead.
 		${c}RUN echo "--> CACHE MISS IN DOCKERFILE: apt packages." && \\
 		${c} DEBIAN_FRONTEND=noninteractive apt-get -y update && \\
 		${c} DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${BASIC_DEPS[@]} ${host_dependencies[@]}
 		${c}# Use C.UTF-8 locale which is available in rootfs from the very first command
-		WORKDIR ${DOCKER_ARMBIAN_TARGET_PATH}
-		ENV ARMBIAN_RUNNING_IN_CONTAINER=yes LANG=C.UTF-8
-		ADD . ${DOCKER_ARMBIAN_TARGET_PATH}/
-		${c}${c_req}RUN echo "--> CACHE MISS IN DOCKERFILE: running Armbian requirements initialization." && \\
-		${c}${c_req} ARMBIAN_INSIDE_DOCKERFILE_BUILD="yes" /bin/bash "${DOCKER_ARMBIAN_TARGET_PATH}/compile.sh" requirements SHOW_LOG=yes && \\
-		${c}${c_req} rm -rf "${DOCKER_ARMBIAN_TARGET_PATH}/output" "${DOCKER_ARMBIAN_TARGET_PATH}/.tmp" "${DOCKER_ARMBIAN_TARGET_PATH}/cache"
+		WORKDIR ${DOCKER_ATRIOS_TARGET_PATH}
+		ENV ATRIOS_RUNNING_IN_CONTAINER=yes LANG=C.UTF-8
+		ADD . ${DOCKER_ATRIOS_TARGET_PATH}/
+		${c}${c_req}RUN echo "--> CACHE MISS IN DOCKERFILE: running AtriOS requirements initialization." && \\
+		${c}${c_req} ATRIOS_INSIDE_DOCKERFILE_BUILD="yes" /bin/bash "${DOCKER_ATRIOS_TARGET_PATH}/compile.sh" requirements SHOW_LOG=yes && \\
+		${c}${c_req} rm -rf "${DOCKER_ATRIOS_TARGET_PATH}/output" "${DOCKER_ATRIOS_TARGET_PATH}/.tmp" "${DOCKER_ATRIOS_TARGET_PATH}/cache"
 		${docker_include_dot_git_dir}
 	INITIAL_DOCKERFILE
 	# For debugging: RUN rm -fv /usr/bin/pip3 # Remove pip3 symlink to make sure we're not depending on it; non-Dockers may not have it
@@ -355,36 +355,36 @@ function docker_cli_build_dockerfile() {
 
 	if [[ "${do_force_pull}" == "no" ]]; then
 		# Check if the base image is up to date.
-		local_image_sha="$(docker images --no-trunc --quiet "${DOCKER_ARMBIAN_BASE_IMAGE}")"
+		local_image_sha="$(docker images --no-trunc --quiet "${DOCKER_ATRIOS_BASE_IMAGE}")"
 		display_alert "Checking if base image exists at all" "local_image_sha: '${local_image_sha}'" "debug"
 		if [[ -n "${local_image_sha}" ]]; then
-			display_alert "Armbian docker image" "already exists: ${DOCKER_ARMBIAN_BASE_IMAGE}" "info"
+			display_alert "AtriOS docker image" "already exists: ${DOCKER_ATRIOS_BASE_IMAGE}" "info"
 		else
-			display_alert "Armbian docker image" "does not exist: ${DOCKER_ARMBIAN_BASE_IMAGE}" "info"
+			display_alert "AtriOS docker image" "does not exist: ${DOCKER_ATRIOS_BASE_IMAGE}" "info"
 			do_force_pull="yes"
 		fi
 	fi
 
 	if [[ "${do_force_pull:-yes}" == "yes" ]]; then
-		display_alert "Pulling" "${DOCKER_ARMBIAN_BASE_IMAGE}" "info"
+		display_alert "Pulling" "${DOCKER_ATRIOS_BASE_IMAGE}" "info"
 		local pull_failed="yes"
-		run_host_command_logged docker pull "${DOCKER_ARMBIAN_BASE_IMAGE}" && pull_failed="no"
+		run_host_command_logged docker pull "${DOCKER_ATRIOS_BASE_IMAGE}" && pull_failed="no"
 
 		if [[ "${pull_failed}" == "no" ]]; then
-			local_image_sha="$(docker images --no-trunc --quiet "${DOCKER_ARMBIAN_BASE_IMAGE}")"
+			local_image_sha="$(docker images --no-trunc --quiet "${DOCKER_ATRIOS_BASE_IMAGE}")"
 			display_alert "New local image sha after pull" "local_image_sha: ${local_image_sha}" "debug"
 			# print current date and time in epoch format; touches mtime of file
-			echo "${DOCKER_ARMBIAN_BASE_IMAGE}|${local_image_sha}|$(date +%s)" >> "${docker_marker_dir}"/last-pull
+			echo "${DOCKER_ATRIOS_BASE_IMAGE}|${local_image_sha}|$(date +%s)" >> "${docker_marker_dir}"/last-pull
 		else
-			display_alert "Failed to pull" "${DOCKER_ARMBIAN_BASE_IMAGE}; will build from scratch instead" "wrn"
+			display_alert "Failed to pull" "${DOCKER_ATRIOS_BASE_IMAGE}; will build from scratch instead" "wrn"
 		fi
 	fi
 
 	# If we get here without a local_image_sha, we need to build from scratch, so we need to re-create the Dockerfile.
 	if [[ -z "${local_image_sha}" ]]; then
-		display_alert "Base image not in local cache, building from scratch" "${DOCKER_ARMBIAN_BASE_IMAGE}" "info"
-		declare -g DOCKERFILE_USE_ARMBIAN_IMAGE_AS_BASE=no
-		declare -g DOCKER_ARMBIAN_BASE_IMAGE="${DOCKER_ARMBIAN_BASE_IMAGE_SCRATCH}"
+		display_alert "Base image not in local cache, building from scratch" "${DOCKER_ATRIOS_BASE_IMAGE}" "info"
+		declare -g DOCKERFILE_USE_ATRIOS_IMAGE_AS_BASE=no
+		declare -g DOCKER_ATRIOS_BASE_IMAGE="${DOCKER_ATRIOS_BASE_IMAGE_SCRATCH}"
 		docker_prepare_cli_skip_exts="yes" docker_cli_prepare
 		display_alert "Re-created" "Dockerfile, proceeding, build from scratch" "debug"
 	fi
@@ -392,7 +392,7 @@ function docker_cli_build_dockerfile() {
 	display_alert "Building" "Dockerfile via '${DOCKER_BUILDX_OR_BUILD[*]}'" "info"
 
 	BUILDKIT_COLORS="run=123,20,245:error=yellow:cancel=blue:warning=white" \
-		run_host_command_logged docker "${DOCKER_BUILDX_OR_BUILD[@]}" -t "${DOCKER_ARMBIAN_INITIAL_IMAGE_TAG}" -f "${SRC}"/Dockerfile "${SRC}"
+		run_host_command_logged docker "${DOCKER_BUILDX_OR_BUILD[@]}" -t "${DOCKER_ATRIOS_INITIAL_IMAGE_TAG}" -f "${SRC}"/Dockerfile "${SRC}"
 }
 
 function docker_cli_prepare_launch() {
@@ -404,11 +404,11 @@ function docker_cli_prepare_launch() {
 		"--cap-add=MKNOD"      # (though MKNOD should be already present)
 		"--cap-add=SYS_PTRACE" # CAP_SYS_PTRACE is required for systemd-detect-virt in some cases @TODO: rpardini: so lets eliminate it @TODO: rpardini maybe it's dead already?
 
-		# Pass env var ARMBIAN_RUNNING_IN_CONTAINER to indicate we're running under Docker. This is also set in the Dockerfile; make sure.
-		"--env" "ARMBIAN_RUNNING_IN_CONTAINER=yes"
+		# Pass env var ATRIOS_RUNNING_IN_CONTAINER to indicate we're running under Docker. This is also set in the Dockerfile; make sure.
+		"--env" "ATRIOS_RUNNING_IN_CONTAINER=yes"
 
 		# Change the ccache directory to the named volume or bind created. @TODO: this needs more love. it works for Docker, but not sudo
-		"--env" "CCACHE_DIR=${DOCKER_ARMBIAN_TARGET_PATH}/cache/ccache"
+		"--env" "CCACHE_DIR=${DOCKER_ATRIOS_TARGET_PATH}/cache/ccache"
 
 		# Pass down the TERM, COLORFGBG, and the COLUMNS
 		"--env" "TERM=${TERM}"
@@ -472,8 +472,8 @@ function docker_cli_prepare_launch() {
 	fi
 
 	# This env var is used super early (in entrypoint.sh), so set it as an env to current value.
-	if [[ "${DOCKER_ARMBIAN_ENABLE_CALL_TRACING:-no}" == "yes" ]]; then
-		DOCKER_ARGS+=("--env" "ARMBIAN_ENABLE_CALL_TRACING=yes")
+	if [[ "${DOCKER_ATRIOS_ENABLE_CALL_TRACING:-no}" == "yes" ]]; then
+		DOCKER_ARGS+=("--env" "ATRIOS_ENABLE_CALL_TRACING=yes")
 	fi
 
 	# If set, pass down git_info_ansi as an env var
@@ -554,18 +554,18 @@ function docker_cli_prepare_launch() {
 			anonymous)
 				display_alert "Mounting" "anonymous volume for '${MOUNT_DIR}'" "debug"
 				# type=volume, without source=, is an anonymous volume -- will be auto cleaned up together with the container;
-				# this could also be a type=tmpfs if you had enough ram - but armbian already does tmpfs for you if you
+				# this could also be a type=tmpfs if you had enough ram - but atrios already does tmpfs for you if you
 				#                                                         have enough RAM (inside the container) so don't bother.
-				DOCKER_ARGS+=("--mount" "type=volume,destination=${DOCKER_ARMBIAN_TARGET_PATH}/${MOUNT_DIR}${DOCKER_IS_PODMAN:+,exec,dev}")
+				DOCKER_ARGS+=("--mount" "type=volume,destination=${DOCKER_ATRIOS_TARGET_PATH}/${MOUNT_DIR}${DOCKER_IS_PODMAN:+,exec,dev}")
 				;;
 			bind)
 				display_alert "Mounting" "bind mount for '${MOUNT_DIR}'" "debug"
 				mkdir -p "${SRC}/${MOUNT_DIR}"
-				DOCKER_ARGS+=("--mount" "type=bind,source=${SRC}/${MOUNT_DIR},target=${DOCKER_ARMBIAN_TARGET_PATH}/${MOUNT_DIR}")
+				DOCKER_ARGS+=("--mount" "type=bind,source=${SRC}/${MOUNT_DIR},target=${DOCKER_ATRIOS_TARGET_PATH}/${MOUNT_DIR}")
 				;;
 			namedvolume)
 				display_alert "Mounting" "named volume id '${volume_id}' for '${MOUNT_DIR}'" "debug"
-				DOCKER_ARGS+=("--mount" "type=volume,source=armbian-${volume_id},destination=${DOCKER_ARMBIAN_TARGET_PATH}/${MOUNT_DIR}${DOCKER_IS_PODMAN:+,exec,dev}")
+				DOCKER_ARGS+=("--mount" "type=volume,source=atrios-${volume_id},destination=${DOCKER_ATRIOS_TARGET_PATH}/${MOUNT_DIR}${DOCKER_IS_PODMAN:+,exec,dev}")
 				;;
 			*)
 				display_alert "Unknown Mountpoint Type" "unknown volume type '${docker_kind}' for '${MOUNT_DIR}'" "err"
@@ -574,16 +574,16 @@ function docker_cli_prepare_launch() {
 		esac
 	}
 
-	loop_over_armbian_mountpoints prepare_docker_args_for_mountpoint
+	loop_over_atrios_mountpoints prepare_docker_args_for_mountpoint
 
 	# @TODO: auto-compute this list; just get the dirs and filter some out?
 	for MOUNT_DIR in "lib" "config" "extensions" "packages" "patch" "tools" "userpatches"; do
 		mkdir -p "${SRC}/${MOUNT_DIR}"
-		DOCKER_ARGS+=("--mount" "type=bind,source=${SRC}/${MOUNT_DIR},target=${DOCKER_ARMBIAN_TARGET_PATH}/${MOUNT_DIR}")
+		DOCKER_ARGS+=("--mount" "type=bind,source=${SRC}/${MOUNT_DIR},target=${DOCKER_ATRIOS_TARGET_PATH}/${MOUNT_DIR}")
 	done
 
 	if [[ "${DOCKER_SERVER_REQUIRES_LOOP_HACKS}" == "yes" ]]; then
-		display_alert "Adding /dev/loop* hacks for" "${DOCKER_ARMBIAN_HOST_OS_UNAME}" "debug"
+		display_alert "Adding /dev/loop* hacks for" "${DOCKER_ATRIOS_HOST_OS_UNAME}" "debug"
 		DOCKER_ARGS+=("--security-opt=apparmor:unconfined") # mounting things inside the container on Ubuntu won't work without this https://github.com/moby/moby/issues/16429#issuecomment-217126586
 		DOCKER_ARGS+=(--device-cgroup-rule='b 7:* rmw')     # allow loop devices (not required)
 		DOCKER_ARGS+=(--device-cgroup-rule='b 259:* rmw')   # allow loop device partitions
@@ -602,7 +602,7 @@ function docker_cli_prepare_launch() {
 		fi
 
 	else
-		display_alert "Skipping /dev/loop* hacks for" "${DOCKER_ARMBIAN_HOST_OS_UNAME}" "debug"
+		display_alert "Skipping /dev/loop* hacks for" "${DOCKER_ATRIOS_HOST_OS_UNAME}" "debug"
 	fi
 
 	if [[ -t 0 ]]; then
@@ -624,7 +624,7 @@ function docker_cli_prepare_launch() {
 		Available variables:
 		  - DOCKER_ARGS[@]: current Docker arguments (do not modify directly)
 		  - DOCKER_EXTRA_ARGS[@]: array to append extra arguments for docker run
-		  - DOCKER_ARMBIAN_TARGET_PATH: path inside container (/armbian)
+		  - DOCKER_ATRIOS_TARGET_PATH: path inside container (/atrios)
 	HOST_PRE_DOCKER_LAUNCH
 
 	# Add DOCKER_EXTRA_ARGS to DOCKER_ARGS if any were added by extensions
@@ -653,13 +653,13 @@ function docker_cli_launch() {
 	# The amount of privileges and capabilities given is a bare minimum needed for losetup to work
 	if [[ ! -e /dev/loop0 ]]; then
 		display_alert "Running losetup in a temporary container" "because no loop devices exist" "info"
-		run_host_command_logged docker run --rm --privileged --cap-add=MKNOD "${DOCKER_ARMBIAN_INITIAL_IMAGE_TAG}" /usr/sbin/losetup -f
+		run_host_command_logged docker run --rm --privileged --cap-add=MKNOD "${DOCKER_ATRIOS_INITIAL_IMAGE_TAG}" /usr/sbin/losetup -f
 	fi
 
 	display_alert "-----------------Relaunching in Docker after ${SECONDS}s------------------" "here comes the 🐳" "info"
 
 	local -i docker_build_result
-	if docker run "${DOCKER_ARGS[@]}" "${DOCKER_ARMBIAN_INITIAL_IMAGE_TAG}" /bin/bash "${DOCKER_ARMBIAN_TARGET_PATH}/compile.sh" "${ARMBIAN_CLI_FINAL_RELAUNCH_ARGS[@]}"; then
+	if docker run "${DOCKER_ARGS[@]}" "${DOCKER_ATRIOS_INITIAL_IMAGE_TAG}" /bin/bash "${DOCKER_ATRIOS_TARGET_PATH}/compile.sh" "${ATRIOS_CLI_FINAL_RELAUNCH_ARGS[@]}"; then
 		docker_build_result=$? # capture exit code of test done in the line above.
 		display_alert "-------------Docker run finished after ${SECONDS}s------------------------" "🐳 successful" "info"
 	else
@@ -668,9 +668,9 @@ function docker_cli_launch() {
 		skip_ci_special="yes" display_alert "-------------Docker run failed after ${SECONDS}s--------------------------" "🐳 failed" "err"
 	fi
 
-	# Find and show the path to the log file for the ARMBIAN_BUILD_UUID.
+	# Find and show the path to the log file for the ATRIOS_BUILD_UUID.
 	local logs_path="${DEST}/logs" log_file
-	log_file="$(find "${logs_path}" -type f -name "*${ARMBIAN_BUILD_UUID}*.*" -print -quit)"
+	log_file="$(find "${logs_path}" -type f -name "*${ATRIOS_BUILD_UUID}*.*" -print -quit)"
 	docker_produced_logs=0 # outer scope variable
 	if [[ -f "${log_file}" ]]; then
 		docker_produced_logs=1 # outer scope variable
@@ -686,10 +686,10 @@ function docker_cli_launch() {
 }
 
 function docker_purge_deprecated_volumes() {
-	prepare_armbian_mountpoints_description_dict
+	prepare_atrios_mountpoints_description_dict
 	local mountpoint=""
-	for mountpoint in "${ARMBIAN_MOUNTPOINTS_DEPRECATED[@]}"; do
-		local volume_id="armbian-${mountpoint//\//-}"
+	for mountpoint in "${ATRIOS_MOUNTPOINTS_DEPRECATED[@]}"; do
+		local volume_id="atrios-${mountpoint//\//-}"
 		display_alert "Purging deprecated Docker volume" "${volume_id}" "info"
 		if docker volume inspect "${volume_id}" &> /dev/null; then
 			run_host_command_logged docker volume rm "${volume_id}"
@@ -701,7 +701,7 @@ function docker_purge_deprecated_volumes() {
 }
 
 # Clean old/unused Docker images to free disk space
-# Removes dangling images and keeps only the 2 most recent armbian images per tag
+# Removes dangling images and keeps only the 2 most recent atrios images per tag
 function docker_cleanup_old_images() {
 	display_alert "Cleaning old Docker images" "removing dangling and keeping only 2 most recent per tag" "info"
 
@@ -709,11 +709,11 @@ function docker_cleanup_old_images() {
 	display_alert "Pruning dangling images" "docker image prune -f" "debug"
 	docker image prune -f > /dev/null 2>&1 || true
 
-	# For each armbian image tag, keep only the 2 most recent
+	# For each atrios image tag, keep only the 2 most recent
 	declare image_tags=()
 	while IFS= read -r line; do
 		image_tags+=("$line")
-	done < <(docker images --format '{{.Repository}}:{{.Tag}}' | grep "docker-armbian-build" | sort -u)
+	done < <(docker images --format '{{.Repository}}:{{.Tag}}' | grep "docker-atrios-build" | sort -u)
 
 	for image_tag in "${image_tags[@]}"; do
 		# Get all image IDs for this tag, sorted by creation date (newest first)
@@ -731,7 +731,7 @@ function docker_cleanup_old_images() {
 		fi
 	done
 
-	display_alert "Docker cleanup complete" "dangling images removed, old armbian images pruned" "info"
+	display_alert "Docker cleanup complete" "dangling images removed, old atrios images pruned" "info"
 }
 
 # Pull a Docker image and update the marker file to track when it was last pulled
@@ -766,26 +766,26 @@ function docker_pull_with_marker() {
 
 # Setup or update system cronjob to automatically pull Docker images
 # This ensures images are always fresh before builds start
-# Controlled by ARMBIAN_DOCKER_AUTO_PULL environment variable (must be explicitly set to "yes" to enable)
+# Controlled by ATRIOS_DOCKER_AUTO_PULL environment variable (must be explicitly set to "yes" to enable)
 function docker_setup_auto_pull_cronjob() {
 	if [[ ! -d /etc/cron.d ]]; then
 		exit_with_error "Docker auto-pull cronjob" "cron not available; /etc/cron.d does not exist on this system"
 	fi
-	declare cron_file="/etc/cron.d/armbian-docker-pull"
-	declare wrapper_script="/usr/local/bin/armbian-docker-pull"
-	declare hash_file="/var/lib/armbian/docker-pull.hash"
+	declare cron_file="/etc/cron.d/atrios-docker-pull"
+	declare wrapper_script="/usr/local/bin/atrios-docker-pull"
+	declare hash_file="/var/lib/atrios/docker-pull.hash"
 
 	# Determine which images to pull based on common base images
 	declare -a images_to_pull=(
-		"ghcr.io/armbian/docker-armbian-build:armbian-ubuntu-noble-latest"
-		"ghcr.io/armbian/docker-armbian-build:armbian-debian-trixie-latest"
+		"ghcr.io/leftymods/docker-atrios-build:atrios-ubuntu-noble-latest"
+		"ghcr.io/leftymods/docker-atrios-build:atrios-debian-trixie-latest"
 	)
 
 	# Generate the wrapper script content (self-contained)
 	declare wrapper_content
 	wrapper_content=$(cat <<- 'EOT'
 	#!/usr/bin/env bash
-	# Auto-generated by Armbian build framework
+	# Auto-generated by AtriOS build framework
 	# Pulls Docker images and updates markers to prevent unnecessary re-pulls
 	# DO NOT EDIT MANUALLY - this file is regenerated by the build system
 
@@ -804,7 +804,7 @@ function docker_setup_auto_pull_cronjob() {
 
 	# Simple logging function
 	log() {
-		echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | logger -t armbian-docker-pull
+		echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | logger -t atrios-docker-pull
 	}
 
 	# Pull a Docker image and update the marker file
@@ -813,7 +813,7 @@ function docker_setup_auto_pull_cronjob() {
 
 		log "Pulling Docker image: ${image_name}"
 
-		if docker pull "${image_name}" 2>&1 | logger -t armbian-docker-pull; then
+		if docker pull "${image_name}" 2>&1 | logger -t atrios-docker-pull; then
 			# Update marker file after successful pull
 			local local_image_sha
 			local_image_sha="$(docker images --no-trunc --quiet "${image_name}")"
@@ -848,14 +848,14 @@ function docker_setup_auto_pull_cronjob() {
 	# Generate the cron file content
 	declare cron_content
 	cron_content=$(cat <<- 'EOT'
-	# Armbian Docker image auto-pull
+	# AtriOS Docker image auto-pull
 	# Pulls Docker images every 12 hours to keep them fresh
 	# This prevents the '12 hours since last pull, pulling again' delay during builds
 	# DO NOT EDIT MANUALLY - this file is regenerated by the build system
 	EOT
 	)
-	declare cron_user="${ARMBIAN_DOCKER_PULL_USER:-${SUDO_USER:-$(whoami)}}"
-	cron_content="${cron_content}"$'\n'"0 */12 * * * ${cron_user} ${wrapper_script} 2>&1 | logger -t armbian-docker-pull"
+	declare cron_user="${ATRIOS_DOCKER_PULL_USER:-${SUDO_USER:-$(whoami)}}"
+	cron_content="${cron_content}"$'\n'"0 */12 * * * ${cron_user} ${wrapper_script} 2>&1 | logger -t atrios-docker-pull"
 
 	# Calculate combined hash (wrapper + cron content)
 	declare current_hash="${current_wrapper_hash}"
@@ -903,14 +903,14 @@ function docker_setup_auto_pull_cronjob() {
 }
 
 # Check if auto-pull cronjob is installed, and install if not or outdated
-# Controlled by ARMBIAN_DOCKER_AUTO_PULL environment variable (must be explicitly set to "yes" to enable)
+# Controlled by ATRIOS_DOCKER_AUTO_PULL environment variable (must be explicitly set to "yes" to enable)
 function docker_ensure_auto_pull_cronjob() {
-	declare wrapper_script="/usr/local/bin/armbian-docker-pull"
-	declare cron_file="/etc/cron.d/armbian-docker-pull"
-	declare hash_file="/var/lib/armbian/docker-pull.hash"
+	declare wrapper_script="/usr/local/bin/atrios-docker-pull"
+	declare cron_file="/etc/cron.d/atrios-docker-pull"
+	declare hash_file="/var/lib/atrios/docker-pull.hash"
 
-	# Only proceed if ARMBIAN_DOCKER_AUTO_PULL is explicitly set to "yes"
-	if [[ "${ARMBIAN_DOCKER_AUTO_PULL}" != "yes" ]]; then
+	# Only proceed if ATRIOS_DOCKER_AUTO_PULL is explicitly set to "yes"
+	if [[ "${ATRIOS_DOCKER_AUTO_PULL}" != "yes" ]]; then
 		# Remove cronjob, wrapper script, and hash file if they exist
 		if [[ -f "${cron_file}" ]] || [[ -f "${wrapper_script}" ]] || [[ -f "${hash_file}" ]]; then
 			display_alert "Docker auto-pull" "removing cronjob and wrapper script" "info"
@@ -935,7 +935,7 @@ function docker_ensure_auto_pull_cronjob() {
 		return 0
 	fi
 
-	# ARMBIAN_DOCKER_AUTO_PULL is explicitly set to "yes", ensure cronjob is installed
+	# ATRIOS_DOCKER_AUTO_PULL is explicitly set to "yes", ensure cronjob is installed
 	# Always call docker_setup_auto_pull_cronjob - it will check hashes and only update if needed
 	docker_setup_auto_pull_cronjob
 }

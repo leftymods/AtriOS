@@ -1,13 +1,13 @@
 # Internal build options
 
-These options are used to declare variables used by the armbian build system to build a board-specific configuration.
+These options are used to declare variables used by the atrios build system to build a board-specific configuration.
 
-If you are unsure about the documentation then invoke `$ grep -r -A5 -B5 "BUILD_OPTION_HERE" /path/to/local/armbian/build/repository` to get context to the option from the source code.
+If you are unsure about the documentation then invoke `$ grep -r -A5 -B5 "BUILD_OPTION_HERE" /path/to/local/AtriOS/build/repository` to get context to the option from the source code.
 
 - **BOARD_NAME** ( company product version ): defines the board name used in welcome text, hostname and others relevant usage.The general convention is `COMPANY PRODUCT VERSION` - Often used as part of the scripting logic (namely for hacks) so follow the name declared in the board configuration.
 	- Example: `OLIMEX Teres A64`
 - **BOARDFAMILY** ( board-family ): defines the family of the board to apply board-specific configuration during build time such as adjustments for the temperature, LED behavior, etc..
-	- Refer to [sources table](https://github.com/armbian/build/blob/master/config/sources/README.md)
+	- Refer to [sources table](https://github.com/leftymods/CoreOS/blob/master/config/sources/README.md)
 	- Example: `sun50iw1`
 - **BOARD_MAINTAINER** ( space-separated list of Github login ): Declares the maintainer of the board
 - **INTRODUCED** ( year ): When the board first came to market
@@ -20,8 +20,8 @@ If you are unsure about the documentation then invoke `$ grep -r -A5 -B5 "BUILD_
 	- Example: `256`
 - **BOOT_LOGO** ( string ): defines whether to use a eyecandy during bootloader phase
 	- Values:
-		- yes: Show the armbian boot logo
-		- desktop: Show the armbian boot logo when `BUILD_DESKTOP` is set to `yes`
+		- yes: Show the atrios boot logo
+		- desktop: Show the atrios boot logo when `BUILD_DESKTOP` is set to `yes`
 	- Default: `not set`
 - **CRUSTCONFIG** ( crust identifier ): declares the name of the crust defconfig configuration for the build. Specify only if the board has Allwinner CPU with AR100 coprocessor and SOC is supported by [crust firmware](https://github.com/crust-firmware/crust).
 	- Refer to the [crust source tree](https://github.com/crust-firmware/crust/tree/master/configs) to find configuration for the board
@@ -61,10 +61,10 @@ If you are unsure about the documentation then invoke `$ grep -r -A5 -B5 "BUILD_
 - **MODULES_BLACKLIST_EDGE** ( space-separated list of kernel modules ): appends modules to the kernel's blacklist/deny list for **edge** kernel
 - **SERIALCON** ( comma-separated list of terminal interfaces [:bandwidth] ): declares which serial console should be used on the system
 	- Example: `ttyS0:15000000,ttyGS1`
-- **SKIP_ARMBIAN_REPO** ( boolean ): Whether to exclude the armbian repository from the built image
+- **SKIP_AtriOS_REPO** ( boolean ): Whether to exclude the atrios repository from the built image
     - Values:
-        - yes: Exclude the armbian repo (armbian.sources stays `.disabled`)
-        - no: Include the armbian repo (default)
+        - yes: Exclude the AtriOS repo (atrios.sources stays `.disabled`)
+        - no: Include the AtriOS repo (default)
 - **POWER_MANAGEMENT_FEATURES** (boolean): Controls whether system sleep functionality (suspend, hibernate, hybrid sleep) is allowed on the built image.
     - Values:
          - yes: Enable power-management sleep features (allow systemd sleep modes)

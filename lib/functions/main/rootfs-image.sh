@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function build_rootfs_and_image() {
 	display_alert "Checking for rootfs cache" "$(echo "${BRANCH} ${BOARD} ${RELEASE} ${DESKTOP_ENVIRONMENT:-cli} ${DESKTOP_TIER:-none} ${BUILD_MINIMAL}" | tr -s " ")" "info"
@@ -30,36 +30,36 @@ function build_rootfs_and_image() {
 	LOG_SECTION="install_distribution_specific_${RELEASE}" do_with_logging install_distribution_specific
 	LOG_SECTION="install_distribution_agnostic" do_with_logging install_distribution_agnostic # does apt update
 
-	# install locally built packages  #  @TODO: armbian-nextify this eventually
+	# install locally built packages  #  @TODO: atrios-buildify this eventually
 	#[[ $EXTERNAL_NEW == compile ]] && LOG_SECTION="packages_local" do_with_logging chroot_installpackages_local
-	[[ $EXTERNAL_NEW == compile ]] && display_alert "Not running" "NOT armbian-next ported yet: chroot_installpackages_local" "warn"
+	[[ $EXTERNAL_NEW == compile ]] && display_alert "Not running" "NOT atrios-build ported yet: chroot_installpackages_local" "warn"
 
-	# install from apt.armbian.com  # @TODO: armbian-nextify this eventually
+	# install from apt.leftymods.com  # @TODO: atrios-buildify this eventually
 	#[[ $EXTERNAL_NEW == prebuilt ]] && LOG_SECTION="packages_prebuilt" do_with_logging chroot_installpackages "yes"
-	[[ $EXTERNAL_NEW == prebuilt ]] && display_alert "Not running" "NOT armbian-next ported yet: chroot_installpackages 'yes'" "warn"
+	[[ $EXTERNAL_NEW == prebuilt ]] && display_alert "Not running" "NOT atrios-build ported yet: chroot_installpackages 'yes'" "warn"
 
 	# stage: user customization script
 	# NOTE: installing too many packages may fill tmpfs mount
-	# NOTE(rpardini): hooks run _without_ the standard Armbian repo (sources.list) enabled.
+	# NOTE(rpardini): hooks run _without_ the standard AtriOS repo (sources.list) enabled.
 	LOG_SECTION="customize_image" do_with_logging customize_image
 
-	# Deploy the full apt lists, including the Armbian repo. Hook: "custom_apt_repo"
+	# Deploy the full apt lists, including the AtriOS repo. Hook: "custom_apt_repo"
 	create_sources_list_and_deploy_repo_key "image-late" "${RELEASE}" "${SDCARD}/"
 
 	# We call this above method too many times. @TODO: find out why and fix the same
-	# We may have a armbian.sources.disabled file lying around. Remove the same
-	if [[ -e "${SDCARD}"/etc/apt/sources.list.d/armbian.sources.disabled ]]; then
-		rm "${SDCARD}"/etc/apt/sources.list.d/armbian.sources.disabled
+	# We may have a AtriOS.sources.disabled file lying around. Remove the same
+	if [[ -e "${SDCARD}"/etc/apt/sources.list.d/AtriOS.sources.disabled ]]; then
+		rm "${SDCARD}"/etc/apt/sources.list.d/AtriOS.sources.disabled
 	fi
 
 	LOG_SECTION="post_repo_apt_update" do_with_logging post_repo_apt_update
 
-	## stage: further customization; hooks only run _with_ Armbian repo enabled, or not at all.
-	if [[ "${SKIP_ARMBIAN_REPO}" != "yes" ]]; then
-		LOG_SECTION="post_armbian_repo_customize_image" do_with_logging run_hooks_post_armbian_repo_customize_image
+	## stage: further customization; hooks only run _with_ AtriOS repo enabled, or not at all.
+	if [[ "${SKIP_AtriOS_REPO}" != "yes" ]]; then
+		LOG_SECTION="post_AtriOS_repo_customize_image" do_with_logging run_hooks_post_AtriOS_repo_customize_image
 	fi
 
-	## stage: late customization script; hooks always run; either with or without Armbian repo enabled.
+	## stage: late customization script; hooks always run; either with or without AtriOS repo enabled.
 	LOG_SECTION="post_repo_customize_image" do_with_logging run_hooks_post_repo_customize_image
 
 	# remove packages that are no longer needed. rootfs cache + uninstall might have leftovers.
@@ -136,10 +136,10 @@ function list_installed_packages() {
 		pkg_wanted_version="${image_artifacts_packages_version[${pkg_name}]}" # this is the hash-version
 		display_alert "Checking installed version of package" "${pkg_name}=${pkg_wanted_version}" "debug"
 		declare actual_version
-		actual_version=$(chroot "${SDCARD}" dpkg-query -W -f='${Status} ${Package} ${Armbian-Original-Hash}\n' "${pkg_name}" | grep " ok installed" | cut -d " " -f 5)
+		actual_version=$(chroot "${SDCARD}" dpkg-query -W -f='${Status} ${Package} ${AtriOS-Original-Hash}\n' "${pkg_name}" | grep " ok installed" | cut -d " " -f 5)
 		if [[ "${actual_version}" != "${pkg_wanted_version}" ]]; then
 			declare dpkg_status
-			dpkg_status=$(chroot "${SDCARD}" dpkg-query -W -f='${Status} ${Package} ${Armbian-Original-Hash}\n' "${pkg_name}" || true)
+			dpkg_status=$(chroot "${SDCARD}" dpkg-query -W -f='${Status} ${Package} ${AtriOS-Original-Hash}\n' "${pkg_name}" || true)
 			display_alert "Installed hash of package does not match wanted hash. Check for inconsistent repo, customize.sh/hooks, extensions, or upgrades installing wrong version" "${pkg_name} :: actual:'${actual_version}' wanted:'${pkg_wanted_version}'; status: '${dpkg_status}'" "warn"
 		else
 			display_alert "Image installed package hash" "✅ ${pkg_name} = ${actual_version}" "info"

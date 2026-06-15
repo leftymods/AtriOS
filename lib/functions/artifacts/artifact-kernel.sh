@@ -4,14 +4,14 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function artifact_kernel_config_dump() {
 	# BOARD is NOT included. See explanation below.
 	artifact_input_variables[LINUXFAMILY]="${LINUXFAMILY}"
 	artifact_input_variables[LINUXCONFIG]="${LINUXCONFIG}"
-	artifact_input_variables[ARMBIAN_KERNEL_DEB_NAME]="${LINUXFAMILY}-${BRANCH}"
+	artifact_input_variables[AtriOS_KERNEL_DEB_NAME]="${LINUXFAMILY}-${BRANCH}"
 	artifact_input_variables[BRANCH]="${BRANCH}"
 	artifact_input_variables[KERNEL_MAJOR_MINOR]="${KERNEL_MAJOR_MINOR}"
 	artifact_input_variables[KERNELSOURCE]="${KERNELSOURCE}"
@@ -22,7 +22,7 @@ function artifact_kernel_config_dump() {
 }
 
 # This is run in a logging section.
-# Prepare the version, "sans-repos": just the armbian/build repo contents are available.
+# Prepare the version, "sans-repos": just the AtriOS/build repo contents are available.
 # It is OK to reach out to the internet for a curl or ls-remote, but not for a git clone, but
 # you *must* _cache_ results on disk @TODO with a TTL determined by live code, not preset in cached entries.
 function artifact_kernel_prepare_version() {
@@ -58,11 +58,11 @@ function artifact_kernel_prepare_version() {
 	#     - reduce:  to "${LINUXFAMILY}-${BRANCH}", but keep an "example" BOARD= for each group, so that it can be input to
 	#       this building process 🤯
 	# - Also note: BOARDFAMILY is not an input here; and merely a mechanism for BOARDs to share some common defs.
-	#     - That was later (but pre-armbian-next) made more complicated by sourcing, "families/includes/<xxx>_common.inc"
+	#     - That was later (but pre-atrios-build) made more complicated by sourcing, "families/includes/<xxx>_common.inc"
 	# - 👉 tl;dr: AtriOS kernels can't have per-board patches or configs; "family code" is a lie; repo management is hell.
 	debug_var BOARD              # Heh.
 	debug_var BOARDFAMILY        # Heh.
-	debug_var KERNEL_MAJOR_MINOR # Double heh. transitional stuff, from when armbian-next began. 🤣
+	debug_var KERNEL_MAJOR_MINOR # Double heh. transitional stuff, from when atrios-build began. 🤣
 	debug_var BRANCH
 	debug_var KERNELSOURCE
 	debug_var KERNELBRANCH
@@ -307,7 +307,7 @@ function artifact_kernel_build_from_sources() {
 }
 
 function artifact_kernel_cli_adapter_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -316,19 +316,19 @@ function artifact_kernel_cli_adapter_pre_run() {
 function artifact_kernel_cli_adapter_config_prep() {
 	# Sanity check / cattle guard
 	# If KERNEL_CONFIGURE=yes, or CREATE_PATCHES=yes, user must have used the correct CLI commands, and only add those params.
-	if [[ "${KERNEL_CONFIGURE}" == "yes" && "${ARMBIAN_COMMAND}" != *kernel-config ]]; then
-		exit_with_error "KERNEL_CONFIGURE=yes is not supported anymore. Please use the new 'kernel-config' CLI command. Current command: '${ARMBIAN_COMMAND}'"
+	if [[ "${KERNEL_CONFIGURE}" == "yes" && "${AtriOS_COMMAND}" != *kernel-config ]]; then
+		exit_with_error "KERNEL_CONFIGURE=yes is not supported anymore. Please use the new 'kernel-config' CLI command. Current command: '${AtriOS_COMMAND}'"
 	fi
 
-	if [[ "${CREATE_PATCHES}" == "yes" && "${ARMBIAN_COMMAND}" != "kernel-patch" ]]; then
-		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'kernel-patch' CLI command. Current command: '${ARMBIAN_COMMAND}'"
+	if [[ "${CREATE_PATCHES}" == "yes" && "${AtriOS_COMMAND}" != "kernel-patch" ]]; then
+		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'kernel-patch' CLI command. Current command: '${AtriOS_COMMAND}'"
 	fi
 
 	use_board="yes" prep_conf_main_minimal_ni < /dev/null # no stdin for this, so it bombs if tries to be interactive.
 }
 
 function artifact_kernel_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/armbian/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
 }
 
 function artifact_kernel_is_available_in_local_cache() {

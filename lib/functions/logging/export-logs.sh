@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function prepare_ansi_git_info_log_header() {
 	# writes to stdout, ANSI format
@@ -33,13 +33,13 @@ function export_markdown_logs() {
 	display_alert "Preparing Markdown log from" "${LOGDIR} (${ascii_log_file})" "debug"
 
 	cat <<- MARKDOWN_HEADER > "${target_file}"
-		<details><summary>Build: ${ARMBIAN_ORIGINAL_ARGV[*]}</summary>
+		<details><summary>Build: ${AtriOS_ORIGINAL_ARGV[*]}</summary>
 		<p>
 
-		### Armbian logs for ${ARMBIAN_BUILD_UUID}
-		#### Armbian build at $(LC_ALL=C LANG=C date) on $(hostname || true)
+		### AtriOS logs for ${AtriOS_BUILD_UUID}
+		#### AtriOS build at $(LC_ALL=C LANG=C date) on $(hostname || true)
 		#### Repeat build: ${repeat_args_string:-""}
-		#### ARGs: \`${ARMBIAN_ORIGINAL_ARGV[@]@Q}\`
+		#### ARGs: \`${AtriOS_ORIGINAL_ARGV[@]@Q}\`
 	MARKDOWN_HEADER
 
 	if [[ -n "$(command -v git)" && -d "${SRC}/.git" ]]; then
@@ -88,7 +88,7 @@ function export_markdown_logs() {
 		if [[ -f "${ascii_log_file}" ]]; then
 			# Newlines are relevant here.
 			cat <<- MARKDOWN_LOG_HEADER >> "${target_file}"
-				<details><summary>ASCII logs: ${ARMBIAN_BUILD_UUID}</summary>
+				<details><summary>ASCII logs: ${AtriOS_BUILD_UUID}</summary>
 				<p>
 
 				\`\`\`bash
@@ -117,11 +117,11 @@ function export_ansi_logs() {
 	dim_line_separator=$(echo -e -n "${gray_color:-}")------------------------------------------------------------------------------------------------------------$(echo -e -n "${ansi_reset_color:-}")
 
 	cat <<- ANSI_HEADER > "${target_file}"
-		# Armbian ANSI build logs for ${ARMBIAN_BUILD_UUID} - use "less -SR" to view
-		$(echo -e -n "${bright_blue_color:-}")# Armbian build at $(LC_ALL=C LANG=C date) on $(hostname || true)$(echo -e -n "${ansi_reset_color}")
+		# AtriOS ANSI build logs for ${AtriOS_BUILD_UUID} - use "less -SR" to view
+		$(echo -e -n "${bright_blue_color:-}")# AtriOS build at $(LC_ALL=C LANG=C date) on $(hostname || true)$(echo -e -n "${ansi_reset_color}")
 		${dim_line_separator}
 		$(echo -e -n "${bright_blue_color}")# Repeat build: ${repeat_args_string:-""}$(echo -e -n "${ansi_reset_color}")
-		$(echo -e -n "${bright_blue_color}")# ARGs: ${ARMBIAN_ORIGINAL_ARGV[@]@Q}$(echo -e -n "${ansi_reset_color}")
+		$(echo -e -n "${bright_blue_color}")# ARGs: ${AtriOS_ORIGINAL_ARGV[@]@Q}$(echo -e -n "${ansi_reset_color}")
 		${dim_line_separator}
 	ANSI_HEADER
 
@@ -165,11 +165,11 @@ function export_ansi_logs() {
 	declare target_relative_to_src
 	target_relative_to_src="$(realpath --relative-to="${SRC}" "${target_file}")"
 
-	if [[ "${show_message_after_export:-"yes"}" != "skip" && "${ARMBIAN_INSIDE_DOCKERFILE_BUILD:-"no"}" != "yes" ]]; then
+	if [[ "${show_message_after_export:-"yes"}" != "skip" && "${AtriOS_INSIDE_DOCKERFILE_BUILD:-"no"}" != "yes" ]]; then
 		display_alert "ANSI log file built; inspect it by running:" "less -RS ${target_relative_to_src}"
 
 		# Define here the paste servers to use, in order: each will be tried in sequence until one works
-		declare -a paste_servers=("paste.armbian.com" "paste.armbian.de" "paste.next.armbian.com" "paste.armbian.eu")
+		declare -a paste_servers=("paste.AtriOS.com" "paste.AtriOS.de" "paste.next.AtriOS.com" "paste.AtriOS.eu")
 
 		# User can override by setting PASTE_SERVER_HOST=some.paste.server.com - it will be added as the first to try
 		if [[ "${PASTE_SERVER_HOST}" != "" ]]; then

@@ -6,7 +6,7 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Rebuild AtriOS
-# https://github.com/ophub/amlogic-s9xxx-armbian
+# https://github.com/leftymods/CoreOS
 #
 # Function: Customize the startup script. Add content as needed.
 # Dependent script: /etc/rc.local (which runs with 'set -e')

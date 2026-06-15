@@ -7,7 +7,7 @@ config: # This is file 'patch/kernel/archive/sm8250-6.18/0000.patching_config.ya
   branch: linux-6.18.y
   last-known-good-tag: v6.18.3
   maintainers:
-    - { github: rpardini, name: Ricardo Pardini, email: ricardo@pardini.net, armbian-forum: rpardini }
+    - { github: rpardini, name: Ricardo Pardini, email: ricardo@pardini.net, AtriOS-forum: rpardini }
 
   # .dts files in these directories will be copied as-is to the build tree; later ones overwrite earlier ones.
   # This is meant to provide a way to "add a board DTS" without having to null-patch them in.

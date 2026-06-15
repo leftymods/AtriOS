@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 ### Attention: we can't use any interactive programs, read from stdin, nor use non-coreutils utilities here.
 
@@ -38,21 +38,21 @@ function do_main_configuration() {
 		exit_with_error "REVISION must begin with a digit, got '${REVISION}'"
 	fi
 
-	# Armbian image is set as unofficial if build manually or without declaring from outside
-	[[ -z $VENDOR ]] && VENDOR="Armbian-unofficial"
+	# AtriOS image is set as unofficial if build manually or without declaring from outside
+	[[ -z $VENDOR ]] && VENDOR="AtriOS-unofficial"
 
-	# Use framework defaults for community Armbian images and unsupported distribution when building Armbian distribution
-	if [[ ${VENDOR} == "Armbian" ]] && [[ ${BOARD_TYPE} != "conf" || $(cat $SRC/config/distributions/$RELEASE/support) != "supported" ]]; then
-		VENDORURL="https://www.armbian.com/"
+	# Use framework defaults for community AtriOS images and unsupported distribution when building AtriOS distribution
+	if [[ ${VENDOR} == "AtriOS" ]] && [[ ${BOARD_TYPE} != "conf" || $(cat $SRC/config/distributions/$RELEASE/support) != "supported" ]]; then
+		VENDORURL="https://github.com/leftymods/CoreOS"
 		unset VENDORSUPPORT,VENDORPRIVACY,VENDORBUGS,VENDORLOGO,ROOTPWD,MAINTAINER,MAINTAINERMAIL
 	fi
 
 	[[ -z $VENDORCOLOR ]] && VENDORCOLOR="247;16;0"                           # RGB values for MOTD logo
 	[[ -z $VENDORURL ]] && VENDORURL="https://duckduckgo.com/"
-	[[ -z $VENDORSUPPORT ]] && VENDORSUPPORT="https://community.armbian.com/"
+	[[ -z $VENDORSUPPORT ]] && VENDORSUPPORT="https://community.AtriOS.com/"
 	[[ -z $VENDORPRIVACY ]] && VENDORPRIVACY="https://duckduckgo.com/"
-	[[ -z $VENDORBUGS ]] && VENDORBUGS="https://armbian.atlassian.net/"
-	[[ -z $VENDORDOCS ]] && VENDORDOCS="https://docs.armbian.com/"
+	[[ -z $VENDORBUGS ]] && VENDORBUGS="https://AtriOS.atlassian.net/"
+	[[ -z $VENDORDOCS ]] && VENDORDOCS="https://docs.AtriOS.com/"
 	[[ -z $VENDORLOGO ]] && VENDORLOGO="atrios-logo"
 	[[ -z $ROOTPWD ]] && ROOTPWD="1234"                                       # Must be changed @first login
 	[[ -z $MAINTAINER ]] && MAINTAINER="John Doe"                             # deb signature
@@ -62,8 +62,8 @@ function do_main_configuration() {
 
 	declare -g USE_CCACHE="${USE_CCACHE:-no}"                              # stop using ccache as our worktree is more effective
 
-	# Armbian config is central tool used in all builds. As its build externally, we have moved it to extension. Enable it here.
-	enable_extension "armbian-config"
+	# AtriOS config is central tool used in all builds. As its build externally, we have moved it to extension. Enable it here.
+	enable_extension "atrios-config"
 
 	# Fix binman pkg_resources removal in setuptools >= 82. Can be removed when all U-Boot versions are >= v2025.10.
 	enable_extension "uboot-binman-fix-pkg-resources"
@@ -177,7 +177,7 @@ function do_main_configuration() {
 		if [[ -z $CRYPTROOT_PASSPHRASE ]] && [[ -z $CRYPTROOT_AUTOUNLOCK ]]; then # a passphrase is mandatory if rootfs encryption is enabled, unless CRYPTROOT_AUTOUNLOCK is wanted
 			exit_with_error "Root encryption is enabled but CRYPTROOT_PASSPHRASE or CRYPTROOT_AUTOUNLOCK is not set"
 		fi
-		[[ -z $CRYPTROOT_MAPPER ]] && CRYPTROOT_MAPPER="armbian-root" # TODO: fixed name can't be used for parallel image building (rpardini: ?)
+		[[ -z $CRYPTROOT_MAPPER ]] && CRYPTROOT_MAPPER="AtriOS-root" # TODO: fixed name can't be used for parallel image building (rpardini: ?)
 		[[ -z $CRYPTROOT_SSH_UNLOCK ]] && CRYPTROOT_SSH_UNLOCK=yes
 		[[ -z $CRYPTROOT_SSH_UNLOCK_PORT ]] && CRYPTROOT_SSH_UNLOCK_PORT=2022
 		# Default to pdkdf2, this used to be the default with cryptroot <= 2.0, however

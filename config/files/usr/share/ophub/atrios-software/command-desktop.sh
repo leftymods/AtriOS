@@ -6,11 +6,11 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Rebuild Armbian
-# https://github.com/ophub/amlogic-s9xxx-armbian
+# https://github.com/leftymods/CoreOS
 #
 # Function: Manage desktop software installation, update, and removal
 # Copyright (C) 2021- https://github.com/unifreq/openwrt_packit
-# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+# Copyright (C) 2021- https://github.com/leftymods/CoreOS
 #
 # Command: command-desktop.sh -s <software_id> -m <install/update/remove>
 # Example: command-desktop.sh -s 201 -m install

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function cli_config_dump_json_pre_run() {
 	declare -g -r CONFIG_DEFS_ONLY='yes' # @TODO: This is actually too late (early optimizations in logging etc), so callers should also set it in the environment when using CLI. sorry.
@@ -15,7 +15,7 @@ function cli_config_dump_json_run() {
 	# configuration etc - it initializes the extension manager
 	do_capturing_defs config_board_and_remove_useless < /dev/null # this sets CAPTURED_VARS_NAMES and CAPTURED_VARS_ARRAY; the < /dev/null is take away the terminal from stdin
 
-	if [[ "${ARMBIAN_COMMAND}" == "config-dump-no-json" ]]; then
+	if [[ "${AtriOS_COMMAND}" == "config-dump-no-json" ]]; then
 		# for debugging the bash-declare-to-JSON parser
 		echo "${CAPTURED_VARS_ARRAY[@]}"
 		return 0

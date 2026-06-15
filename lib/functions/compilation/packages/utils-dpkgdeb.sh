@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # for RAW deb building. does a bunch of magic to "DEBIAN" directory. Arguments are the open package directory and the artifact_deb_id
 function dpkg_deb_build() {
@@ -168,14 +168,14 @@ function generic_artifact_package_hook_helper() {
 
 	cat >> "${package_DEBIAN_dir}/${script}" <<- EOT
 		#!/bin/bash
-		echo "Armbian '${artifact_name:?}' for '${artifact_version:?}': '${script}' starting."
-		set +e # NO ERROR CONTROL, for compatibility with legacy Armbian scripts.
+		echo "AtriOS '${artifact_name:?}' for '${artifact_version:?}': '${script}' starting."
+		set +e # NO ERROR CONTROL, for compatibility with legacy AtriOS scripts.
 		#set -e # Debugging
 
 		$(echo "${contents}")
 
 		set +x # Disable debugging
-		echo "Armbian '${artifact_name:?}' for '${artifact_version:?}': '${script}' finishing."
+		echo "AtriOS '${artifact_name:?}' for '${artifact_version:?}': '${script}' finishing."
 		true
 	EOT
 	chmod 755 "${package_DEBIAN_dir}/${script}"

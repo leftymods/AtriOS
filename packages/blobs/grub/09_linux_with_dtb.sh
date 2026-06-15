@@ -3,7 +3,7 @@ set -e
 
 # This is an Armbian-specific /etc/grub.d/09_linux_with_dtb.sh
 # It has been cobbled together from bookworm's 10_linux and Ubuntu's 10_linux.
-# The main change is looking for a version-specific /boot/armbian-dtb-<version> file or symlink.
+# The main change is looking for a version-specific /boot/atrios-dtb-<version> file or symlink.
 # Ubuntu's original implementation is at https://git.launchpad.net/~ubuntu-core-dev/grub/+git/ubuntu/tree/debian/patches/ubuntu-add-devicetree-command-support.patch
 # We've further modified it to only look for a specific version, check it is a file or symlink, write the used name.
 
@@ -427,11 +427,11 @@ while [ "x$list" != "x" ]; do
 
 	dtb=
 	# shellcheck disable=SC2066 # yeah I know, just wanna keep it similar to Ubuntu's
-	for i in "armbian-dtb-${version}"; do # This used to include "dtb" but that conflicts with Armbian's linux-dtb
+	for i in "atrios-dtb-${version}"; do # This used to include "dtb" but that conflicts with AtriOS linux-dtb
 		if test -e "${dirname}/${i}"; then
 			gettext_printf "Found DTB path: %s\n" "${dirname}/${i}" >&2
 
-			# skip if it's a directory, and in the case of Armbian's linux-dtb.
+			# skip if it's a directory, and in the case of AtriOS linux-dtb.
 			if test -d "${dirname}/${i}"; then
 				gettext_printf "Found DTB directory, skipping: %s\n" "${dirname}/${i}" >&2
 				continue

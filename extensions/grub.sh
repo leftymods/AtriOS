@@ -5,7 +5,7 @@ function extension_prepare_config__prepare_grub_standard() {
 	declare -g DISTRO_GENERIC_KERNEL=${DISTRO_GENERIC_KERNEL:-no}             # if yes, does not build our own kernel, instead, uses generic one from distro
 	declare -g UEFI_GRUB_TERMINAL="${UEFI_GRUB_TERMINAL:-"serial console"}"   # 'serial' forces grub menu on serial console. empty to not include
 	declare -g UEFI_GRUB_DISABLE_OS_PROBER="${UEFI_GRUB_DISABLE_OS_PROBER:-}" # 'true' will disable os-probing, useful for SD cards.
-	declare -g UEFI_GRUB_DISTRO_NAME="${UEFI_GRUB_DISTRO_NAME:-Armbian}"      # Will be used on grub menu display
+	declare -g UEFI_GRUB_DISTRO_NAME="${UEFI_GRUB_DISTRO_NAME:-AtriOS}"      # Will be used on grub menu display
 	declare -g UEFI_GRUB_TIMEOUT=${UEFI_GRUB_TIMEOUT:-0}                      # Small timeout by default
 	declare -g GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT:-}"   # Cmdline by default
 	declare -g UEFI_ENABLE_BIOS_AMD64="${UEFI_ENABLE_BIOS_AMD64:-yes}"        # Enable BIOS too if target is amd64
@@ -64,10 +64,10 @@ function extension_prepare_config__prepare_grub_standard() {
 	if [[ "${DISTRO_GENERIC_KERNEL}" == "yes" ]]; then
 		declare -g IMAGE_INSTALLED_KERNEL_VERSION="${DISTRO_KERNEL_VER}"
 		declare -g KERNELSOURCE='none'         # We need to be explicit we don't want a kernel built.
-		declare -g INSTALL_ARMBIAN_FIRMWARE=no # Should skip build and install of Armbian-firmware.
+		declare -g INSTALL_AtriOS_FIRMWARE=no # Should skip build and install of AtriOS-firmware.
 	else
 		declare -g KERNELDIR="linux-uefi-${LINUXFAMILY}" # Avoid sharing a source tree with others, until we know it's safe.
-		# Don't install anything. Armbian handles everything.
+		# Don't install anything. AtriOS handles everything.
 		DISTRO_KERNEL_PACKAGES=""
 		DISTRO_FIRMWARE_PACKAGES=""
 	fi
@@ -119,7 +119,7 @@ pre_umount_final_image__install_grub() {
 	display_alert "Extension: ${EXTENSION}: Installing bootloader" "GRUB" "info"
 
 	# Ubuntu's grub (10_linux) will look for /boot/dtb, /boot/dtb-<version> ...
-	# ... unfortunately it does not account for the fact those might be a directories (as in Armbian's linux-dtb case).
+	# ... unfortunately it does not account for the fact those might be a directories (as in AtriOS's linux-dtb case).
 	# Zap everything out of there, the hook below will have a chance to put them back, as symlinks.
 	# Kernel hooks should maintain the link for apt upgrades (same as done for initrd).
 	rm -rf "${MOUNT}"/boot/dtb* || true
@@ -132,11 +132,11 @@ pre_umount_final_image__install_grub() {
 	GRUB_EARLY_CONFIG
 
 	# add config to disable os-prober, otherwise image will have the host's other OSes boot entries.
-	cat <<- grubCfgFragHostSide >> "${MOUNT}"/etc/default/grub.d/99-armbian-host-side.cfg
+	cat <<- grubCfgFragHostSide >> "${MOUNT}"/etc/default/grub.d/99-AtriOS-host-side.cfg
 		GRUB_DISABLE_OS_PROBER=true
 	grubCfgFragHostSide
 
-	# copy Armbian GRUB wallpaper
+	# copy AtriOS GRUB wallpaper
 	mkdir -p "${MOUNT}"/usr/share/images/grub/
 	cp "${SRC}"/packages/blobs/splash/grub.png "${MOUNT}"/usr/share/images/grub/wallpaper.png
 
@@ -174,8 +174,8 @@ pre_umount_final_image__install_grub() {
 	# Irony: let's use grub-probe to find out the UUID of the root partition, and then create a symlink to it.
 	# Another: on some systems (eg, not Docker) the thing might already exist due to udev actually working.
 	# shellcheck disable=SC2016 # some wierd escaping going on there.
-	# Root is needed so that UUID of the unlocked /dev/mapper/armbian-root is discovered by grub-update,
-	# UUID is then put into grub.cfg instead of raw /dev/mapper/armbian-root which will fail further sanity check
+	# Root is needed so that UUID of the unlocked /dev/mapper/AtriOS-root is discovered by grub-update,
+	# UUID is then put into grub.cfg instead of raw /dev/mapper/AtriOS-root which will fail further sanity check
 	chroot_custom "$chroot_target" mkdir -pv '/dev/disk/by-uuid/"$(grub-probe --target=fs_uuid /)"' "||" true
 	# Include /boot that might point to a separate boot partition in case one exists (lvm, cryptroot)
 	# Even if boot partition doesn't exist - the command will be the same as mkdir for / above
@@ -236,7 +236,7 @@ pre_umount_final_image__install_grub() {
 	fi
 
 	# Remove host-side config.
-	rm -f "${MOUNT}"/etc/default/grub.d/99-armbian-host-side.cfg
+	rm -f "${MOUNT}"/etc/default/grub.d/99-AtriOS-host-side.cfg
 
 	undeploy_qemu_binary_from_chroot "$chroot_target" "grub"
 	umount_chroot "$chroot_target/"
@@ -269,7 +269,7 @@ configure_grub() {
 	# (splash plymouth.ignore-serial-consoles) on UEFI x86,
 	# regardless of whether this image is being built as CLI or
 	# desktop. Two reasons:
-	#   1. Users routinely add a desktop later via armbian-config
+	#   1. Users routinely add a desktop later via atrios-config
 	#      and we don't want that to require regenerating grub.cfg.
 	#      The .cfg is baked once at image-build time and stays
 	#      put across desktop installs.
@@ -289,9 +289,9 @@ configure_grub() {
 	# the splash and read the messages directly.
 	GRUB_CMDLINE_LINUX_DEFAULT+=" splash plymouth.ignore-serial-consoles i915.force_probe=*"
 
-	# Enable Armbian Wallpaper on GRUB
-	if [[ "${VENDOR}" == Armbian ]]; then
-		display_alert "Extension: ${EXTENSION}: Enabling" "Armbian Wallpaper on GRUB" "info"
+	# Enable AtriOS Wallpaper on GRUB
+	if [[ "${VENDOR}" == AtriOS ]]; then
+		display_alert "Extension: ${EXTENSION}: Enabling" "AtriOS Wallpaper on GRUB" "info"
 		mkdir -p "${MOUNT}"/usr/share/desktop-base/
 		cat <<- grubWallpaper >> "${MOUNT}"/usr/share/desktop-base/grub_background.sh
 			WALLPAPER=/usr/share/images/grub/wallpaper.png
@@ -302,11 +302,11 @@ configure_grub() {
 	fi
 
 	display_alert "Extension: ${EXTENSION}: GRUB EFI kernel cmdline" "cmdline '${GRUB_CMDLINE_LINUX_DEFAULT}' distro=${UEFI_GRUB_DISTRO_NAME} timeout=${UEFI_GRUB_TIMEOUT}" ""
-	cat <<- grubCfgFrag >> "${MOUNT}"/etc/default/grub.d/98-armbian.cfg
+	cat <<- grubCfgFrag >> "${MOUNT}"/etc/default/grub.d/98-AtriOS.cfg
 		GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT}"
-		GRUB_TIMEOUT_STYLE=menu                                  # Show the menu with Kernel options (Armbian or -generic)...
-		GRUB_TIMEOUT=${UEFI_GRUB_TIMEOUT}                        # ... for ${UEFI_GRUB_TIMEOUT} seconds, then boot the Armbian default.
-		GRUB_DISTRIBUTOR="${UEFI_GRUB_DISTRO_NAME}"              # On GRUB menu will show up as "Armbian GNU/Linux" (will show up in some UEFI BIOS boot menu (F8?) as "armbian", not on others)
+		GRUB_TIMEOUT_STYLE=menu                                  # Show the menu with Kernel options (AtriOS or -generic)...
+		GRUB_TIMEOUT=${UEFI_GRUB_TIMEOUT}                        # ... for ${UEFI_GRUB_TIMEOUT} seconds, then boot the AtriOS default.
+		GRUB_DISTRIBUTOR="${UEFI_GRUB_DISTRO_NAME}"              # On GRUB menu will show up as "AtriOS GNU/Linux" (will show up in some UEFI BIOS boot menu (F8?) as "AtriOS", not on others)
 		GRUB_DISABLE_SUBMENU=y                                   # Do not put all kernel options into a submenu, instead, list them all on the main menu.
 		GRUB_DISABLE_OS_PROBER=false                             # Have to be explicit about enabling os-prober
 		GRUB_FONT="/usr/share/grub/unicode.pf2"                  # Be explicit about the font to use so Ubuntu does not freak out and mess gfxterm
@@ -316,13 +316,13 @@ configure_grub() {
 	grubCfgFrag
 
 	if [[ "a${UEFI_GRUB_DISABLE_OS_PROBER}" != "a" ]]; then
-		cat <<- grubCfgFragHostSide >> "${MOUNT}"/etc/default/grub.d/98-armbian.cfg
+		cat <<- grubCfgFragHostSide >> "${MOUNT}"/etc/default/grub.d/98-AtriOS.cfg
 			GRUB_DISABLE_OS_PROBER=${UEFI_GRUB_DISABLE_OS_PROBER}
 		grubCfgFragHostSide
 	fi
 
 	if [[ "a${UEFI_GRUB_TERMINAL}" != "a" ]]; then
-		cat <<- grubCfgFragTerminal >> "${MOUNT}"/etc/default/grub.d/98-armbian.cfg
+		cat <<- grubCfgFragTerminal >> "${MOUNT}"/etc/default/grub.d/98-AtriOS.cfg
 			GRUB_TERMINAL="${UEFI_GRUB_TERMINAL}"
 		grubCfgFragTerminal
 	fi

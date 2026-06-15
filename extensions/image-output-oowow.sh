@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 # This converts the output image to the Khadas OOWOW format.
@@ -47,13 +47,13 @@ function post_build_image__900_convert_to_oowow() {
 
 	declare xze_params=(
 		"--meta"
-		"label=Armbian"
-		"builder=Armbian"
+		"label=AtriOS"
+		"builder=AtriOS"
 		"date=$(LANG=C TZ='' date)"
 		"match=BOARD=${KHADAS_OOWOW_BOARD_ID}"
-		"link=https://www.armbian.com/"
+		"link=https://github.com/leftymods/CoreOS"
 		"duration=60"
-		"desc=Armbian ${BOARD} ${RELEASE} ${BRANCH} ${REVISION}"
+		"desc=AtriOS ${BOARD} ${RELEASE} ${BRANCH} ${REVISION}"
 	)
 
 	display_alert "Converting image to Khadas OOWOW format" "${EXTENSION} :: ${KHADAS_OOWOW_BOARD_ID}" "info"

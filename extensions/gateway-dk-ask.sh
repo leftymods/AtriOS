@@ -101,7 +101,7 @@ function custom_kernel_config__ask_modules() {
 	cp "${ASK_CACHE_DIR}/Kconfig" "${ask_drv}/Kconfig"
 	cp "${ASK_CACHE_DIR}/Kbuild.mk" "${ask_drv}/Makefile"
 
-	# Board-specific modules (not part of ASK repo — from Armbian BSP)
+	# Board-specific modules (not part of ASK repo — from AtriOS BSP)
 	if [[ "${BOARD}" == "gateway-dk" ]]; then
 		mkdir -p "${ask_drv}/sfp_led" "${ask_drv}/leds_lp5812"
 		cp "${bsp_dir}/sfp-led.c" "${ask_drv}/sfp_led/"
@@ -139,7 +139,7 @@ function custom_kernel_config__ask_modules() {
 }
 
 # Copy ASK kernel patch to userpatches (gitignored) so it's applied during kernel build.
-# userpatches/ is the Armbian-standard location for extension-provided patches — the build
+# userpatches/ is the AtriOS-standard location for extension-provided patches — the build
 # framework merges them with patches from patch/kernel/ at build time. The directory is
 # gitignored and ephemeral; it does not persist across clean builds.
 function post_family_config__ask_kernel_patch() {
@@ -148,7 +148,7 @@ function post_family_config__ask_kernel_patch() {
 	[[ -f "${patch_src}" ]] || exit_with_error "ASK kernel patch not found" "${patch_src}"
 	local patch_dst="${SRC}/userpatches/kernel/${KERNELPATCHDIR}"
 	mkdir -p "${patch_dst}"
-	# Renamed to 003- to apply after 001-ina234 and 002-device-tree in the Armbian patch dir
+	# Renamed to 003- to apply after 001-ina234 and 002-device-tree in the AtriOS patch dir
 	cp "${patch_src}" "${patch_dst}/003-mono-gateway-ask-kernel_linux_6_12.patch"
 	display_alert "ASK extension" "ASK kernel patch staged in userpatches" "info"
 }

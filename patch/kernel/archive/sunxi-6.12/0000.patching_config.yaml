@@ -7,7 +7,7 @@ config:
   branch: linux-6.12.y
   last-known-good-tag: v6.7.0
   maintainers:
-    - { github: pyavitz, name: Patrick Yavitz, email: pyavitz@gmail.com, armbian-forum: c0rnelius }
+    - { github: pyavitz, name: Patrick Yavitz, email: pyavitz@gmail.com, AtriOS-forum: c0rnelius }
 
   # .dts files in these directories will be copied as-is to the build tree; later ones overwrite earlier ones.
   # This is meant to provide a way to "add a board DTS" without having to null-patch them in.

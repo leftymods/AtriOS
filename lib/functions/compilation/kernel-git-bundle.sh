@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # This is NOT run under do_with_retries.
 function download_git_kernel_bundle() {
@@ -58,7 +58,7 @@ function kernel_download_bundle_with_axel() {
 
 function kernel_prepare_bare_repo_from_bundle() {
 	kernel_git_bare_tree="${SRC}/cache/git-bare/kernel" # sets the outer scope variable
-	declare kernel_git_bare_tree_done_marker="${kernel_git_bare_tree}/.git/armbian-bare-tree-done"
+	declare kernel_git_bare_tree_done_marker="${kernel_git_bare_tree}/.git/atrios-bare-tree-done"
 
 	if [[ ! -d "${kernel_git_bare_tree}" || ! -f "${kernel_git_bare_tree_done_marker}" ]]; then
 		if [[ -d "${kernel_git_bare_tree}" ]]; then

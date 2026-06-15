@@ -1,4 +1,4 @@
-# Requirements/dependencies for various Python scripts used in the Armbian Build Framework
+# Requirements/dependencies for various Python scripts used in the AtriOS Build Framework
 #
 # IMPORTANT NOTES:
 # When adding a new requirements, please leave a comment to explain its purpose.

@@ -18,7 +18,7 @@ config: # This is file 'patch/kernel/spacemit-legacy-6.1/0000.patching_config.ya
   branch: linux-6.18.y
   last-known-good-tag: v6.18
   maintainers:
-    - { github: none, name: none, email: none, armbian-forum: none }
+    - { github: none, name: none, email: none, AtriOS-forum: none }
 
   # .dts files in these directories will be copied as-is to the build tree; later ones overwrite earlier ones.
   # This is meant to provide a way to "add a board DTS" without having to null-patch them in.

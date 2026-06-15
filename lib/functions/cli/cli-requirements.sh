@@ -4,11 +4,11 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function cli_requirements_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	if [[ "$(uname)" != "Linux" ]]; then
 		display_alert "Not running on Linux" "refusing to run 'requirements'" "err"
@@ -33,7 +33,7 @@ function cli_requirements_run() {
 	LOG_SECTION="install_host_dependencies" do_with_logging install_host_dependencies "for requirements command"
 	declare -i -g -r prepare_host_has_already_run=1 # global, readonly. fool the rest of the script into thinking we've already run prepare_host.
 
-	if [[ "${ARMBIAN_INSIDE_DOCKERFILE_BUILD}" == "yes" ]]; then
+	if [[ "${AtriOS_INSIDE_DOCKERFILE_BUILD}" == "yes" ]]; then
 		# Include python/pip packages in the Dockerfile build.
 		deploy_to_non_cache_dir="yes" prepare_python_and_pip
 

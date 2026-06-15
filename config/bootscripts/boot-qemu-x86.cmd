@@ -14,7 +14,7 @@ load ${devtype} ${devnum}:${distro_bootpart} ${kernel_addr_r} /vmlinuz
 load ${devtype} ${devnum}:${distro_bootpart} ${ramdisk_addr_r} /initrd.img
 
 # boot params
-# @TODO: armbianEnv.txt, etc.
+# @TODO: atriosEnv.txt, etc.
 setenv bootargs root=LABEL=armbi_root ro  console=ttyS0
 
 # zboot knows how to handle bzImage...

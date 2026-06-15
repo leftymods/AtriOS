@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Call: prepare_tmpfs_for "NAME_OF_TMPFS_DIR" "${PATH_TO_DIR}" # this adds its own cleanup handler
 function prepare_tmpfs_for() {
@@ -36,7 +36,7 @@ function prepare_tmpfs_for() {
 	if [[ "${OSTYPE}" != "linux"* ]] || [[ "${EUID}" -ne 0 ]]; then
 		display_alert "prepare_tmpfs_for: not on Linux or not root, skipping" "${tmpfs_name}" "cleanup"
 		cleanup_params+=("no_umount_tmpfs")
-	elif [[ "${ARMBIAN_INSIDE_DOCKERFILE_BUILD}" == "yes" ]]; then
+	elif [[ "${AtriOS_INSIDE_DOCKERFILE_BUILD}" == "yes" ]]; then
 		display_alert "prepare_tmpfs_for: inside Dockerfile build, skipping" "${tmpfs_name}" "cleanup"
 		cleanup_params+=("no_umount_tmpfs")
 	elif [[ "${USE_TMPFS}" == "no" ]]; then

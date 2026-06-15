@@ -98,10 +98,10 @@
 #   extension silently falls back to local ccache only.
 #
 # Cache sharing requirements:
-#   For cache to be shared across multiple build hosts, the Armbian project
-#   path must be identical on all machines (e.g., /home/build/armbian).
+#   For cache to be shared across multiple build hosts, the AtriOS project
+#   path must be identical on all machines (e.g., /home/build/AtriOS).
 #   This is because ccache includes the working directory in the cache key.
-#   Docker builds automatically use consistent paths (/armbian/...).
+#   Docker builds automatically use consistent paths (/AtriOS/...).
 
 # Default Redis connection timeout in milliseconds (can be overridden by user)
 # Note: Must be set before extension loads (e.g., via environment or command line)

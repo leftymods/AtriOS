@@ -2,7 +2,7 @@
 # Source this file from individual board configs.
 
 # Seeed APT repository configuration
-SEEED_APT_REPO_URL="https://seeed-studio.github.io/seeed_armbian_extension"
+SEEED_APT_REPO_URL="https://seeed-studio.github.io/seeed_AtriOS_extension"
 
 # Configure Seeed APT repository in the image (persists for apt upgrade)
 function post_family_tweaks_bsp__seeed_configure_apt_source() {
@@ -135,7 +135,7 @@ function post_repo_customize_image__recomputer_install_fcs960k_bluez() {
 	# Re-disable display managers: reinstalling gdm3 triggers its postinst
 	# which re-enables display-manager.service, undoing desktop_postinstall()'s
 	# disable. Without this the system boots into GDM instead of console,
-	# skipping armbian-firstlogin's user/password setup prompt.
+	# skipping AtriOS-firstlogin's user/password setup prompt.
 	disable_systemd_service_sdcard gdm3.service
 	disable_systemd_service_sdcard lightdm.service
 	disable_systemd_service_sdcard sddm.service
@@ -448,27 +448,27 @@ function pre_umount_final_image__recomputer_mali_gbm_fixup() {
 	fi
 }
 
-# Patch armbian-firstlogin: disable GDM auto-login.
+# Patch AtriOS-firstlogin: disable GDM auto-login.
 # Upstream sets AutomaticLoginEnable=true and relies on a background
 # (sleep 20; sed) to disable it, which is unreliable and gets killed.
 # Force AutomaticLoginEnable=false so GDM always prompts for password.
 function post_family_tweaks__recomputer_disable_gdm_autologin() {
-	display_alert "$BOARD" "Disabling GDM auto-login in armbian-firstlogin" "info"
+	display_alert "$BOARD" "Disabling GDM auto-login in AtriOS-firstlogin" "info"
 	sed -i 's/AutomaticLoginEnable = true/AutomaticLoginEnable = false/' \
-		"${SDCARD}/usr/lib/armbian/armbian-firstlogin"
+		"${SDCARD}/usr/lib/AtriOS/AtriOS-firstlogin"
 }
 
 #
 
 # Stage kernel patches from Seeed extension into userpatches so the
-# Armbian framework applies them during kernel build. Uses the same
+# AtriOS framework applies them during kernel build. Uses the same
 # pattern as gateway-dk-ask.sh: copy to userpatches/kernel/${KERNELPATCHDIR}/.
 function post_family_config__recomputer_stage_kernel_patches() {
 	if [[ "${ENABLE_SEEED_RK_EXTENSION}" != "yes" ]]; then
 		return 0
 	fi
 
-	local ext_patch_dir="${SRC}/extensions/seeed_armbian_extension/patches/kernel"
+	local ext_patch_dir="${SRC}/extensions/seeed_AtriOS_extension/patches/kernel"
 	local user_patch_dir="${SRC}/userpatches/kernel/${KERNELPATCHDIR}"
 
 	if [[ ! -d "${ext_patch_dir}" ]]; then
@@ -493,34 +493,34 @@ if [[ "${ENABLE_SEEED_RK_EXTENSION:-no}" == "yes" ]]; then
 	# GITHUB_SOURCE is not set yet during board config sourcing; provide a default
 	# so fetch_from_repo's URL rewriting works correctly.
 	GITHUB_SOURCE="${GITHUB_SOURCE:-https://github.com}"
-	fetch_from_repo "https://github.com/Seeed-Studio/seeed_armbian_extension" "seeed_armbian_extension" "branch:main"
-	SEEED_EXT_DIR="${SRC}/cache/sources/seeed_armbian_extension"
+	fetch_from_repo "https://github.com/Seeed-Studio/seeed_AtriOS_extension" "seeed_AtriOS_extension" "branch:main"
+	SEEED_EXT_DIR="${SRC}/cache/sources/seeed_AtriOS_extension"
 	mkdir -p "${SRC}/extensions"
-	ln -sf "${SEEED_EXT_DIR}" "${SRC}/extensions/seeed_armbian_extension"
-	enable_extension "seeed_armbian_extension"
+	ln -sf "${SEEED_EXT_DIR}" "${SRC}/extensions/seeed_AtriOS_extension"
+	enable_extension "seeed_AtriOS_extension"
 fi
 
-# Disable armbian-hardware-optimize — the BSP kernel handles DVFS via DT OPP
+# Disable AtriOS-hardware-optimize — the BSP kernel handles DVFS via DT OPP
 # tables + devfreq, and IRQ affinity is a no-op for seeed-rk35xx families
 # (no matching case in the script). The service's USB quirks function also
-# risks corrupting /boot/armbianEnv.txt with multiple non-atomic sed -i writes.
-function post_family_tweaks__recomputer_rk35xx_disable_armbian_hardware_optimize() {
-	display_alert "$BOARD" "Removing armbian-hardware-optimize.service" "info"
+# risks corrupting /boot/atriosEnv.txt with multiple non-atomic sed -i writes.
+function post_family_tweaks__recomputer_rk35xx_disable_AtriOS_hardware_optimize() {
+	display_alert "$BOARD" "Removing AtriOS-hardware-optimize.service" "info"
 
-	chroot_sdcard systemctl --no-reload disable armbian-hardware-optimize.service 2>/dev/null || true
-	rm -f "${SDCARD}"/lib/systemd/system/armbian-hardware-optimize.service
+	chroot_sdcard systemctl --no-reload disable AtriOS-hardware-optimize.service 2>/dev/null || true
+	rm -f "${SDCARD}"/lib/systemd/system/AtriOS-hardware-optimize.service
 }
 
-# Create armbianEnv.txt.bak at build time.
+# Create atriosEnv.txt.bak at build time.
 # Protects against sed -i + power loss corruption.
-function pre_umount_final_image__recomputer_armbianenv_backup() {
-	display_alert "$BOARD" "Creating armbianEnv.txt backup" "info"
+function pre_umount_final_image__recomputer_AtriOSenv_backup() {
+	display_alert "$BOARD" "Creating atriosEnv.txt backup" "info"
 
-	local env_file="${MOUNT}/boot/armbianEnv.txt"
-	local bak_file="${MOUNT}/boot/armbianEnv.txt.bak"
+	local env_file="${MOUNT}/boot/atriosEnv.txt"
+	local bak_file="${MOUNT}/boot/atriosEnv.txt.bak"
 
 	if [[ -f "${env_file}" ]]; then
 		cp -a "${env_file}" "${bak_file}"
-		display_alert "$BOARD" "armbianEnv.txt.bak created"
+		display_alert "$BOARD" "atriosEnv.txt.bak created"
 	fi
 }

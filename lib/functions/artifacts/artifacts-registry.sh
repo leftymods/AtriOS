@@ -4,12 +4,12 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
-function armbian_register_artifacts() {
+function AtriOS_register_artifacts() {
 
-	declare -g -A ARMBIAN_ARTIFACTS_TO_HANDLERS_DICT=(
+	declare -g -A AtriOS_ARTIFACTS_TO_HANDLERS_DICT=(
 		# deb-tar
 		["kernel"]="kernel"
 
@@ -19,13 +19,13 @@ function armbian_register_artifacts() {
 		["firmware"]="firmware"
 		["full_firmware"]="full_firmware"
 		["fake_ubuntu_advantage_tools"]="fake_ubuntu_advantage_tools"
-		["armbian-zsh"]="atrios-zsh"
 		["atrios-zsh"]="atrios-zsh"
-		["armbian-plymouth-theme"]="atrios-plymouth-theme"
+		["atrios-zsh"]="atrios-zsh"
 		["atrios-plymouth-theme"]="atrios-plymouth-theme"
-		["armbian-base-files"]="atrios-base-files"
+		["atrios-plymouth-theme"]="atrios-plymouth-theme"
 		["atrios-base-files"]="atrios-base-files"
-		["armbian-bsp-cli"]="atrios-bsp-cli"
+		["atrios-base-files"]="atrios-base-files"
+		["atrios-bsp-cli"]="atrios-bsp-cli"
 		["atrios-bsp-cli"]="atrios-bsp-cli"
 
 		# tar.zst

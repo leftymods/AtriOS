@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function compile_firmware() {
 	: "${artifact_version:?artifact_version is not set}"
@@ -15,16 +15,16 @@ function compile_firmware() {
 	declare cleanup_id="" fw_temp_dir=""
 	prepare_temp_dir_in_workdir_and_schedule_cleanup "deb-firmware${FULL}" cleanup_id fw_temp_dir # namerefs
 
-	declare fw_dir="armbian-firmware${FULL}"
+	declare fw_dir="atrios-firmware${FULL}"
 	mkdir -p "${fw_temp_dir}/${fw_dir}/lib/firmware"
 
-	local ARMBIAN_FIRMWARE_GIT_SOURCE="${ARMBIAN_FIRMWARE_GIT_SOURCE:-"https://github.com/armbian/firmware"}"
-	local ARMBIAN_FIRMWARE_GIT_BRANCH="${ARMBIAN_FIRMWARE_GIT_BRANCH:-"master"}"
+	local AtriOS_FIRMWARE_GIT_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/AtriOS/firmware"}"
+	local AtriOS_FIRMWARE_GIT_BRANCH="${AtriOS_FIRMWARE_GIT_BRANCH:-"master"}"
 
-	# Fetch Armbian firmware from git.
+	# Fetch AtriOS firmware from git.
 	declare fetched_revision
-	do_checkout="no" fetch_from_repo "${ARMBIAN_FIRMWARE_GIT_SOURCE}" "armbian-firmware-git" "branch:${ARMBIAN_FIRMWARE_GIT_BRANCH}"
-	declare -r armbian_firmware_git_sha1="${fetched_revision}"
+	do_checkout="no" fetch_from_repo "${AtriOS_FIRMWARE_GIT_SOURCE}" "atrios-firmware-git" "branch:${AtriOS_FIRMWARE_GIT_BRANCH}"
+	declare -r AtriOS_firmware_git_sha1="${fetched_revision}"
 
 	declare extra_conflicts_comma=""
 	if [[ -n $FULL ]]; then
@@ -40,15 +40,15 @@ function compile_firmware() {
 		# Full version conflicts with more stuff, of course.
 		extra_conflicts_comma=",amd64-microcode,intel-microcode"
 
-		# This symlink messes with the armbian-firmware overwrite step
-		# @TODO: remove no longer needed symlink from armbian-firmware
+		# This symlink messes with the atrios-firmware overwrite step
+		# @TODO: remove no longer needed symlink from atrios-firmware
 		if [[ -d "${fw_temp_dir}/${fw_dir}/lib/firmware/ath11k/WCN6855/hw2.1/" ]]; then
 			run_host_command_logged rm -r "${fw_temp_dir}/${fw_dir}/lib/firmware/ath11k/WCN6855/hw2.1/"
 		fi
 	fi
 
-	# Armbian firmware; this overwrites anything in the mainline firmware repo (if that was included, in the full version only)
-	run_host_command_logged git -C "${SRC}/cache/sources/armbian-firmware-git" archive --format=tar "${armbian_firmware_git_sha1}" "|" tar -C "${fw_temp_dir}/${fw_dir}/lib/firmware/" -xf -
+	# AtriOS firmware; this overwrites anything in the mainline firmware repo (if that was included, in the full version only)
+	run_host_command_logged git -C "${SRC}/cache/sources/atrios-firmware-git" archive --format=tar "${AtriOS_firmware_git_sha1}" "|" tar -C "${fw_temp_dir}/${fw_dir}/lib/firmware/" -xf -
 
 	# Show the size of the firmware directory in a tree if debugging
 	if [[ "${SHOW_DEBUG}" == "yes" ]]; then
@@ -61,20 +61,20 @@ function compile_firmware() {
 	mkdir -p DEBIAN
 	# @TODO: rpardini: this needs Conflicts: with the standard Ubuntu/Debian linux-firmware packages and other firmware pkgs in Debian
 	cat <<- END > DEBIAN/control
-		Package: armbian-firmware${FULL}
+		Package: atrios-firmware${FULL}
 		Version: ${artifact_version}
 		Architecture: all
 		Maintainer: $MAINTAINER <$MAINTAINERMAIL>
-		Conflicts: linux-firmware, firmware-brcm80211, firmware-ralink, firmware-samsung, firmware-realtek, armbian-firmware${REPLACE}${extra_conflicts_comma}
-		Provides: linux-firmware, firmware-brcm80211, firmware-ralink, firmware-samsung, firmware-realtek, armbian-firmware${REPLACE}${extra_conflicts_comma}
+		Conflicts: linux-firmware, firmware-brcm80211, firmware-ralink, firmware-samsung, firmware-realtek, atrios-firmware${REPLACE}${extra_conflicts_comma}
+		Provides: linux-firmware, firmware-brcm80211, firmware-ralink, firmware-samsung, firmware-realtek, atrios-firmware${REPLACE}${extra_conflicts_comma}
 		Section: kernel
 		Priority: optional
-		Description: Armbian - Linux firmware${FULL}
+		Description: AtriOS - Linux firmware${FULL}
 	END
 
 	cd "${fw_temp_dir}" || exit_with_error "can't change directory"
 
-	dpkg_deb_build "armbian-firmware${FULL}" "armbian-firmware${FULL}"
+	dpkg_deb_build "atrios-firmware${FULL}" "atrios-firmware${FULL}"
 
 	done_with_temp_dir "${cleanup_id}" # changes cwd to "${SRC}" and fires the cleanup function early
 }

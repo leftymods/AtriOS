@@ -265,7 +265,7 @@ update_main() {
 
 	# Create common repo if it doesn't exist
 	if [[ -z $(aptly repo list -config="${CONFIG}" -raw | awk '{print $(NF)}' | grep common) ]]; then
-		run_aptly repo create -config="${CONFIG}" -distribution="common" -component="main" -comment="Armbian common packages" "common" | logger -t repo-management >/dev/null
+		run_aptly repo create -config="${CONFIG}" -distribution="common" -component="main" -comment="AtriOS common packages" "common" | logger -t repo-management >/dev/null
 	fi
 
 	# Add packages from main folder
@@ -318,10 +318,10 @@ process_release() {
 
 	# Create release-specific repositories if they don't exist
 	if [[ -z $(aptly repo list -config="${CONFIG}" -raw | awk '{print $(NF)}' | grep "${release}-utils") ]]; then
-		run_aptly repo create -config="${CONFIG}" -component="${release}-utils" -distribution="${release}" -comment="Armbian ${release}-utils repository" "${release}-utils" | logger -t repo-management >/dev/null
+		run_aptly repo create -config="${CONFIG}" -component="${release}-utils" -distribution="${release}" -comment="AtriOS ${release}-utils repository" "${release}-utils" | logger -t repo-management >/dev/null
 	fi
 	if [[ -z $(aptly repo list -config="${CONFIG}" -raw | awk '{print $(NF)}' | grep "${release}-desktop") ]]; then
-		run_aptly repo create -config="${CONFIG}" -component="${release}-desktop" -distribution="${release}" -comment="Armbian ${release}-desktop repository" "${release}-desktop" | logger -t repo-management >/dev/null
+		run_aptly repo create -config="${CONFIG}" -component="${release}-desktop" -distribution="${release}" -comment="AtriOS ${release}-desktop repository" "${release}-desktop" | logger -t repo-management >/dev/null
 	fi
 
 	# Add packages ONLY from release-specific extra folders
@@ -470,8 +470,8 @@ process_release() {
 		-skip-contents \
 		-architectures="armhf,arm64,amd64,riscv64,i386,loong64,all" \
 		-passphrase="${gpg_password}" \
-		-origin="Armbian" \
-		-label="Armbian" \
+		-origin="AtriOS" \
+		-label="AtriOS" \
 		-config="${CONFIG}" \
 		-component="$component_list" \
 		-distribution="${release}" snapshot $snapshot_list
@@ -578,7 +578,7 @@ publishing() {
 	if [[ -z "$SINGLE_RELEASE" ]]; then
 		# This repository contains packages that are the same in all releases
 		if [[ -z $(aptly repo list -config="${CONFIG}" -raw | awk '{print $(NF)}' | grep common) ]]; then
-			run_aptly repo create -config="${CONFIG}" -distribution="common" -component="main" -comment="Armbian common packages" "common" | logger -t repo-management >/dev/null
+			run_aptly repo create -config="${CONFIG}" -distribution="common" -component="main" -comment="AtriOS common packages" "common" | logger -t repo-management >/dev/null
 		fi
 
 		# Add packages from main folder
@@ -621,8 +621,8 @@ publishing() {
 	# Copy GPG key to repository
 	mkdir -p "${2}"/public/
 	# Remove existing key file if it exists to avoid permission issues
-	rm -f "${2}"/public/armbian.key
-	cp config/armbian.key "${2}"/public/
+	rm -f "${2}"/public/atrios.key
+	cp config/atrios.key "${2}"/public/
 
 	# Write repository sync control file
 	date +%s > ${2}/public/control
@@ -784,7 +784,7 @@ merge_repos() {
 
 				# Create repo in main DB if it doesn't exist
 				if ! aptly -config="$main_db_config" repo show "${release}-utils" &>/dev/null; then
-					run_aptly -config="$main_db_config" repo create -component="${release}-utils" -distribution="${release}" -comment="Armbian ${release}-utils repository" "${release}-utils"
+					run_aptly -config="$main_db_config" repo create -component="${release}-utils" -distribution="${release}" -comment="AtriOS ${release}-utils repository" "${release}-utils"
 				fi
 
 				# Export packages from isolated repo and import to main repo
@@ -835,7 +835,7 @@ merge_repos() {
 
 				# Create repo in main DB if it doesn't exist
 				if ! aptly -config="$main_db_config" repo show "${release}-desktop" &>/dev/null; then
-					run_aptly -config="$main_db_config" repo create -component="${release}-desktop" -distribution="${release}" -comment="Armbian ${release}-desktop repository" "${release}-desktop"
+					run_aptly -config="$main_db_config" repo create -component="${release}-desktop" -distribution="${release}" -comment="AtriOS ${release}-desktop repository" "${release}-desktop"
 				fi
 
 				# Export packages from isolated repo and import to main repo
@@ -982,8 +982,8 @@ merge_repos() {
 			-skip-contents \
 			-architectures="armhf,arm64,amd64,riscv64,i386,loong64,all" \
 			-passphrase="${password:-}" \
-			-origin="Armbian" \
-			-label="Armbian" \
+			-origin="AtriOS" \
+			-label="AtriOS" \
 			-config="$main_db_config" \
 			-component="$component_list" \
 			-distribution="${release}" snapshot $snapshot_list; then
@@ -1004,8 +1004,8 @@ merge_repos() {
 
 	# Copy GPG key to repository
 	mkdir -p "${output_folder}"/public/
-	rm -f "${output_folder}"/public/armbian.key
-	cp config/armbian.key "${output_folder}"/public/
+	rm -f "${output_folder}"/public/atrios.key
+	cp config/atrios.key "${output_folder}"/public/
 	log "Copied GPG key to repository"
 
 	# Write repository sync control file
@@ -1187,7 +1187,7 @@ fi
 
 help()
 {
-echo "Armbian wrapper for Aptly v1.0
+echo "AtriOS wrapper for Aptly v1.0
 
 (c) 2025-2026 leftymods
 
@@ -1200,7 +1200,7 @@ Usage: $0 [ -short | --long ]
 -o --output [output folder]   output folder for repository
 -p --password [GPG password]  GPG password for signing
 -r --repository [jammy,sid,bullseye,...]  comma-separated list of releases
--l --list [\"Name (% linux*)|armbian-config\"]  list of packages
+-l --list [\"Name (% linux*)|atrios-config\"]  list of packages
 -c --command                  command to execute
 -R --single-release [name]    process only a single release (for parallel GitHub Actions)
                              example: -R jammy or -R noble

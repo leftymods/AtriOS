@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function prepare_kernel_config_core_or_userpatches() {
 	# LINUXCONFIG is set or exit_with_error
@@ -27,14 +27,14 @@ function kernel_config() {
 	# check $kernel_work_dir is set and exists, or bail
 	[[ -z "${kernel_work_dir}" ]] && exit_with_error "kernel_work_dir is not set"
 	[[ ! -d "${kernel_work_dir}" ]] && exit_with_error "kernel_work_dir does not exist: ${kernel_work_dir}"
-	declare previous_config_filename=".config.armbian.previous"
+	declare previous_config_filename=".config.AtriOS.previous"
 	declare kernel_config_source_filename="" # which actual .config was used?
 
 	LOG_SECTION="kernel_config_initialize" do_with_logging do_with_hooks kernel_config_initialize
 
 	if [[ "${KERNEL_CONFIGURE}" == "yes" ]]; then
 		# Start interactive config menu unless running rewrite-kernel-config
-		if [[ "${ARMBIAN_COMMAND}" != "rewrite-kernel-config" ]]; then
+		if [[ "${AtriOS_COMMAND}" != "rewrite-kernel-config" ]]; then
 			# This piece is interactive, no logging
 			display_alert "Starting (interactive) kernel ${KERNEL_MENUCONFIG:-menuconfig}" "${LINUXCONFIG}" "debug"
 			run_kernel_make_dialog "${KERNEL_MENUCONFIG:-menuconfig}"
@@ -104,23 +104,23 @@ function call_extensions_kernel_config() {
 		declare -ga kernel_config_modifying_hashes=()
 	fi
 
-	# Run the core-armbian config modifications here, built-in extensions:
-	call_extension_method "armbian_kernel_config" <<- 'ARMBIAN_KERNEL_CONFIG'
-		*Armbian-core default hook point for pre-olddefconfig Kernel config modifications*
-		NOT for user consumption. Do NOT use this hook, this is internal to Armbian.
+	# Run the core-AtriOS config modifications here, built-in extensions:
+	call_extension_method "AtriOS_kernel_config" <<- 'AtriOS_KERNEL_CONFIG'
+		*AtriOS-core default hook point for pre-olddefconfig Kernel config modifications*
+		NOT for user consumption. Do NOT use this hook, this is internal to AtriOS.
 		Instead, use `custom_kernel_config` which runs later and can undo anything done by this step.
 		IMPORTANT: this hook might be run multiple times, and one of them might not have a .config in place!
 		Therefore, please check with "if [[ -f .config ]]; then" if you want to modify the kernel config.
 		Either way, the hook _must_ add representative changes to the `kernel_config_modifying_hashes` array, for kernel config hashing.
 		Please note: Manually changing options doesn't check the validity of the .config file. Check for warnings in your build log.
-	ARMBIAN_KERNEL_CONFIG
+	AtriOS_KERNEL_CONFIG
 
 	# Custom hooks receive a clean / updated config; depending on their modifications, they may need to run olddefconfig again.
 	call_extension_method "custom_kernel_config" <<- 'CUSTOM_KERNEL_CONFIG'
 		*Kernel .config is in place, still clean from git version*
 		Called after ${LINUXCONFIG}.config is put in place (.config).
 		A good place to customize the .config directly.
-		Armbian default Kconfig modifications have already been applied and can be overriden.
+		AtriOS default Kconfig modifications have already been applied and can be overriden.
 		IMPORTANT: this hook might be run multiple times, and one of them might not have a .config in place!
 		Therefore, please check with "if [[ -f .config ]]; then" if you want to modify the kernel config.
 		Either way, the hook _must_ add representative changes to the `kernel_config_modifying_hashes` array, for kernel config hashing.
@@ -128,7 +128,7 @@ function call_extensions_kernel_config() {
 	CUSTOM_KERNEL_CONFIG
 
 	# Apply the modifications set in the arrays/dict
-	armbian_kernel_config_apply_opts_from_arrays
+	AtriOS_kernel_config_apply_opts_from_arrays
 }
 
 function kernel_config_finalize() {
@@ -157,7 +157,7 @@ function kernel_config_export() {
 	# store kernel defconfig in easily reachable place (output dir)
 	mkdir -p "${DEST}"/config
 	display_alert "Exporting new kernel defconfig" "$DEST/config/$LINUXCONFIG.config" "info"
-	echo "# Armbian defconfig generated with ${KERNEL_MAJOR_MINOR}" > "${DEST}/config/${LINUXCONFIG}.config"
+	echo "# AtriOS defconfig generated with ${KERNEL_MAJOR_MINOR}" > "${DEST}/config/${LINUXCONFIG}.config"
 	run_host_command_logged cat defconfig >> "${DEST}/config/${LINUXCONFIG}.config"
 
 	# store back into original LINUXCONFIG too, if it came from there, so it's pending commits when done.

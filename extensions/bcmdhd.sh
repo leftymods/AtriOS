@@ -12,11 +12,11 @@ function post_install_kernel_debs__install_bcmdhd_dkms_package() {
 
 	[[ "${INSTALL_HEADERS}" != "yes" ]] || [[ "${KERNEL_HAS_WORKING_HEADERS}" != "yes" ]] && return 0
 	[[ -z $BCMDHD_TYPE ]] && return 0
-	api_url="https://api.github.com/repos/armbian/bcmdhd-dkms/releases/latest"
+	api_url="https://api.github.com/repos/AtriOS/bcmdhd-dkms/releases/latest"
 	latest_version=$(curl -s "${api_url}" | jq -r '.tag_name')
-	bcmdhd_pcie_url="https://github.com/armbian/bcmdhd-dkms/releases/download/${latest_version}/bcmdhd-pcie-dkms_${latest_version}_all.deb"
-	bcmdhd_sdio_url="https://github.com/armbian/bcmdhd-dkms/releases/download/${latest_version}/bcmdhd-sdio-dkms_${latest_version}_all.deb"
-	bcmdhd_usb_url="https://github.com/armbian/bcmdhd-dkms/releases/download/${latest_version}/bcmdhd-usb-dkms_${latest_version}_all.deb"
+	bcmdhd_pcie_url="https://github.com/AtriOS/bcmdhd-dkms/releases/download/${latest_version}/bcmdhd-pcie-dkms_${latest_version}_all.deb"
+	bcmdhd_sdio_url="https://github.com/AtriOS/bcmdhd-dkms/releases/download/${latest_version}/bcmdhd-sdio-dkms_${latest_version}_all.deb"
+	bcmdhd_usb_url="https://github.com/AtriOS/bcmdhd-dkms/releases/download/${latest_version}/bcmdhd-usb-dkms_${latest_version}_all.deb"
 	if [[ "${GITHUB_MIRROR}" == "ghproxy" ]]; then
 		ghproxy_header="https://ghfast.top/"
 		bcmdhd_pcie_url=${ghproxy_header}${bcmdhd_pcie_url}

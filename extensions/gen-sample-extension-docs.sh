@@ -43,7 +43,7 @@ function loop_over_hook_points_and_call() {
 function generate_markdown_docs_to_stdout() {
 	read_common_data
 	cat << MASTER_HEADER
-# Armbian build system extensibility documentation
+# AtriOS build system extensibility documentation
 - This documentation is auto-generated.
 MASTER_HEADER
 
@@ -97,11 +97,11 @@ HOOK_DOCS
 generate_sample_extension_to_stdout() {
 	read_common_data
 	cat << HEADER
-# Sample Armbian build system extension with all extension methods.
+# Sample AtriOS build system extension with all extension methods.
 # This file is auto-generated from and by the build system itself.
 # Please, always use the latest version of this file as a starting point for your own extensions.
 # Generation date: $(date)
-# Read more about the build system at https://docs.armbian.com/Developer-Guide_Build-Preparation/
+# Read more about the build system at https://docs.AtriOS.com/Developer-Guide_Build-Preparation/
 
 HEADER
 

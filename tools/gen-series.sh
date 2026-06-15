@@ -15,7 +15,7 @@ function print_usage() {
 	echo -e "\t-v - enable verbose output"
 	echo -e ""
 	echo -e "Example:"
-	echo -e "\t$TOOL -v patches.libreelec patches.armbian"
+	echo -e "\t$TOOL -v patches.libreelec patches.AtriOS"
 
 }
 

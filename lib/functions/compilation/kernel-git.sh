@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function kernel_prepare_git() {
 	[[ "${KERNELSOURCE}" == 'none' ]] && return 0 # do nothing if no kernel source... but again, why were we called then?

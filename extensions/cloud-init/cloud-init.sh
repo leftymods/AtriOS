@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
-# Minimalistic implementation of Cloud-Init for Armbian
+# Minimalistic implementation of Cloud-Init for AtriOS
 # Functionaly equivalent to the implementation by Ubuntu for the Raspberri PI distribution
 
 # Implementaiton is based on the NoCLoud data source that will use
@@ -13,7 +13,7 @@
 # The Cloud init files in the boot partition are meant to be replaced with user provided ones, they are empty
 # of configurations except for setting hostname and DHCP on ethernet adapters.
 
-# This extension also disables armbian-first-run
+# This extension also disables AtriOS-first-run
 
 # Cloud-Init image marker
 function extension_prepare_config__ci_image_suffix() {
@@ -54,19 +54,19 @@ function pre_customize_image__inject_cloud_init_config() {
 	return 0
 }
 
-# @TODO: would be better to have "armbian first run" as an extension that can be disabled
-function pre_customize_image__disable_armbian_first_run() {
-	display_alert "Extension: ${EXTENSION}: Disabling" "armbian firstrun" "info"
+# @TODO: would be better to have "AtriOS first run" as an extension that can be disabled
+function pre_customize_image__disable_AtriOS_first_run() {
+	display_alert "Extension: ${EXTENSION}: Disabling" "AtriOS firstrun" "info"
 
 	# Clean up default profile and network
-	rm -f "${SDCARD}"/etc/profile.d/armbian-check-first-*
-	rm -f "${SDCARD}"/etc/netplan/armbian-*
+	rm -f "${SDCARD}"/etc/profile.d/AtriOS-check-first-*
+	rm -f "${SDCARD}"/etc/netplan/AtriOS-*
 
-	# remove any networkd config leftover from armbian build
+	# remove any networkd config leftover from AtriOS build
 	rm -f "${SDCARD}"/etc/systemd/network/*.network || true
 
-	# cleanup -- cloud-init makes some Armbian stuff actually get in the way
-	[[ -f "${SDCARD}/boot/armbian_first_run.txt.template" ]] && rm -f "${SDCARD}/boot/armbian_first_run.txt.template"
+	# cleanup -- cloud-init makes some AtriOS stuff actually get in the way
+	[[ -f "${SDCARD}/boot/AtriOS_first_run.txt.template" ]] && rm -f "${SDCARD}/boot/AtriOS_first_run.txt.template"
 	[[ -f "${SDCARD}/root/.not_logged_in_yet" ]] && rm -f "${SDCARD}/root/.not_logged_in_yet"
 
 }

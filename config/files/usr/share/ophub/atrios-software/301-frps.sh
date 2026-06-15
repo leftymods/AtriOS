@@ -6,11 +6,11 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Rebuild Armbian
-# https://github.com/ophub/amlogic-s9xxx-armbian
+# https://github.com/leftymods/CoreOS
 #
 # Function: Manage frps (FRP server) software installation, update, and removal
 # Copyright (C) 2021- https://github.com/unifreq/openwrt_packit
-# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+# Copyright (C) 2021- https://github.com/leftymods/CoreOS
 #
 # Command: ${0} <install/update/remove>
 # Example: ${0} install
@@ -149,7 +149,7 @@ EOF
     cat <<EOF
 ============================================[ Instructions for use of frps ]============================================
 Official website: https://github.com/fatedier/frp
-Documentation: https://github.com/ophub/amlogic-s9xxx-armbian/blob/main/build-armbian/documents/armbian_software.md
+Documentation: https://github.com/leftymods/CoreOS/blob/main/build-atrios/documents/atrios_software.md
 
 Core file path: [ ${software_core} ]
 Config file path: [ ${software_conf} ]

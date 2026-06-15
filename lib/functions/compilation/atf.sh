@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 compile_atf() {
 	if [[ -n "${ATFSOURCE}" && "${ATFSOURCE}" != "none" ]]; then
@@ -81,12 +81,12 @@ compile_atf() {
 	fi
 	unset -f gcc_accepts_flag ld_supports_flag
 
-	# - ENABLE_BACKTRACE="0" has been added to workaround a regression in ATF. Check: https://github.com/armbian/build/issues/1157
+	# - ENABLE_BACKTRACE="0" has been added to workaround a regression in ATF. Check: https://github.com/leftymods/CoreOS/issues/1157
 
 	run_host_command_logged "CROSS_COMPILE='ccache ${ATF_COMPILER}'" CCACHE_BASEDIR="$(pwd)" "CC='ccache ${ATF_COMPILER}gcc'" \
 		"CFLAGS='-fdiagnostics-color=always -Wno-error=attributes -Wno-error=incompatible-pointer-types'" \
 		"TF_LDFLAGS='${binutils_flags_atf}'" \
-		make ENABLE_BACKTRACE="0" LOG_LEVEL="40" BUILD_STRING="armbian" $target_make "${CTHREADS}"
+		make ENABLE_BACKTRACE="0" LOG_LEVEL="40" BUILD_STRING="AtriOS" $target_make "${CTHREADS}"
 
 	# @TODO: severely missing logging
 	[[ $(type -t atf_custom_postprocess) == function ]] && atf_custom_postprocess 2>&1

@@ -4,11 +4,11 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function cli_artifact_pre_run() {
-	case "${ARMBIAN_COMMAND}" in
+	case "${AtriOS_COMMAND}" in
 		download-artifact)
 			display_alert "download-only mode:" "won't build '${WHAT}'" "info"
 			declare -g DONT_BUILD_ARTIFACTS="${WHAT}"
@@ -47,7 +47,7 @@ function cli_artifact_run() {
 
 	declare deploy_to_remote="no"
 
-	case "${ARMBIAN_COMMAND}" in
+	case "${AtriOS_COMMAND}" in
 		download-artifact)
 			display_alert "Running in download-artifact mode" "download-artifact" "ext"
 			;;

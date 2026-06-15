@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # prepare_host
 #
@@ -24,7 +24,7 @@ function assert_prepared_host() {
 	fi
 
 	if [[ ${prepare_host_has_already_run:-0} -lt 1 ]]; then
-		exit_with_error "assert_prepared_host: Host has not yet been prepared. This is a bug in armbian-next code. Please report!"
+		exit_with_error "assert_prepared_host: Host has not yet been prepared. This is a bug in atrios-build code. Please report!"
 	fi
 }
 
@@ -56,7 +56,7 @@ function prepare_host_noninteractive() {
 		display_alert "USE_LOCAL_APT_DEB_CACHE is set to 'no'" "not recommended" "wrn"
 	fi
 
-	if armbian_is_running_in_container; then
+	if AtriOS_is_running_in_container; then
 		display_alert "Running in container" "Adding provisions for container building" "info"
 		declare -g CONTAINER_COMPAT=yes # this controls mknod usage for loop devices.
 
@@ -190,7 +190,7 @@ function adaptative_prepare_host_dependencies() {
 		parted gdisk fdisk                       # partition tools @TODO why so many?
 		aria2 curl axel wget                     # downloaders et al
 		parallel                                 # do things in parallel (used for fast md5 hashing in initrd cache)
-		rdfind                                   # armbian-firmware-full/linux-firmware symlink creation step
+		rdfind                                   # atrios-firmware-full/linux-firmware symlink creation step
 		binwalk                                  # for debugging produced u-boot binaries
 	)
 
@@ -199,7 +199,7 @@ function adaptative_prepare_host_dependencies() {
 	### Python
 	host_deps_add_extra_python # See python-tools.sh::host_deps_add_extra_python()
 
-	### Python3 -- required for Armbian's Python tooling, and also for more recent u-boot builds. Needs 3.9+; ffi-dev is needed for some Python packages when the wheel is not prebuilt
+	### Python3 -- required for AtriOS's Python tooling, and also for more recent u-boot builds. Needs 3.9+; ffi-dev is needed for some Python packages when the wheel is not prebuilt
 	### 'python3-setuptools' and 'python3-pyelftools' moved to requirements.txt to make sure build hosts use the same/latest versions of these tools.
 	### 'python3-dev' depends on distutils, so instead depend on libpython3-dev which doesn't.
 	### 'python3-yaml' is needed by configng's parse_desktop_yaml.py during

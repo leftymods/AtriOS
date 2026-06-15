@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 # This adds the required host-side dependencies, clones and builds mtk-flash.
@@ -27,7 +27,7 @@ function extension_finish_config__900_mtkflash() {
 	declare -g -r mtkflash_bin_path="${mtkflash_dir}/target/release/mtk-flash-${MTKFLASH_GIT_COMMIT}"
 
 	# if under docker, exit_with_error; we can't get at the USB needed.
-	if [[ "${ARMBIAN_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
 		exit_with_error "mtkflash: running under Docker is not supported. it requires direct access to the host USB devices."
 	fi
 }
@@ -125,7 +125,7 @@ function build_mtkflash() {
 	run_host_command_logged mv -v "${mtkflash_dir}/target/release/mtk-flash" "${mtkflash_bin_path}"
 	run_host_command_logged pipetty ls -la "${mtkflash_bin_path}"
 
-	popd &> /dev/null || exit_with_error "Fail to cd back to armbian-build"
+	popd &> /dev/null || exit_with_error "Fail to cd back to AtriOS-build"
 }
 
 function check_mtkflash() {

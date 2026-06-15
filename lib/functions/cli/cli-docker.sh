@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function cli_docker_pre_run() {
 	if [[ "${DOCKERFILE_GENERATE_ONLY}" == "yes" ]]; then
@@ -24,8 +24,8 @@ function cli_docker_pre_run() {
 	esac
 
 	# make sure we're not _ALREADY_ running under docker... otherwise eternal loop?
-	if [[ "${ARMBIAN_RUNNING_IN_CONTAINER}" == "yes" ]]; then
-		exit_with_error "asking for docker... inside docker. how did this happen? Tip: you don't need 'docker' to run armbian-next inside Docker; it's automatically detected and used when appropriate."
+	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+		exit_with_error "asking for docker... inside docker. how did this happen? Tip: you don't need 'docker' to run atrios-build inside Docker; it's automatically detected and used when appropriate."
 	fi
 }
 
@@ -38,7 +38,7 @@ function cli_docker_run() {
 	# If it's too big, it will cause "argument list too long" errors when launching docker.
 	# Limit it to 1024 characters, otherwise replace it with a simple message.
 	if [[ ${#GIT_INFO_ANSI} -gt 1024 ]]; then
-		GIT_INFO_ANSI="Armbian: too many git changes to list."
+		GIT_INFO_ANSI="AtriOS: too many git changes to list."
 	fi
 
 	# Same stuff for BUILD_REPOSITORY_URL and BUILD_REPOSITORY_COMMIT.
@@ -48,7 +48,7 @@ function cli_docker_run() {
 
 	LOG_SECTION="docker_cli_prepare" do_with_logging docker_cli_prepare
 
-	# Ensure Docker auto-pull cronjob is installed (controlled by ARMBIAN_DOCKER_AUTO_PULL flag)
+	# Ensure Docker auto-pull cronjob is installed (controlled by AtriOS_DOCKER_AUTO_PULL flag)
 	# Only run this when not generating Dockerfile only
 	if [[ "${DOCKERFILE_GENERATE_ONLY}" != "yes" ]]; then
 		docker_ensure_auto_pull_cronjob
@@ -68,20 +68,20 @@ function cli_docker_run() {
 
 	LOG_SECTION="docker_cli_prepare_launch" do_with_logging docker_cli_prepare_launch
 
-	ARMBIAN_CLI_RELAUNCH_PARAMS+=(["SET_OWNER_TO_UID"]="${EUID}")                 # fix the owner of files to our UID
-	ARMBIAN_CLI_RELAUNCH_PARAMS+=(["ARMBIAN_BUILD_UUID"]="${ARMBIAN_BUILD_UUID}") # pass down our uuid to the docker instance
-	ARMBIAN_CLI_RELAUNCH_PARAMS+=(["SKIP_LOG_ARCHIVE"]="yes")                     # launched docker instance will not cleanup logs.
+	AtriOS_CLI_RELAUNCH_PARAMS+=(["SET_OWNER_TO_UID"]="${EUID}")                 # fix the owner of files to our UID
+	AtriOS_CLI_RELAUNCH_PARAMS+=(["AtriOS_BUILD_UUID"]="${AtriOS_BUILD_UUID}") # pass down our uuid to the docker instance
+	AtriOS_CLI_RELAUNCH_PARAMS+=(["SKIP_LOG_ARCHIVE"]="yes")                     # launched docker instance will not cleanup logs.
 	if [[ -n "${DOCKER_NICE:-}" ]]; then
-		ARMBIAN_CLI_RELAUNCH_PARAMS+=(["DOCKER_NICE"]="${DOCKER_NICE}") # propagated `nice` value
+		AtriOS_CLI_RELAUNCH_PARAMS+=(["DOCKER_NICE"]="${DOCKER_NICE}") # propagated `nice` value
 	fi
 
 	# Produce the re-launch params.
-	declare -g ARMBIAN_CLI_FINAL_RELAUNCH_ARGS=()
-	declare -g ARMBIAN_CLI_FINAL_RELAUNCH_ENVS=()
-	produce_relaunch_parameters # produces ARMBIAN_CLI_FINAL_RELAUNCH_ARGS and ARMBIAN_CLI_FINAL_RELAUNCH_ENVS
+	declare -g AtriOS_CLI_FINAL_RELAUNCH_ARGS=()
+	declare -g AtriOS_CLI_FINAL_RELAUNCH_ENVS=()
+	produce_relaunch_parameters # produces AtriOS_CLI_FINAL_RELAUNCH_ARGS and AtriOS_CLI_FINAL_RELAUNCH_ENVS
 
 	# Add the relaunch envs to DOCKER_ARGS.
-	for env in "${ARMBIAN_CLI_FINAL_RELAUNCH_ENVS[@]}"; do
+	for env in "${AtriOS_CLI_FINAL_RELAUNCH_ENVS[@]}"; do
 		display_alert "Adding Docker env" "${env}" "debug"
 		DOCKER_ARGS+=("--env" "${env}")
 	done
@@ -89,7 +89,7 @@ function cli_docker_run() {
 	case "${DOCKER_SUBCMD}" in
 		shell)
 			display_alert "Launching Docker shell" "docker-shell" "info"
-			docker run -it "${DOCKER_ARGS[@]}" "${DOCKER_ARMBIAN_INITIAL_IMAGE_TAG}" /bin/bash
+			docker run -it "${DOCKER_ARGS[@]}" "${DOCKER_AtriOS_INITIAL_IMAGE_TAG}" /bin/bash
 			;;
 
 		purge)

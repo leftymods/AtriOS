@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # defines the format for KERNELBRANCH, BOOTBRANCH, and arguments to fetch_from_repo.
 # branch:xxx, tag:yyyy, commit:zzzz, head.
@@ -172,7 +172,7 @@ function fetch_from_repo() {
 		if [[ ! -d ".git" || "$(git rev-parse --git-dir)" != ".git" ]]; then
 			# Dir is not a git working copy. Make it so;
 			display_alert "Initializing empty git local copy" "git init: $dir $ref_name"
-			regular_git init -q . # --initial-branch="armbian_unused_initial_branch" is not supported under focal
+			regular_git init -q . # --initial-branch="AtriOS_unused_initial_branch" is not supported under focal
 			offline=false         # Force online, we'll need to fetch.
 		fi
 	fi

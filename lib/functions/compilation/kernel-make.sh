@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function run_kernel_make_internal() {
 	set -e
@@ -21,7 +21,7 @@ function run_kernel_make_internal() {
 		"CCACHE_BASEDIR='$(pwd)'"                                  # Base directory for ccache, for cache reuse # @TODO: experiment with this and the source path to maximize hit rate
 		"CCACHE_TEMPDIR='${CCACHE_TEMPDIR:?}'"                     # Temporary directory for ccache, under WORKDIR
 		"PATH='${PYTHON3_INFO[USERBASE]}/bin:${PATH}'"             # Insert the pip binaries into the PATH
-		"PYTHONPATH='${PYTHON3_INFO[MODULES_PATH]}:${PYTHONPATH}'" # Insert the pip modules downloaded by Armbian into PYTHONPATH (needed for dtb checks)
+		"PYTHONPATH='${PYTHON3_INFO[MODULES_PATH]}:${PYTHONPATH}'" # Insert the pip modules downloaded by AtriOS into PYTHONPATH (needed for dtb checks)
 		"DPKG_COLORS=always"                                       # Use colors for dpkg @TODO no dpkg is done anymore, remove?
 		"XZ_OPT='--threads=0'"                                     # Use parallel XZ compression
 		"TERM='${TERM}'"                                           # Pass the terminal type, so that 'make menuconfig' can work.
@@ -63,7 +63,7 @@ function run_kernel_make_internal() {
 		"SOURCE_DATE_EPOCH=${kernel_base_revision_ts}"        # https://reproducible-builds.org/docs/source-date-epoch/ and https://www.kernel.org/doc/html/latest/kbuild/reproducible-builds.html
 		"KBUILD_BUILD_TIMESTAMP=${kernel_base_revision_date}" # https://www.kernel.org/doc/html/latest/kbuild/kbuild.html#kbuild-build-timestamp
 		"KBUILD_BUILD_USER=build"                             # https://www.kernel.org/doc/html/latest/kbuild/kbuild.html#kbuild-build-user-kbuild-build-host
-		"KBUILD_BUILD_HOST=armbian"                           # https://www.kernel.org/doc/html/latest/kbuild/kbuild.html#kbuild-build-user-kbuild-build-host
+		"KBUILD_BUILD_HOST=AtriOS"                           # https://www.kernel.org/doc/html/latest/kbuild/kbuild.html#kbuild-build-user-kbuild-build-host
 
 		# Parallel compression, use explicit parallel compressors https://lore.kernel.org/lkml/20200901151002.988547791@linuxfoundation.org/
 		"KGZIP=pigz"

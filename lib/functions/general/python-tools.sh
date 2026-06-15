@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # This whole thing is a big "I refuse to use venv in a simple bash script" delusion.
 # If you know to tame it, teach me. I'd rather not know about PYTHONUSERBASE and such.
@@ -64,7 +64,7 @@ function prepare_python_and_pip() {
 	# Calculate the hash for the Pip requirements
 	python3_pip_dependencies_hash="$(echo "${HOSTRELEASE}" "${python3_version}" "${pip3_version_number}" "$(< "${python3_pip_dependencies_path}")" | sha256sum | cut -d' ' -f1)"
 
-	declare non_cache_dir="/armbian-pip"
+	declare non_cache_dir="/atrios-pip"
 	declare python_pip_cache="${SRC}/cache/pip"
 
 	if [[ "${deploy_to_non_cache_dir:-"no"}" == "yes" ]]; then
@@ -103,7 +103,7 @@ function prepare_python_and_pip() {
 
 	# declare a readonly global array for ENV vars to invoke python3 with
 	declare -r -g -a PYTHON3_VARS=(
-		"PYTHONPATH=/does/not/exist/armbian/uses/user/packages/only"
+		"PYTHONPATH=/does/not/exist/AtriOS/uses/user/packages/only"
 		"PYTHONUSERBASE=${PYTHON3_INFO[USERBASE]}"
 		"PYTHONUNBUFFERED=yes"
 		"PYTHONPYCACHEPREFIX=${PYTHON3_INFO[PYCACHEPREFIX]}"

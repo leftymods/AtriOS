@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 function artifact_reversion_for_deployment() {
@@ -112,7 +112,7 @@ function standard_artifact_reversion_for_deployment_one_deb() {
 
 	# Replace "Version: " field with our own
 	sed -e "s/^Version: .*/Version: ${artifact_final_version_reversioned}/" "${control_file}" > "${control_file_new}"
-	echo "Armbian-Original-Hash: ${artifact_version}" >> "${control_file_new}" # non-standard field.
+	echo "AtriOS-Original-Hash: ${artifact_version}" >> "${control_file_new}" # non-standard field.
 
 	for one_reversion_function_name in "${@}"; do
 		display_alert "reversioning" "call custom function: '${one_reversion_function_name}'" "debug"

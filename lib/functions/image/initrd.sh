@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # update_initramfs
 #
@@ -19,7 +19,7 @@
 #
 # since Debian buster, it has to be called within create_image() on the $MOUNT
 # path instead of $SDCARD (which can be a tmpfs and breaks cryptsetup-initramfs).
-# see: https://github.com/armbian/build/issues/1584
+# see: https://github.com/leftymods/CoreOS/issues/1584
 update_initramfs() {
 	local chroot_target=$1 target_dir
 	target_dir="$(find "${chroot_target}/lib/modules"/ -maxdepth 1 -type d -name "*${IMAGE_INSTALLED_KERNEL_VERSION}*")" # @TODO: rpardini: this will break when we add multi-kernel images
@@ -51,7 +51,7 @@ update_initramfs() {
 
 	display_alert "computing initrd cache hash" "${chroot_target}" "debug"
 	mkdir -p "${SRC}/cache/initrd"
-	initrd_cache_current_manifest_filepath="${WORKDIR}/initrd.img-${initrd_kern_ver}.${ARMBIAN_BUILD_UUID}.manifest"
+	initrd_cache_current_manifest_filepath="${WORKDIR}/initrd.img-${initrd_kern_ver}.${AtriOS_BUILD_UUID}.manifest"
 	initrd_cache_last_manifest_filepath="${SRC}/cache/initrd/initrd.manifest-${initrd_kern_ver}.last.manifest"
 	initrd_files_to_hash=("${chroot_target}/usr/bin/bash" "${chroot_target}/etc/initramfs")
 	initrd_files_to_hash+=("${chroot_target}/etc/initramfs-tools" "${chroot_target}/usr/share/initramfs-tools/")

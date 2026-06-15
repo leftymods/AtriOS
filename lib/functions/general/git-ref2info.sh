@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # This works under memoize-cached.sh::run_memoized() -- which is full of tricks.
 # Nested functions are used because the source of the momoized function is used as part of the cache hash.
@@ -75,7 +75,7 @@ function memoized_git_ref_to_info() {
 		exit_with_error "Failed to fetch SHA1 of '${MEMO_DICT[GIT_SOURCE]}' '${ref_type}' '${ref_name}' - make sure it's correct"
 	fi
 
-	if [[ "${ARMBIAN_COMMAND}" == "artifact-config-dump-json" ]] && [[ ${ref_type} == "branch" ]]; then
+	if [[ "${AtriOS_COMMAND}" == "artifact-config-dump-json" ]] && [[ ${ref_type} == "branch" ]]; then
 		{
 			flock -x 5
 			flock -x 6

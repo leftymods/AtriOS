@@ -2,29 +2,29 @@
 
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 
 echo ""
-echo "Armbian initramfs USB Gadget UMS: ums-initramfs.sh starting..."
+echo "AtriOS initramfs USB Gadget UMS: ums-initramfs.sh starting..."
 
 # First, check if /proc/cmdline contains "ums=yes", otherwise exit
 if ! grep -q "ums=yes" /proc/cmdline; then
-	echo "Armbian initramfs USB Gadget UMS: ums=yes not found in /proc/cmdline, exiting normally."
+	echo "AtriOS initramfs USB Gadget UMS: ums=yes not found in /proc/cmdline, exiting normally."
 	exit 0
 fi
 
-echo "Armbian initramfs USB Gadget UMS: ums=yes found in /proc/cmdline, continuing..."
+echo "AtriOS initramfs USB Gadget UMS: ums=yes found in /proc/cmdline, continuing..."
 sleep 1
 
-deviceinfo_name="Armbian on %%BOARD%%"
-deviceinfo_manufacturer="Armbian on %%BOARD%%"
+deviceinfo_name="AtriOS on %%BOARD%%"
+deviceinfo_manufacturer="AtriOS on %%BOARD%%"
 usb_idVendor="0x1d6b" # Linux Foundation
 usb_idProduct="0x104" # Multifunction Composite Gadget.
-usb_serialnumber="Armbian %%BOARD%%"
+usb_serialnumber="AtriOS %%BOARD%%"
 
-echo "Armbian initramfs USB Gadget UMS: found UDC: $(ls /sys/class/udc) for %%BOARD%%"
+echo "AtriOS initramfs USB Gadget UMS: found UDC: $(ls /sys/class/udc) for %%BOARD%%"
 
-modprobe g_ffs || echo "Armbian initramfs USB Gadget UMS: Failed to modprobe g_ffs"
+modprobe g_ffs || echo "AtriOS initramfs USB Gadget UMS: Failed to modprobe g_ffs"
 
 mkdir -p /config
 mount -t configfs -o nodev,noexec,nosuid configfs /config
@@ -35,7 +35,7 @@ CONFIG=${GADGET}/configs/c.1
 FUNCTIONS=${GADGET}/functions
 
 if [ -d "${GADGET}" ]; then
-	echo "Armbian initramfs USB Gadget UMS: Found existing gadget, removing"
+	echo "AtriOS initramfs USB Gadget UMS: Found existing gadget, removing"
 	echo "" > ${GADGET}/UDC
 
 	rm -v ${CONFIG}/mass_storage.usb*
@@ -117,7 +117,7 @@ for one_block in /sys/class/block/*; do
 		continue # we don't wanna expose devices that don't have a /dev/ entry
 	fi
 
-	description="Armbian${counter} ${basename_device}"
+	description="AtriOS${counter} ${basename_device}"
 
 	model_file="${one_block}/device/model"
 	if [ -f "$model_file" ]; then
@@ -161,13 +161,13 @@ echo "$(ls /sys/class/udc)" > ${GADGET}/UDC || echo "  Couldn't write UDC"
 
 #umount /config
 
-echo "Armbian initramfs USB Gadget UMS: done USB Gadget mode."
+echo "AtriOS initramfs USB Gadget UMS: done USB Gadget mode."
 
 while true; do
-	echo "Armbian initramfs USB Gadget UMS: Board: %%BOARD%%"
-	echo "Armbian initramfs USB Gadget UMS: Machine will hang here forever; connect your USB OTG cable and write to disks!"
-	echo "Armbian initramfs USB Gadget UMS: UMS devices: ${all_devices}"
-	echo "Armbian initramfs USB Gadget UMS: UMS UDC: $(ls /sys/class/udc)"
-	echo "Armbian initramfs USB Gadget UMS: Now: $(date)"
+	echo "AtriOS initramfs USB Gadget UMS: Board: %%BOARD%%"
+	echo "AtriOS initramfs USB Gadget UMS: Machine will hang here forever; connect your USB OTG cable and write to disks!"
+	echo "AtriOS initramfs USB Gadget UMS: UMS devices: ${all_devices}"
+	echo "AtriOS initramfs USB Gadget UMS: UMS UDC: $(ls /sys/class/udc)"
+	echo "AtriOS initramfs USB Gadget UMS: Now: $(date)"
 	sleep 30
 done

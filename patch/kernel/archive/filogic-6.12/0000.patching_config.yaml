@@ -7,8 +7,8 @@ config: # This is file 'patch/kernel/archive/filogic-6.12/0000.patching_config.y
   branch: 6.12-main
   #last-known-good-tag: v6.12.51
   maintainers:
-    - { github: chainsx, name: chainsx, email: i@chainsx.cn, armbian-forum: chainsx }
-    - { github: tabrisnet, name: tabrisnet, email: tabris@tabris.net, armbian-forum: tabrisnet }
+    - { github: chainsx, name: chainsx, email: i@chainsx.cn, AtriOS-forum: chainsx }
+    - { github: tabrisnet, name: tabrisnet, email: tabris@tabris.net, AtriOS-forum: tabrisnet }
 
   # .dts files in these directories will be copied as-is to the build tree; later ones overwrite earlier ones.
   # This is meant to provide a way to "add a board DTS" without having to null-patch them in.

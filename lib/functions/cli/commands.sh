@@ -4,14 +4,14 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
-function armbian_register_commands() {
-	# More than one command can map to the same handler. In that case, use ARMBIAN_COMMANDS_TO_VARS_DICT for specific vars.
-	# The handlers' functions "cli_${ARMBIAN_COMMAND_HANDLER}_pre_run" and "cli_${ARMBIAN_COMMAND_HANDLER}_run" get automatically called in "utils-cli.sh"
+function AtriOS_register_commands() {
+	# More than one command can map to the same handler. In that case, use AtriOS_COMMANDS_TO_VARS_DICT for specific vars.
+	# The handlers' functions "cli_${AtriOS_COMMAND_HANDLER}_pre_run" and "cli_${AtriOS_COMMAND_HANDLER}_run" get automatically called in "utils-cli.sh"
 	# Example: For command "docker-purge", the handler is "docker", which means the functions "cli_docker_pre_run" and "cli_docker_run" inside "cli-docker.sh are automatically called by "utils-cli.sh"
-	declare -g -A ARMBIAN_COMMANDS_TO_HANDLERS_DICT=(
+	declare -g -A AtriOS_COMMANDS_TO_HANDLERS_DICT=(
 		["docker"]="docker" # thus requires cli_docker_pre_run and cli_docker_run
 		["docker-purge"]="docker"
 		["dockerpurge"]="docker"
@@ -84,12 +84,12 @@ function armbian_register_commands() {
 
 		["firmware"]="artifact"
 		["firmware-full"]="artifact"
-		["armbian-zsh"]="artifact"
-		["armbian-plymouth-theme"]="artifact"
+		["atrios-zsh"]="artifact"
+		["atrios-plymouth-theme"]="artifact"
 		["fake-ubuntu-advantage-tools"]="artifact"
 
-		["armbian-base-files"]="artifact"
-		["armbian-bsp-cli"]="artifact"
+		["atrios-base-files"]="artifact"
+		["atrios-bsp-cli"]="artifact"
 
 		["atrios-zsh"]="artifact"
 		["atrios-plymouth-theme"]="artifact"
@@ -106,7 +106,7 @@ function armbian_register_commands() {
 	declare common_cli_artifact_interactive_vars="ARTIFACT_WILL_NOT_BUILD='yes' ARTIFACT_BUILD_INTERACTIVE='yes' ARTIFACT_IGNORE_CACHE='yes'"
 
 	# Vars to be set for each command. Optional.
-	declare -g -A ARMBIAN_COMMANDS_TO_VARS_DICT=(
+	declare -g -A AtriOS_COMMANDS_TO_VARS_DICT=(
 		["docker-purge"]="DOCKER_SUBCMD='purge'"
 		["dockerpurge"]="DOCKER_SUBCMD='purge'"
 		["docker-shell"]="DOCKER_SUBCMD='shell'"
@@ -148,12 +148,12 @@ function armbian_register_commands() {
 
 		["firmware"]="WHAT='firmware' ${common_cli_artifact_vars}"
 		["firmware-full"]="WHAT='full_firmware' ${common_cli_artifact_vars}"
-		["armbian-zsh"]="WHAT='armbian-zsh' ${common_cli_artifact_vars}"
-		["armbian-plymouth-theme"]="WHAT='armbian-plymouth-theme' ${common_cli_artifact_vars}"
+		["atrios-zsh"]="WHAT='atrios-zsh' ${common_cli_artifact_vars}"
+		["atrios-plymouth-theme"]="WHAT='atrios-plymouth-theme' ${common_cli_artifact_vars}"
 		["fake-ubuntu-advantage-tools"]="WHAT='fake_ubuntu_advantage_tools' ${common_cli_artifact_vars}"
 
-		["armbian-base-files"]="WHAT='armbian-base-files' ${common_cli_artifact_vars}"
-		["armbian-bsp-cli"]="WHAT='armbian-bsp-cli' ${common_cli_artifact_vars}"
+		["atrios-base-files"]="WHAT='atrios-base-files' ${common_cli_artifact_vars}"
+		["atrios-bsp-cli"]="WHAT='atrios-bsp-cli' ${common_cli_artifact_vars}"
 
 		["atrios-zsh"]="WHAT='atrios-zsh' ${common_cli_artifact_vars}"
 		["atrios-plymouth-theme"]="WHAT='atrios-plymouth-theme' ${common_cli_artifact_vars}"
@@ -165,13 +165,13 @@ function armbian_register_commands() {
 		["undecided"]="UNDECIDED='yes'"
 	)
 	# Override the LOG_CLI_ID to change the log file name.
-	# Will be set to ARMBIAN_COMMAND if not set after all pre-runs done.
-	declare -g ARMBIAN_LOG_CLI_ID
+	# Will be set to AtriOS_COMMAND if not set after all pre-runs done.
+	declare -g AtriOS_LOG_CLI_ID
 
 	# Keep a running dict of params/variables. Can't repeat stuff here. Dict.
-	declare -g -A ARMBIAN_CLI_RELAUNCH_PARAMS=(["ARMBIAN_RELAUNCHED"]="yes")
-	declare -g -A ARMBIAN_CLI_RELAUNCH_ENVS=(["ARMBIAN_RELAUNCHED"]="yes")
+	declare -g -A AtriOS_CLI_RELAUNCH_PARAMS=(["AtriOS_RELAUNCHED"]="yes")
+	declare -g -A AtriOS_CLI_RELAUNCH_ENVS=(["AtriOS_RELAUNCHED"]="yes")
 
 	# Keep a running array of config files needed for relaunch.
-	declare -g -a ARMBIAN_CLI_RELAUNCH_CONFIGS=()
+	declare -g -a AtriOS_CLI_RELAUNCH_CONFIGS=()
 }

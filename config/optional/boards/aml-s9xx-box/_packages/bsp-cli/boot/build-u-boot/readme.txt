@@ -8,7 +8,7 @@ in the past, we are continuing with that as the status quo, until something
 better is put in place.
 
 All of the u-boot binaries should be recreated from scratch and either built 
-automatically as part of the Armbian build process, or at least instructions 
+automatically as part of the AtriOS build process, or at least instructions 
 should be provided here as to how to rebuild them from source.
 
 Update (3/13/23):
@@ -53,4 +53,4 @@ make
 cp u-boot.bin u-boot-s905x3
 
 TODO: rebuild u-boot-s905 from source
-TODO: automate the manual build process in the armbian build framework
+TODO: automate the manual build process in the atrios build framework

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 #--------------------------------------------------------------------------------------------------------------------------------
 # fingerprint_image <out_txt_file> [image_filename]
@@ -14,7 +14,7 @@
 function fingerprint_image() {
 	cat <<- EOF > "${1}"
 		---------------------------------------------------------------------------
-		Generated with Armbian(tm) build framework https://github.com/armbian/build
+		Generated with AtriOS(tm) build framework https://github.com/AtriOS/build
 		---------------------------------------------------------------------------
 		Vendor:         ${VENDOR}
 		Revision:       $REVISION
@@ -23,7 +23,7 @@ function fingerprint_image() {
 		Build date:     $(date +'%d.%m.%Y')
 		Sources:        ${BUILD_REPOSITORY_URL}
 		Sources rev:    ${BUILD_REPOSITORY_COMMIT}
-		Authors:        https://www.armbian.com/authors
+		Authors:        https://github.com/leftymods/CoreOSauthors
 		Maintainer:     ${MAINTAINER} <$MAINTAINERMAIL>
 		Support:        ${VENDORSUPPORT}
 	EOF

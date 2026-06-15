@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # general_cleaning <target>
 
@@ -13,7 +13,7 @@
 # "make-atf" = make clean for ATF, if it is built.
 # "make-uboot" = make clean for uboot, if it is built.
 # "make-kernel" = make clean for kernel, if it is built. very slow.
-# *important*: "make" by itself has disabled, since Armbian knows how to handle Make timestamping now.
+# *important*: "make" by itself has disabled, since AtriOS knows how to handle Make timestamping now.
 
 # "debs" = delete all packages in "./output/debs"
 # "alldebs" = delete all packages in "./output/debs"
@@ -69,10 +69,10 @@ function general_cleaning() {
 function clean_deprecated_mountpoints() {
 	# Cleaning of old, deprecated mountpoints; only done if not running under Docker.
 	# mountpoints under Docker manifest as volumes, and as such can't be cleaned this way.
-	if [[ "${ARMBIAN_RUNNING_IN_CONTAINER}" != "yes" ]]; then
-		prepare_armbian_mountpoints_description_dict
+	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" != "yes" ]]; then
+		prepare_AtriOS_mountpoints_description_dict
 		local mountpoint=""
-		for mountpoint in "${ARMBIAN_MOUNTPOINTS_DEPRECATED[@]}"; do
+		for mountpoint in "${AtriOS_MOUNTPOINTS_DEPRECATED[@]}"; do
 			local mountpoint_dir="${SRC}/${mountpoint}"
 			display_alert "Considering cleaning deprecated mountpoint" "${mountpoint_dir}" "debug"
 			if [[ -d "${mountpoint_dir}" ]]; then

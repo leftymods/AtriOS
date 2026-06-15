@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function artifact_rootfs_config_dump() {
 	artifact_input_variables[ARCH]="${ARCH}"
@@ -21,7 +21,7 @@ function artifact_rootfs_config_dump() {
 	# mapping, tier overrides, or branding may have changed.
 	if [[ "${BUILD_DESKTOP}" == "yes" ]]; then
 		declare configng_desktops_hash="undetermined"
-		local configng_dir="${SRC}/cache/sources/armbian-configng"
+		local configng_dir="${SRC}/cache/sources/atrios-configng"
 		if [[ -d "${configng_dir}/.git" ]]; then
 			configng_desktops_hash="$(git -C "${configng_dir}" log -1 --format=%H -- tools/modules/desktops/ 2>/dev/null || echo "unknown")"
 		fi
@@ -120,7 +120,7 @@ function artifact_rootfs_build_from_sources() {
 }
 
 function artifact_rootfs_cli_adapter_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -151,16 +151,16 @@ function artifact_rootfs_cli_adapter_config_prep() {
 	declare -g -r RELEASE="${RELEASE}" # make readonly for finding who tries to change it
 	declare -g -r NEEDS_BINFMT="yes"   # make sure binfmts are installed during prepare_host_interactive
 
-	# Don't force SKIP_ARMBIAN_REPO=yes for rootfs artifact builds anymore.
+	# Don't force SKIP_AtriOS_REPO=yes for rootfs artifact builds anymore.
 	# The new desktop install path (module_desktops install mode=build,
-	# invoked from rootfs-create.sh) needs apt.armbian.com's
-	# <release>-utils (armbian-config itself) and <release>-desktop
+	# invoked from rootfs-create.sh) needs apt.leftymods.com's
+	# <release>-utils (atrios-config itself) and <release>-desktop
 	# (firefox, chromium, gnome-branded bits) components to be reachable
 	# while the rootfs is being assembled. Default to "no" (repo ON)
 	# and let boards/userpatches opt out explicitly if they still need
 	# the repo-free rootfs behaviour for whatever reason.
-	declare -g SKIP_ARMBIAN_REPO="${SKIP_ARMBIAN_REPO:-no}"
-	declare -g -r SKIP_ARMBIAN_REPO # make it readonly to ensure sanity if hooks try to change it
+	declare -g SKIP_AtriOS_REPO="${SKIP_AtriOS_REPO:-no}"
+	declare -g -r SKIP_AtriOS_REPO # make it readonly to ensure sanity if hooks try to change it
 
 	track_general_config_variables "in artifact_rootfs_cli_adapter_config_prep"
 
@@ -174,7 +174,7 @@ function artifact_rootfs_cli_adapter_config_prep() {
 }
 
 function artifact_rootfs_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/armbian/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
 }
 
 function artifact_rootfs_is_available_in_local_cache() {

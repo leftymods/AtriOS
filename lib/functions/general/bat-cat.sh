@@ -4,14 +4,14 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function run_tool_batcat() {
 	# Default version
 	BATCAT_VERSION=${BATCAT_VERSION:-0.26.1} # https://github.com/sharkdp/bat/releases
 
-	declare non_cache_dir="/armbian-tools/batcat" # To deploy/reuse cached batcat in a Docker image.
+	declare non_cache_dir="/atrios-tools/batcat" # To deploy/reuse cached batcat in a Docker image.
 
 	if [[ -z "${DIR_BATCAT}" ]]; then
 		display_alert "DIR_BATCAT is not set, using default" "batcat" "debug"

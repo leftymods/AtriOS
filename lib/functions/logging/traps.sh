@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Initialize and prepare the trap managers, one for each of ERR, INT, TERM and EXIT traps.
 # Bash goes insane regarding line numbers and other stuff if we try to overwrite the traps.
@@ -187,7 +187,7 @@ function exit_with_error() {
 
 	## This does not really make sense. wtf?
 	## unlock loop device access in case of starvation # @TODO: hmm, say that again?
-	#exec {FD}> /var/lock/armbian-debootstrap-losetup
+	#exec {FD}> /var/lock/AtriOS-debootstrap-losetup
 	#flock -u "${FD}"
 
 	# do NOT close the fd 13 here, otherwise the error will not be logged to logfile...

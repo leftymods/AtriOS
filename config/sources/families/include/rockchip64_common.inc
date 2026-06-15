@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (c) 2013-2023 Igor Pecovnik, igor@armbian.com
+# Copyright (c) 2013-2023 Igor Pecovnik, igor@AtriOS.com
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 #
 enable_extension "rkbin-tools"
 ARCH=arm64
@@ -386,11 +386,11 @@ write_uboot_platform_mtd() {
 		return
 	fi
 
-	[[ -f /etc/armbian-release ]] && source /etc/armbian-release
-	backtitle="Armbian for $BOARD_NAME install script, https://www.armbian.com"
+	[[ -f /etc/atrios-release ]] && source /etc/atrios-release
+	backtitle="AtriOS for $BOARD_NAME install script, https://www.AtriOS.com"
 
 	CHOICE=$(dialog --no-collapse \
-		--title "armbian-install" \
+		--title "AtriOS-install" \
 		--backtitle "$backtitle" \
 		--radiolist "Choose SPI image:" 0 56 4 \
 		"${MENU_ITEMS[@]}" \

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 #!/usr/bin/env bash
 
@@ -82,7 +82,7 @@ show_developer_warning() {
 
 	This allows building experimental configurations that are provided
 	\Z1AS IS\Zn to developers and expert users,
-	\Z1WITHOUT ANY RESPONSIBILITIES\Zn from the Armbian team:
+	\Z1WITHOUT ANY RESPONSIBILITIES\Zn from the AtriOS team:
 
 	- You are using these configurations \Z1AT YOUR OWN RISK\Zn
 	- Bug reports related to the dev kernel, CSC, WIP and EOS boards

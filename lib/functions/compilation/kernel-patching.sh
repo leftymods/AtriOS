@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 #!/usr/bin/env bash
 
@@ -22,7 +22,7 @@ function kernel_main_patching_python() {
 	declare -a params_quoted=(
 		"${PYTHON3_VARS[@]}"                                  # Default vars, from prepare_python_and_pip
 		"LOG_DEBUG=${patch_debug}"                            # Logging level for python.
-		"SRC=${SRC}"                                          # Armbian root
+		"SRC=${SRC}"                                          # AtriOS root
 		"OUTPUT=${temp_file_for_output}"                      # Output file for the python script.
 		"ASSET_LOG_BASE=$(print_current_asset_log_base_file)" # base file name for the asset log; to write .md summaries.
 		"PATCH_TYPE=kernel"                                   # or, u-boot, or, atf

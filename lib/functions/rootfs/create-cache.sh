@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # called by artifact-rootfs::artifact_rootfs_prepare_version()
 function calculate_rootfs_cache_id() {
@@ -48,10 +48,10 @@ function calculate_rootfs_cache_id() {
 		cache_type="${cache_type}-${DESKTOP_TIER}"
 	fi
 
-	# Fold a short fingerprint of the resolved armbian-configng
+	# Fold a short fingerprint of the resolved atrios-configng
 	# desktop tree into the cache name. The desktop package set is
 	# chosen by configng YAMLs at rootfs-create time
-	# (`armbian-config --api module_desktops install mode=build`),
+	# (`atrios-config --api module_desktops install mode=build`),
 	# not by the aggregation layer — so packages_hash and
 	# AGGREGATED_ROOTFS_HASH are blind to configng entirely. Without
 	# this, a configng commit that changes which packages a DE
@@ -61,7 +61,7 @@ function calculate_rootfs_cache_id() {
 	#
 	# CONFIGNG_DESKTOPS_HASH is set by artifact_rootfs_config_dump
 	# above from `git log -1 -- tools/modules/desktops/` in the
-	# cache/sources/armbian-configng clone. 8-char prefix keeps
+	# cache/sources/atrios-configng clone. 8-char prefix keeps
 	# the filename readable while still giving us ~2^32 of
 	# collision resistance — same truncation style the rest of
 	# this file uses for the hash_hooks/bash_hash components.
@@ -160,7 +160,7 @@ function extract_rootfs_artifact() {
 	run_host_command_logged echo "nameserver ${NAMESERVER}" ">" "${SDCARD}"/etc/resolv.conf
 
 	# all sources etc.
-	# armbian repo is NOT yet included here, since we'll be building the image, and don't want the repo interferring.
+	# AtriOS repo is NOT yet included here, since we'll be building the image, and don't want the repo interferring.
 	create_sources_list_and_deploy_repo_key "image-early" "${RELEASE}" "${SDCARD}/"
 
 	return 0

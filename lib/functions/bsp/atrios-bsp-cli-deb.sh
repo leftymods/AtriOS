@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function compile_atrios-bsp-cli-transitional() {
 	: "${artifact_version:?artifact_version is not set}"
@@ -191,7 +191,7 @@ function compile_atrios-bsp-cli() {
 	EOF
 
 	# copy distribution support and upgrade status
-	# this information is used in motd to show status and within armbian-config to perform upgrades
+	# this information is used in motd to show status and within atrios-config to perform upgrades
 	declare -a releases=()
 	mapfile -t releases < <(for relorder in "${SRC}"/config/distributions/*/order; do echo "${relorder} $(xargs echo < "${relorder}")"; done | sort -nk2 | sed "s/\/order.*//g")
 	for i in "${releases[@]}"; do
@@ -432,7 +432,7 @@ function board_side_bsp_cli_postinst_base() {
 	# shellcheck source=/dev/null
 	[[ -f /etc/atrios-release ]] && . /etc/atrios-release
 
-	# ARMBIAN_PRETTY_NAME is now set in atrios-base-files.
+	# AtriOS_PRETTY_NAME is now set in atrios-base-files.
 
 	# Force ramlog to be enabled if it exists. @TODO: why?
 	[[ -f /etc/lib/systemd/system/atrios-ramlog.service ]] && systemctl --no-reload enable atrios-ramlog.service

@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (c) 2013-2023 Igor Pecovnik, igor@armbian.com
+# Copyright (c) 2013-2023 Igor Pecovnik, igor@AtriOS.com
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 #
 enable_extension "sunxi-tools"
 declare -g ARCH=armhf
@@ -44,7 +44,7 @@ family_tweaks() {
 	# execute specific tweaks function if present
 	[[ $(type -t family_tweaks_s) == function ]] && family_tweaks_s
 
-	cp $SRC/packages/blobs/splash/armbian-u-boot-24.bmp $SDCARD/boot/boot.bmp
+	cp $SRC/packages/blobs/splash/atrios-u-boot-24.bmp $SDCARD/boot/boot.bmp
 }
 
 family_tweaks_bsp() {
@@ -68,8 +68,8 @@ setup_write_uboot_platform() {
 		[[ -n $tmp ]] && part=$(findfs PARTUUID=$tmp 2> /dev/null)
 		[[ -n $part ]] && dev=$(lsblk -n -o PKNAME $part 2> /dev/null)
 		[[ -n $dev ]] && DEVICE="/dev/$dev"
-	elif [[ -f /var/lib/armbian/force_search_uboot ]]; then
-		# This may cause overwriting u-boot for android or other non-Armbian OS installed on eMMC
+	elif [[ -f /var/lib/AtriOS/force_search_uboot ]]; then
+		# This may cause overwriting u-boot for android or other non-AtriOS OS installed on eMMC
 		# so don't run this function by default
 		for dev in $(lsblk -d -n -p -o NAME); do
 			if grep -q 'eGON.BT0' <(dd if=$dev bs=32 skip=256 count=1 status=none); then

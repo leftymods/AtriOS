@@ -4,14 +4,14 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function cli_entrypoint() {
 	# array, readonly, global, for future reference, "exported" to shutup shellcheck
-	declare -rg -x -a ARMBIAN_ORIGINAL_ARGV=("${@}")
+	declare -rg -x -a AtriOS_ORIGINAL_ARGV=("${@}")
 
-	if [[ "${ARMBIAN_ENABLE_CALL_TRACING}" == "yes" ]]; then
+	if [[ "${AtriOS_ENABLE_CALL_TRACING}" == "yes" ]]; then
 		set -T # inherit return/debug traps
 		mkdir -p "${SRC}"/output/call-traces
 		echo -n "" > "${SRC}"/output/call-traces/calls.txt
@@ -23,42 +23,42 @@ function cli_entrypoint() {
 	# This would allow for custom commands and interceptors.
 
 	# Decide what we're gonna do. We've a few hardcoded, 1st-argument "commands".
-	declare -g -A ARMBIAN_COMMANDS_TO_HANDLERS_DICT ARMBIAN_COMMANDS_TO_VARS_DICT
-	armbian_register_commands # this defines the above two dictionaries
+	declare -g -A AtriOS_COMMANDS_TO_HANDLERS_DICT AtriOS_COMMANDS_TO_VARS_DICT
+	AtriOS_register_commands # this defines the above two dictionaries
 
 	# Process the command line, separating params (XX=YY) from non-params arguments.
 	# That way they can be set in any order.
-	declare -A -g ARMBIAN_PARSED_CMDLINE_PARAMS=() # A dict of PARAM=VALUE
-	declare -a -g ARMBIAN_NON_PARAM_ARGS=()        # An array of all non-param arguments
+	declare -A -g AtriOS_PARSED_CMDLINE_PARAMS=() # A dict of PARAM=VALUE
+	declare -a -g AtriOS_NON_PARAM_ARGS=()        # An array of all non-param arguments
 	parse_cmdline_params "${@}"                    # which fills the above vars.
 
 	# Now load the key=value pairs from cmdline into environment, before loading config or executing commands.
 	# This will be done _again_ later, to make sure cmdline params override config et al.
-	apply_cmdline_params_to_env "early" # which uses ARMBIAN_PARSED_CMDLINE_PARAMS
-	# From here on, no more ${1} or stuff. We've parsed it all into ARMBIAN_PARSED_CMDLINE_PARAMS or ARMBIAN_NON_PARAM_ARGS and ARMBIAN_COMMAND.
+	apply_cmdline_params_to_env "early" # which uses AtriOS_PARSED_CMDLINE_PARAMS
+	# From here on, no more ${1} or stuff. We've parsed it all into AtriOS_PARSED_CMDLINE_PARAMS or AtriOS_NON_PARAM_ARGS and AtriOS_COMMAND.
 
 	# Re-initialize logging, to take into account the new environment after parsing cmdline params.
 	logging_init
 
-	declare -a -g ARMBIAN_CONFIG_FILES=()                                            # fully validated, complete paths to config files.
-	declare -g ARMBIAN_COMMAND_HANDLER="" ARMBIAN_COMMAND="" ARMBIAN_COMMAND_VARS="" # only valid command and handler will ever be set here.
-	declare -g ARMBIAN_HAS_UNKNOWN_ARG="no"                                          # if any unknown params, bomb.
-	for argument in "${ARMBIAN_NON_PARAM_ARGS[@]}"; do                               # loop over all non-param arguments, find commands and configs.
+	declare -a -g AtriOS_CONFIG_FILES=()                                            # fully validated, complete paths to config files.
+	declare -g AtriOS_COMMAND_HANDLER="" AtriOS_COMMAND="" AtriOS_COMMAND_VARS="" # only valid command and handler will ever be set here.
+	declare -g AtriOS_HAS_UNKNOWN_ARG="no"                                          # if any unknown params, bomb.
+	for argument in "${AtriOS_NON_PARAM_ARGS[@]}"; do                               # loop over all non-param arguments, find commands and configs.
 		parse_each_cmdline_arg_as_command_param_or_config "${argument}"                 # sets all the vars above
 	done
 
 	# More sanity checks.
 	# If unknowns, bail.
-	if [[ "${ARMBIAN_HAS_UNKNOWN_ARG}" == "yes" ]]; then
+	if [[ "${AtriOS_HAS_UNKNOWN_ARG}" == "yes" ]]; then
 		exit_with_error "Unknown arguments found. Please check the output above and fix them."
 	fi
 
 	# @TODO: Have a config that is always included? "${SRC}/userpatches/config-default.conf" ?
 
 	# If we don't have a command decided yet, use the undecided command.
-	if [[ "${ARMBIAN_COMMAND}" == "" ]]; then
+	if [[ "${AtriOS_COMMAND}" == "" ]]; then
 		display_alert "No command found, using default" "undecided" "debug"
-		ARMBIAN_COMMAND="undecided"
+		AtriOS_COMMAND="undecided"
 	fi
 
 	# If we don't have a command at this stage, we should default either to 'build' or 'docker', depending on OS.
@@ -67,34 +67,34 @@ function cli_entrypoint() {
 	# Also allows for launchers to keep themselves when re-launched, yet do something diferent. (eg: docker under docker does build).
 	# Or: build under Darwin does docker...
 	# each _pre_run can change the command and vars to run too, so do it in a loop until it stops changing.
-	declare -g ARMBIAN_CHANGE_COMMAND_TO="${ARMBIAN_COMMAND}"
-	while [[ "${ARMBIAN_CHANGE_COMMAND_TO}" != "" ]]; do
-		display_alert "Still a command to pre-run, this time:" "${ARMBIAN_CHANGE_COMMAND_TO}" "debug"
+	declare -g AtriOS_CHANGE_COMMAND_TO="${AtriOS_COMMAND}"
+	while [[ "${AtriOS_CHANGE_COMMAND_TO}" != "" ]]; do
+		display_alert "Still a command to pre-run, this time:" "${AtriOS_CHANGE_COMMAND_TO}" "debug"
 
-		declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="no" # reset this before every pre_run, so only the last one wins.
-		ARMBIAN_COMMAND="${ARMBIAN_CHANGE_COMMAND_TO}"
-		armbian_prepare_cli_command_to_run "${ARMBIAN_COMMAND}"
+		declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="no" # reset this before every pre_run, so only the last one wins.
+		AtriOS_COMMAND="${AtriOS_CHANGE_COMMAND_TO}"
+		AtriOS_prepare_cli_command_to_run "${AtriOS_COMMAND}"
 
-		ARMBIAN_CHANGE_COMMAND_TO=""
-		armbian_cli_pre_run_command
+		AtriOS_CHANGE_COMMAND_TO=""
+		AtriOS_cli_pre_run_command
 	done
 
 	declare -g DOCKER_NICE
-	if [[ "$ARMBIAN_COMMAND" == "docker" ]] || \
-		[[ -n "${ARMBIAN_PARSED_CMDLINE_PARAMS["PREFER_DOCKER"]}" && "${ARMBIAN_PARSED_CMDLINE_PARAMS["PREFER_DOCKER"]}" == "yes" ]] || \
-		[[ -n "${ARMBIAN_PARSED_CMDLINE_PARAMS["DOCKER_NICE"]}" ]]; then
+	if [[ "$AtriOS_COMMAND" == "docker" ]] || \
+		[[ -n "${AtriOS_PARSED_CMDLINE_PARAMS["PREFER_DOCKER"]}" && "${AtriOS_PARSED_CMDLINE_PARAMS["PREFER_DOCKER"]}" == "yes" ]] || \
+		[[ -n "${AtriOS_PARSED_CMDLINE_PARAMS["DOCKER_NICE"]}" ]]; then
 
 		CURRENT_NICE=$(($(ps -p $$ -o 'nice=')+0))
 		# by default, docker sets up a separate environment that inherits next to nothing.
 		# this detects the current process nice value and attempts to propagate it.
-		if [[ -z "${ARMBIAN_PARSED_CMDLINE_PARAMS["DOCKER_NICE"]}" ]]; then
+		if [[ -z "${AtriOS_PARSED_CMDLINE_PARAMS["DOCKER_NICE"]}" ]]; then
 		# since it's not been passed to us in our invocation, use our current nice value
 		# this becomes a propagated cmdline parameter in cli-docker.sh
 			DOCKER_NICE=$CURRENT_NICE
 			display_alert "Niceness parameter (DOCKER_NICE)" "$DOCKER_NICE" "debug"
 		else
 			# initialize from passed cmdline arg
-			DOCKER_NICE="${ARMBIAN_PARSED_CMDLINE_PARAMS["DOCKER_NICE"]}"
+			DOCKER_NICE="${AtriOS_PARSED_CMDLINE_PARAMS["DOCKER_NICE"]}"
 			# we cast DOCKER_NICE to integer in case we were handed garbage.
 			DOCKER_NICE=$(("$DOCKER_NICE"+0))
 		fi
@@ -122,36 +122,36 @@ function cli_entrypoint() {
 
 	# set unique mounting directory for this execution.
 	# basic deps, which include "uuidgen", will be installed _after_ this, so we gotta tolerate it not being there yet.
-	declare -g ARMBIAN_BUILD_UUID
-	if [[ "${ARMBIAN_BUILD_UUID}" != "" ]]; then
-		display_alert "Using passed-in ARMBIAN_BUILD_UUID" "${ARMBIAN_BUILD_UUID}" "debug"
+	declare -g AtriOS_BUILD_UUID
+	if [[ "${AtriOS_BUILD_UUID}" != "" ]]; then
+		display_alert "Using passed-in AtriOS_BUILD_UUID" "${AtriOS_BUILD_UUID}" "debug"
 	else
 		if command -v uuidgen 1> /dev/null; then
-			ARMBIAN_BUILD_UUID="$(uuidgen)"
+			AtriOS_BUILD_UUID="$(uuidgen)"
 		else
 			display_alert "uuidgen not found" "uuidgen not installed yet" "info"
-			ARMBIAN_BUILD_UUID="no-uuidgen-yet-${RANDOM}-$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))"
+			AtriOS_BUILD_UUID="no-uuidgen-yet-${RANDOM}-$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))"
 		fi
-		display_alert "Generated ARMBIAN_BUILD_UUID" "${ARMBIAN_BUILD_UUID}" "debug"
+		display_alert "Generated AtriOS_BUILD_UUID" "${AtriOS_BUILD_UUID}" "debug"
 	fi
-	declare -g -r ARMBIAN_BUILD_UUID="${ARMBIAN_BUILD_UUID}" # Make read-only
-	display_alert "Build UUID:" "${ARMBIAN_BUILD_UUID}" "debug"
+	declare -g -r AtriOS_BUILD_UUID="${AtriOS_BUILD_UUID}" # Make read-only
+	display_alert "Build UUID:" "${AtriOS_BUILD_UUID}" "debug"
 
 	# Super-global variables, used everywhere. The directories are NOT _created_ here, since this very early stage. They are all readonly, for sanity.
 	declare -g -r WORKDIR_BASE_TMP="${SRC}/.tmp" # a.k.a. ".tmp" dir. it is a shared base dir for all builds, but each build gets its own WORKDIR/TMPDIR.
 
-	declare -g -r WORKDIR="${WORKDIR_BASE_TMP}/work-${ARMBIAN_BUILD_UUID}"                         # WORKDIR at this stage. It will become TMPDIR later. It has special significance to `mktemp` and others!
-	declare -g -r LOGDIR="${WORKDIR_BASE_TMP}/logs-${ARMBIAN_BUILD_UUID}"                          # Will be initialized very soon, literally, below.
-	declare -g -r EXTENSION_MANAGER_TMP_DIR="${WORKDIR_BASE_TMP}/extensions-${ARMBIAN_BUILD_UUID}" # EXTENSION_MANAGER_TMP_DIR used to store extension-composed functions
+	declare -g -r WORKDIR="${WORKDIR_BASE_TMP}/work-${AtriOS_BUILD_UUID}"                         # WORKDIR at this stage. It will become TMPDIR later. It has special significance to `mktemp` and others!
+	declare -g -r LOGDIR="${WORKDIR_BASE_TMP}/logs-${AtriOS_BUILD_UUID}"                          # Will be initialized very soon, literally, below.
+	declare -g -r EXTENSION_MANAGER_TMP_DIR="${WORKDIR_BASE_TMP}/extensions-${AtriOS_BUILD_UUID}" # EXTENSION_MANAGER_TMP_DIR used to store extension-composed functions
 
 	# @TODO: These are used only by rootfs/image actual build, move there...
-	declare -g -r SDCARD="${WORKDIR_BASE_TMP}/rootfs-${ARMBIAN_BUILD_UUID}" # SDCARD (which is NOT an sdcard, but will be, maybe, one day) is where we work the rootfs before final imaging. "rootfs" stage.
-	declare -g -r MOUNT="${WORKDIR_BASE_TMP}/mount-${ARMBIAN_BUILD_UUID}"   # MOUNT ("mounted on the loop") is the mounted root on final image (via loop). "image" stage
-	declare -g -r DESTIMG="${WORKDIR_BASE_TMP}/image-${ARMBIAN_BUILD_UUID}" # DESTIMG is where the backing image (raw, huge, sparse file) is kept (not the final destination)
+	declare -g -r SDCARD="${WORKDIR_BASE_TMP}/rootfs-${AtriOS_BUILD_UUID}" # SDCARD (which is NOT an sdcard, but will be, maybe, one day) is where we work the rootfs before final imaging. "rootfs" stage.
+	declare -g -r MOUNT="${WORKDIR_BASE_TMP}/mount-${AtriOS_BUILD_UUID}"   # MOUNT ("mounted on the loop") is the mounted root on final image (via loop). "image" stage
+	declare -g -r DESTIMG="${WORKDIR_BASE_TMP}/image-${AtriOS_BUILD_UUID}" # DESTIMG is where the backing image (raw, huge, sparse file) is kept (not the final destination)
 
-	# Make sure ARMBIAN_LOG_CLI_ID is set, and unique, and readonly.
-	# Pre-runs might change it before this, but if not set, default to ARMBIAN_COMMAND.
-	declare -r -g ARMBIAN_LOG_CLI_ID="${ARMBIAN_LOG_CLI_ID:-${ARMBIAN_COMMAND}}"
+	# Make sure AtriOS_LOG_CLI_ID is set, and unique, and readonly.
+	# Pre-runs might change it before this, but if not set, default to AtriOS_COMMAND.
+	declare -r -g AtriOS_LOG_CLI_ID="${AtriOS_LOG_CLI_ID:-${AtriOS_COMMAND}}"
 
 	# If we're on Linux & root, mount tmpfs on LOGDIR. This has it's own cleanup handler.
 	# It also _creates_ the LOGDIR, and the cleanup handler will delete.
@@ -162,7 +162,7 @@ function cli_entrypoint() {
 	add_cleanup_handler trap_handler_reset_output_owner # make sure output folder is owned by pre-sudo/pre-Docker user if that's the case
 
 	# @TODO: So gigantic contention point here about logging the basic deps installation.
-	if [[ "${ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS}" == "yes" ]]; then
+	if [[ "${AtriOS_COMMAND_REQUIRE_BASIC_DEPS}" == "yes" ]]; then
 		if [[ "${OFFLINE_WORK}" == "yes" ]]; then
 			display_alert "* " "You are working offline!"
 			display_alert "* " "Sources, time and host will not be checked"
@@ -176,8 +176,8 @@ function cli_entrypoint() {
 	# @TODO: a quick check on the globals in extensions.sh would get rid of this.
 	extension_manager_declare_globals
 
-	# Loop over the ARMBIAN_CONFIG_FILES array and source each. The order is important.
-	for config_file in "${ARMBIAN_CONFIG_FILES[@]}"; do
+	# Loop over the AtriOS_CONFIG_FILES array and source each. The order is important.
+	for config_file in "${AtriOS_CONFIG_FILES[@]}"; do
 		local config_filename="${config_file##*/}" config_dir="${config_file%/*}"
 		display_alert "Sourcing config file" "${config_filename}" "debug"
 
@@ -198,15 +198,15 @@ function cli_entrypoint() {
 
 		# Apply the params received from the command line _again_ after running the config.
 		# This ensures that params take precedence over stuff possibly defined in the config.
-		apply_cmdline_params_to_env "after config '${config_filename}'" # which uses ARMBIAN_PARSED_CMDLINE_PARAMS
+		apply_cmdline_params_to_env "after config '${config_filename}'" # which uses AtriOS_PARSED_CMDLINE_PARAMS
 	done
 
 	# Early check for deprecations
 	error_if_lib_tag_set # make sure users are not thrown off by using old parameter which does nothing anymore; explain
 
-	display_alert "Executing final CLI command" "${ARMBIAN_COMMAND}" "debug"
-	armbian_cli_run_command
-	display_alert "Done Executing final CLI command" "${ARMBIAN_COMMAND}" "debug"
+	display_alert "Executing final CLI command" "${AtriOS_COMMAND}" "debug"
+	AtriOS_cli_run_command
+	display_alert "Done Executing final CLI command" "${AtriOS_COMMAND}" "debug"
 
 	# Build done, run the cleanup handlers explicitly.
 	# This zeroes out the list of cleanups, so it"s not done again when the main script exits normally and trap = 0 runs.

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function obtain_and_check_host_release_and_arch() {
 
@@ -23,7 +23,7 @@ function obtain_and_check_host_release_and_arch() {
 			;;
 		*)
 			display_alert "Please read documentation to set up proper compilation environment"
-			display_alert "https://www.armbian.com/using-armbian-tools/"
+			display_alert "https://github.com/leftymods/CoreOSusing-atrios-tools/"
 			exit_with_error "Running this tool on '${HOSTARCH}' build host is not supported"
 			;;
 	esac

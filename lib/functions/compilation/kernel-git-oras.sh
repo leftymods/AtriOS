@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # This is not run under logging section.
 function kernel_prepare_bare_repo_decide_shallow_or_full() {
@@ -135,7 +135,7 @@ function kernel_prepare_bare_repo_decide_shallow_or_full() {
 
 	display_alert "Using ${decision} Kernel bare tree for ${KERNEL_MAJOR_MINOR}" "${decision_why}" "info"
 
-	declare base_oras_ref="${GHCR_SOURCE}/armbian/shallow" # @TODO allow changing this
+	declare base_oras_ref="${GHCR_SOURCE}/AtriOS/shallow" # @TODO allow changing this
 	declare estimated_dl_size_mib=0 benefits="" cons=""
 	case "${decision}" in
 		shallow)
@@ -203,7 +203,7 @@ function kernel_prepare_bare_repo_from_oras_gitball() {
 		fi
 
 		# For custom kernels (not mainline), skip ORAS bundle and clone directly.
-		# The ORAS bundles on ghcr.io/armbian only contain mainline kernel trees.
+		# The ORAS bundles on ghcr.io/leftymods only contain mainline kernel trees.
 		if [[ -n "${KERNELSOURCE}" && "${KERNELSOURCE}" != "https://git.kernel.org/"* && "${KERNELSOURCE}" != "https://kernel.googlesource.com/"* ]]; then
 			display_alert "Custom kernel source detected" "skipping ORAS bundle, cloning directly" "info"
 			run_host_command_logged mkdir -p "${kernel_git_bare_tree}"

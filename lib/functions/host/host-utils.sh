@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function fetch_and_build_host_tools() {
 	call_extension_method "fetch_sources_tools" <<- 'FETCH_SOURCES_TOOLS'
@@ -200,8 +200,8 @@ function local_apt_deb_cache_prepare() {
 	return 0
 }
 
-# usage: if armbian_is_host_running_systemd; then ... fi
-function armbian_is_host_running_systemd() {
+# usage: if AtriOS_is_host_running_systemd; then ... fi
+function AtriOS_is_host_running_systemd() {
 	# Detect if systemctl is available in the path
 	if [[ -n "$(command -v systemctl)" ]]; then
 		display_alert "systemctl binary found" "host has systemd installed" "debug"
@@ -222,11 +222,11 @@ function armbian_is_host_running_systemd() {
 	return 1
 }
 
-# usage: if armbian_is_running_in_container; then ... fi
-function armbian_is_running_in_container() {
+# usage: if AtriOS_is_running_in_container; then ... fi
+function AtriOS_is_running_in_container() {
 	# First, check an environment variable. This is passed by the docker launchers, and also set in the Dockerfile, so should be authoritative.
-	if [[ "${ARMBIAN_RUNNING_IN_CONTAINER}" == "yes" ]]; then
-		display_alert "ARMBIAN_RUNNING_IN_CONTAINER is set to 'yes' in the environment" "so we're running in a container/Docker" "debug"
+	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+		display_alert "AtriOS_RUNNING_IN_CONTAINER is set to 'yes' in the environment" "so we're running in a container/Docker" "debug"
 		return 0
 	fi
 
@@ -237,7 +237,7 @@ function armbian_is_running_in_container() {
 	fi
 
 	# Third: if host is actively running systemd (not just installed), it's very _unlikely_ that we're running under Docker. bail.
-	if armbian_is_host_running_systemd; then
+	if AtriOS_is_host_running_systemd; then
 		display_alert "Host is running systemd" "so we're not running in a container/Docker" "debug"
 		return 1
 	fi
@@ -260,7 +260,7 @@ function armbian_is_running_in_container() {
 }
 
 # This does `mkdir -p` on the parameters, and also sets it to be owned by the correct UID.
-# Call: armbian_mkdir_p_and_chown_to_user "dir1" "dir2" "dir3/dir4"
+# Call: AtriOS_mkdir_p_and_chown_to_user "dir1" "dir2" "dir3/dir4"
 function mkdir_recursive_and_set_uid_owner() {
 	# loop over args...
 	for dir in "$@"; do

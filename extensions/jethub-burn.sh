@@ -2,11 +2,11 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025 JetHome
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 # Extension: jethub-burn
-# Automatically converts Armbian .img into burn image after build
+# Automatically converts AtriOS .img into burn image after build
 
 # Download and prepare tools
 function bootstrap_tools() {
@@ -21,7 +21,7 @@ function bootstrap_tools() {
   declare -g BINS_DIR="${TOOLS_DIR}/bins"
   declare -g DTS_DIR="${TOOLS_DIR}/dts"
   declare -g DTBTOOLS_DIR="${TOOLS_DIR}/dtbtools"
-  declare -g IMAGE_CFG="${BINS_DIR}/image.armbian.cfg"
+  declare -g IMAGE_CFG="${BINS_DIR}/image.AtriOS.cfg"
 
   [[ -x "${PACKER}" ]] || exit_with_error "aml_image_v2_packer_new not found at ${PACKER}"
 

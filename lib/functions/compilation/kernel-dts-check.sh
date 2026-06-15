@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Validate the dts/dtb file against dt bindings found in "linux/Documentation/devicetree/bindings/"
 # See slide 15 in https://elinux.org/images/1/17/How_to_Get_Your_DT_Schema_Bindings_Accepted_in_Less_than_10_Iterations_-_Krzysztof_Kozlowski%2C_Linaro_-_ELCE_2023.pdf

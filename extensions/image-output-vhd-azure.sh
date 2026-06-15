@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 
 # This outputs image in VHD format, for use with and Microsoft Azure.
 # The important part is making sure the input raw file is a multiple of 1024*1024 bytes, as per Microsoft's instructions.

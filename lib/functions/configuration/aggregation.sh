@@ -4,12 +4,12 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function assert_requires_aggregation() {
 	if [[ ${aggregation_has_already_run:-0} -lt 1 ]]; then
-		exit_with_error "assert_requires_aggregation: Aggregation has not been run. This is a bug in armbian-next code. Please report!"
+		exit_with_error "assert_requires_aggregation: Aggregation has not been run. This is a bug in atrios-build code. Please report!"
 	fi
 }
 
@@ -89,7 +89,7 @@ function aggregate_all_packages_python() {
 		"EXTRA_PACKAGES_IMAGE=${EXTRA_PACKAGES_IMAGE[*]}"
 		"EXTRA_PACKAGES_IMAGE_REFS=${EXTRA_PACKAGES_IMAGE_REFS[*]}"
 
-		# Desktop: armbian-config owns package lists now; only the
+		# Desktop: atrios-config owns package lists now; only the
 		# flag and DE name are needed for cache-key computation.
 		"BUILD_DESKTOP=${BUILD_DESKTOP}"
 		"DESKTOP_ENVIRONMENT=${DESKTOP_ENVIRONMENT}"

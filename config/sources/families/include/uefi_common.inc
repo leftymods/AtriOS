@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (c) 2013-2023 Igor Pecovnik, igor@armbian.com
+# Copyright (c) 2013-2023 Igor Pecovnik, igor@AtriOS.com
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 #
 declare -g SERIALCON="${SERIALCON:-tty1}"            # Consistent serial console device unlikely on UEFI arch pair. Customize if otherwise.
 declare -g UEFI_GRUB_TIMEOUT=${UEFI_GRUB_TIMEOUT:-3} # Default 3-seconds timeout for GRUB menu.
@@ -32,7 +32,7 @@ case "${BRANCH}" in
 		declare -g GRUB_CMDLINE_LINUX_DEFAULT="selinux=0 loglevel=3 max_loop=32"
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g LINUXCONFIG="linux-uefi-${LINUXFAMILY}-cloud"
-		declare -g INSTALL_ARMBIAN_FIRMWARE="no"
+		declare -g INSTALL_AtriOS_FIRMWARE="no"
 		declare -g EXTRAWIFI="no"
 		declare -g UEFI_GRUB_TIMEOUT=0
 		declare -g QCOW2_RESIZE_AMOUNT="16G"
@@ -89,11 +89,11 @@ if [[ "${QEMU_UBOOT_BOOTCONFIG}" != "" ]]; then
 
 fi
 
-function pre_customize_image__disable_few_armbian_services() {
-	display_alert "Disabling Armbian services that are not needed for UEFI" "${BOARD}" "info"
-	chroot_sdcard systemctl disable armbian-hardware-monitor.service "||" true
-	chroot_sdcard systemctl disable armbian-hardware-optimize.service "||" true
-	chroot_sdcard systemctl disable armbian-led-state.service "||" true
+function pre_customize_image__disable_few_AtriOS_services() {
+	display_alert "Disabling AtriOS services that are not needed for UEFI" "${BOARD}" "info"
+	chroot_sdcard systemctl disable AtriOS-hardware-monitor.service "||" true
+	chroot_sdcard systemctl disable AtriOS-hardware-optimize.service "||" true
+	chroot_sdcard systemctl disable AtriOS-led-state.service "||" true
 }
 
 function custom_kernel_config__enable_amd_dc() {

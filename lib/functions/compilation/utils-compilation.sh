@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Functions:
 
@@ -49,11 +49,11 @@ overlayfs_wrapper() {
 	if [[ $operation == wrap ]]; then
 		local srcdir="$2"
 		local description="$3"
-		mkdir -p /tmp/overlay_components/ /tmp/armbian_build/
+		mkdir -p /tmp/overlay_components/ /tmp/AtriOS_build/
 		local tempdir workdir mergeddir
 		tempdir=$(mktemp -d --tmpdir="/tmp/overlay_components/") # @TODO: WORKDIR? otherwise uses host's root disk, which might be small
 		workdir=$(mktemp -d --tmpdir="/tmp/overlay_components/")
-		mergeddir=$(mktemp -d --suffix="_$description" --tmpdir="/tmp/armbian_build/")
+		mergeddir=$(mktemp -d --suffix="_$description" --tmpdir="/tmp/AtriOS_build/")
 		mount -t overlay overlay -o lowerdir="$srcdir",upperdir="$tempdir",workdir="$workdir" "$mergeddir"
 		# this is executed in a subshell, so use temp files to pass extra data outside
 		echo "$tempdir" >> /tmp/.overlayfs_wrapper_cleanup

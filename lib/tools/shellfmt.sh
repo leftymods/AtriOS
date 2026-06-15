@@ -5,7 +5,7 @@
 # Copyright (c) 2025-2026 leftymods
 #
 # This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# https://github.com/leftymods/CoreOS/
 
 SHELLFMT_VERSION=${SHELLFMT_VERSION:-3.13.1} # https://github.com/mvdan/sh/releases/
 

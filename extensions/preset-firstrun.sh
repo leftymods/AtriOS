@@ -42,11 +42,11 @@ function post_family_tweaks__preset_configs() {
 	echo "PRESET_ROOT_PASSWORD=RootPassword" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	# Preset username
-	echo "PRESET_USER_NAME=armbian" >> "${SDCARD}"/root/.not_logged_in_yet
+	echo "PRESET_USER_NAME=AtriOS" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	# Preset user password
 	echo "PRESET_USER_PASSWORD=UserPassword" >> "${SDCARD}"/root/.not_logged_in_yet
 
 	# Preset user default realname
-	echo "PRESET_DEFAULT_REALNAME=Armbian" >> "${SDCARD}"/root/.not_logged_in_yet
+	echo "PRESET_DEFAULT_REALNAME=AtriOS" >> "${SDCARD}"/root/.not_logged_in_yet
 }

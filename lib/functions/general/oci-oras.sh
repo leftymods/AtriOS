@@ -4,15 +4,15 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function run_tool_oras() {
 	# Default version
 	ORAS_VERSION=${ORAS_VERSION:-1.3.2} # https://github.com/oras-project/oras/releases
 	#ORAS_VERSION=${ORAS_VERSION:-"1.0.0-rc.1"} # https://github.com/oras-project/oras/releases
 
-	declare non_cache_dir="/armbian-tools/oras" # To deploy/reuse cached ORAS in a Docker image.
+	declare non_cache_dir="/atrios-tools/oras" # To deploy/reuse cached ORAS in a Docker image.
 
 	if [[ -z "${DIR_ORAS}" ]]; then
 		display_alert "DIR_ORAS is not set, using default" "ORAS" "debug"
@@ -131,7 +131,7 @@ function try_download_oras_tooling() {
 }
 
 function oras_push_artifact_file() {
-	declare image_full_oci="${1}" # Something like "ghcr.io/rpardini/armbian-git-shallow/kernel-git:latest"
+	declare image_full_oci="${1}" # Something like "ghcr.io/rpardini/AtriOS-git-shallow/kernel-git:latest"
 	declare upload_file="${2}"    # Absolute path to the file to upload including the path and name
 	declare description="${3:-"missing description"}"
 	declare upload_file_base_path upload_file_name
@@ -162,7 +162,7 @@ function oras_push_artifact_file() {
 
 # Outer scope: oras_has_manifest (yes/no) and oras_manifest_json (json)
 function oras_get_artifact_manifest() {
-	declare image_full_oci="${1}" # Something like "ghcr.io/rpardini/armbian-git-shallow/kernel-git:latest"
+	declare image_full_oci="${1}" # Something like "ghcr.io/rpardini/AtriOS-git-shallow/kernel-git:latest"
 	display_alert "Getting ORAS manifest" "ORAS manifest from ${image_full_oci}" "info"
 
 	declare extra_params=()
@@ -199,7 +199,7 @@ function oras_get_artifact_manifest() {
 
 # oras pull is very hard to work with, since we don't determine the filename until after the download.
 function oras_pull_artifact_file() {
-	declare image_full_oci="${1}" # Something like "ghcr.io/rpardini/armbian-git-shallow/kernel-git:latest"
+	declare image_full_oci="${1}" # Something like "ghcr.io/rpardini/AtriOS-git-shallow/kernel-git:latest"
 	declare target_dir="${2}"     # temporary directory we'll use for the download to workaround oras being maniac
 	declare target_fn="${3}"
 

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function create_artifact_functions() {
 	declare -a funcs=(
@@ -60,8 +60,8 @@ function initialize_artifact() {
 	[[ "${chosen_artifact}" == *" "* ]] && exit_with_error "Artifact name cannot contain spaces"
 	[[ "${chosen_artifact}" == *","* ]] && exit_with_error "Artifact name cannot contain commas"
 
-	armbian_register_artifacts
-	declare -g chosen_artifact_impl="${ARMBIAN_ARTIFACTS_TO_HANDLERS_DICT["${chosen_artifact}"]}"
+	AtriOS_register_artifacts
+	declare -g chosen_artifact_impl="${AtriOS_ARTIFACTS_TO_HANDLERS_DICT["${chosen_artifact}"]}"
 	[[ "x${chosen_artifact_impl}x" == "xx" ]] && exit_with_error "Unknown artifact '${chosen_artifact}'"
 	display_alert "artifact" "${chosen_artifact} :: ${chosen_artifact_impl}()" "info"
 	create_artifact_functions

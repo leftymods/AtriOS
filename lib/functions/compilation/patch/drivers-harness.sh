@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function kernel_drivers_create_patches_hash_only() {
 	hash_only="yes" kernel_drivers_create_patches "${@}"
@@ -158,7 +158,7 @@ function kernel_drivers_prepare_harness() {
 		# change cwd to the kernel working dir
 		cd "${kernel_work_dir}" || exit_with_error "Failed to change directory to ${kernel_work_dir}"
 
-		# invoke the driver; non-armbian-next code.
+		# invoke the driver; non-atrios-build code.
 		FETCH_FROM_REPO_CALLBACK_IF_REF_MUTABLE="kernel_drivers_handle_mutable_ref" DRIVER_HARNESS_DRIVER="${driver}" "${driver}"
 
 		# recover from possible cwd changes in the driver code
@@ -204,7 +204,7 @@ function export_changes_as_patch_via_git_format_patch() {
 		"--unified=3"    # force 3 lines of diff context
 		"--keep-subject" # do not add a prefix to the subject "[PATCH] "
 		# "--no-encode-email-headers" # do not encode email headers - @TODO does not exist under focal, disable
-		'--signature' "Armbian generated patch from drivers for kernel ${version} and family ${LINUXFAMILY}"
+		'--signature' "AtriOS generated patch from drivers for kernel ${version} and family ${LINUXFAMILY}"
 		'--stat=120'            # 'wider' stat output; default is 80
 		'--stat-graph-width=10' # shorten the diffgraph graph part, it's too long
 		"--zero-commit"         # Output an all-zero hash in each patch’s From header instead of the hash of the commit.

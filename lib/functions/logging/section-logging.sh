@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function start_logging_section() {
 	# Sanity check: if this is called, but CURRENT_LOGGING_SECTION is not empty, then something is wrong.

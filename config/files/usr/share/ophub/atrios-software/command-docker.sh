@@ -6,11 +6,11 @@
 # warranty of any kind, whether express or implied.
 #
 # This file is a part of the Rebuild Armbian
-# https://github.com/ophub/amlogic-s9xxx-armbian
+# https://github.com/leftymods/CoreOS
 #
 # Function: Manage Docker container software installation, update, and removal
 # Copyright (C) 2021- https://github.com/unifreq/openwrt_packit
-# Copyright (C) 2021- https://github.com/ophub/amlogic-s9xxx-armbian
+# Copyright (C) 2021- https://github.com/leftymods/CoreOS
 #
 # Command: command-docker.sh -s <software_id> -m <install/update/remove>
 # Example: command-docker.sh -s 101 -m install

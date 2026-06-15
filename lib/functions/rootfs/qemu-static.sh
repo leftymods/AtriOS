@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function deploy_qemu_binary_to_chroot() {
 	declare chroot_target="${1}" caller="${2}"
@@ -36,8 +36,8 @@ function deploy_qemu_binary_to_chroot() {
 	# qemu-user-binfmt registers /usr/bin/qemu-<arch>.
 	declare dst_target="${chroot_target}/usr/bin/${QEMU_BINARY}"
 	declare dst_target_alt="${chroot_target}/usr/bin/${qemu_no_suffix}"
-	declare dst_target_bkp="${dst_target}.armbian.orig"
-	declare dst_target_alt_bkp="${dst_target_alt}.armbian.orig"
+	declare dst_target_bkp="${dst_target}.AtriOS.orig"
+	declare dst_target_alt_bkp="${dst_target_alt}.AtriOS.orig"
 
 	# Assume we're getting a clean base to work with. Namely, we count on the rootfs cache to _not_ have left a dangling binary.
 	# If the dst_target already exists, it means the target actually has the qemu-static package installed.
@@ -73,8 +73,8 @@ function undeploy_qemu_binary_from_chroot() {
 	declare qemu_no_suffix="${QEMU_BINARY%-static}"
 	declare dst_target="${chroot_target}/usr/bin/${QEMU_BINARY}"
 	declare dst_target_alt="${chroot_target}/usr/bin/${qemu_no_suffix}"
-	declare dst_target_bkp="${dst_target}.armbian.orig"
-	declare dst_target_alt_bkp="${dst_target_alt}.armbian.orig"
+	declare dst_target_bkp="${dst_target}.AtriOS.orig"
+	declare dst_target_alt_bkp="${dst_target_alt}.AtriOS.orig"
 
 	# Check the binary we deployed is there. If not, panic, as we've lost control.
 	if [[ ! -f "${dst_target}" ]]; then

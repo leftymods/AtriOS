@@ -4,14 +4,14 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function cli_distccd_pre_run() {
 	: <<- 'HEADER'
 		Sets up an inline extension to include distccd in dependencies.
 	HEADER
-	display_alert "cli_distccd_pre_run" "func cli_distccd_run :: ${ARMBIAN_COMMAND}" "warn"
+	display_alert "cli_distccd_pre_run" "func cli_distccd_run :: ${AtriOS_COMMAND}" "warn"
 
 	# When being relaunched in Docker, I wanna add port-forwardings to the distccd ports.
 	declare -g DOCKER_EXTRA_ARGS+=("-p" "3632:3632" "-p" "3633:3633")

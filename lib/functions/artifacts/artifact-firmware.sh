@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function artifact_firmware_config_dump() {
 	# artifact_input_variables: None, for firmware.
@@ -16,24 +16,24 @@ function artifact_firmware_prepare_version() {
 	artifact_version="undetermined"        # outer scope
 	artifact_version_reason="undetermined" # outer scope
 
-	local ARMBIAN_FIRMWARE_SOURCE="${ARMBIAN_FIRMWARE_GIT_SOURCE:-"https://github.com/armbian/firmware"}"
-	local ARMBIAN_FIRMWARE_BRANCH="branch:${ARMBIAN_FIRMWARE_GIT_BRANCH:-"master"}"
+	local AtriOS_FIRMWARE_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/AtriOS/firmware"}"
+	local AtriOS_FIRMWARE_BRANCH="branch:${AtriOS_FIRMWARE_GIT_BRANCH:-"master"}"
 
-	debug_var ARMBIAN_FIRMWARE_SOURCE
-	debug_var ARMBIAN_FIRMWARE_BRANCH
+	debug_var AtriOS_FIRMWARE_SOURCE
+	debug_var AtriOS_FIRMWARE_BRANCH
 
 	declare short_hash_size=4
 
-	declare -A GIT_INFO_ARMBIAN_FIRMWARE=([GIT_SOURCE]="${ARMBIAN_FIRMWARE_SOURCE}" [GIT_REF]="${ARMBIAN_FIRMWARE_BRANCH}")
-	run_memoized GIT_INFO_ARMBIAN_FIRMWARE "git2info" memoized_git_ref_to_info
-	debug_dict GIT_INFO_ARMBIAN_FIRMWARE
+	declare -A GIT_INFO_AtriOS_FIRMWARE=([GIT_SOURCE]="${AtriOS_FIRMWARE_SOURCE}" [GIT_REF]="${AtriOS_FIRMWARE_BRANCH}")
+	run_memoized GIT_INFO_AtriOS_FIRMWARE "git2info" memoized_git_ref_to_info
+	debug_dict GIT_INFO_AtriOS_FIRMWARE
 
 	# Sanity check, the SHA1 gotta be sane.
-	[[ "${GIT_INFO_ARMBIAN_FIRMWARE[SHA1]}" =~ ^[0-9a-f]{40}$ ]] || exit_with_error "SHA1 is not sane: '${GIT_INFO_ARMBIAN_FIRMWARE[SHA1]}'"
+	[[ "${GIT_INFO_AtriOS_FIRMWARE[SHA1]}" =~ ^[0-9a-f]{40}$ ]] || exit_with_error "SHA1 is not sane: '${GIT_INFO_AtriOS_FIRMWARE[SHA1]}'"
 
 	declare fake_unchanging_base_version="1"
 
-	declare short_sha1="${GIT_INFO_ARMBIAN_FIRMWARE[SHA1]:0:${short_hash_size}}"
+	declare short_sha1="${GIT_INFO_AtriOS_FIRMWARE[SHA1]:0:${short_hash_size}}"
 
 	# get the hashes of the lib/ bash sources involved...
 	declare hash_files="undetermined"
@@ -45,15 +45,15 @@ function artifact_firmware_prepare_version() {
 	artifact_version="${fake_unchanging_base_version}-SA${short_sha1}-B${bash_hash_short}"
 
 	declare -a reasons=(
-		"Armbian firmware git revision \"${GIT_INFO_ARMBIAN_FIRMWARE[SHA1]}\""
+		"AtriOS firmware git revision \"${GIT_INFO_AtriOS_FIRMWARE[SHA1]}\""
 		"framework bash hash \"${bash_hash}\""
 	)
 
 	artifact_version_reason="${reasons[*]}" # outer scope
 
-	artifact_map_packages=(["armbian-firmware"]="armbian-firmware")
+	artifact_map_packages=(["atrios-firmware"]="atrios-firmware")
 
-	artifact_name="armbian-firmware"
+	artifact_name="atrios-firmware"
 	artifact_type="deb"
 	artifact_deb_repo="global"
 	artifact_deb_arch="all"
@@ -66,7 +66,7 @@ function artifact_firmware_build_from_sources() {
 }
 
 function artifact_firmware_cli_adapter_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -77,7 +77,7 @@ function artifact_firmware_cli_adapter_config_prep() {
 }
 
 function artifact_firmware_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/armbian/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
 }
 
 function artifact_firmware_is_available_in_local_cache() {

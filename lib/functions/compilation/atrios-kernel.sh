@@ -4,13 +4,13 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
-# Forced .config options for all Armbian kernels.
+# Forced .config options for all AtriOS kernels.
 
 # IMPORTANT:
-#   armbian_kernel_config hooks are called twice: once for obtaining the version via hashing,
+#   atrios_kernel_config hooks are called twice: once for obtaining the version via hashing,
 #   and once for actually modifying the kernel .config. They *must* be consistent, and can't depend on
 #   the contents of the .config (which is not available during version calculation).
 #
@@ -38,7 +38,7 @@
 #   MAC80211      - Medium Access Control (MAC) layer for 802.11 devices
 #   MAC80211_MESH - Mesh networking support for 802.11
 #   CFG80211_WEXT - Wireless extensions compatibility (legacy API)
-function armbian_kernel_config__extrawifi_enable_wifi_opts_80211() {
+function atrios_kernel_config__extrawifi_enable_wifi_opts_80211() {
 	if linux-version compare "${KERNEL_MAJOR_MINOR}" ge 6.13; then
 		opts_m+=("CFG80211")                          # Wireless configuration API - required by Wi-Fi drivers
 		opts_m+=("MAC80211")                          # MAC layer for 802.11 wireless devices
@@ -52,36 +52,36 @@ function armbian_kernel_config__extrawifi_enable_wifi_opts_80211() {
 # NETKIT is a new networking stack framework introduced in kernel 6.7 that
 # provides improved packet processing capabilities and better performance
 # for network operations.
-function armbian_kernel_config__netkit() {
+function atrios_kernel_config__netkit() {
 	if linux-version compare "${KERNEL_MAJOR_MINOR}" ge 6.7; then
 		opts_y+=("NETKIT")                            # Enables NETKIT networking framework
 	fi
 }
 
-# Disables various kernel configuration options that conflict with Armbian's kernel build requirements.
+# Disables various kernel configuration options that conflict with AtriOS's kernel build requirements.
 # This function disables several kernel configuration options such as
 # module signing and automatic versioning to speed up the build
-# process and ensure compatibility with Armbian requirements.
+# process and ensure compatibility with AtriOS requirements.
 # Additionally, it forces EXPERT mode (EXPERT=y) to ensure otherwise
 # hidden configurations are visible.
-function armbian_kernel_config__disable_various_options() {
-	display_alert "Enable EXPERT=y" "armbian-kernel" "debug"
+function atrios_kernel_config__disable_various_options() {
+	display_alert "Enable EXPERT=y" "atrios-kernel" "debug"
 	opts_y+=("EXPERT")                                # Too many config options are hidden behind EXPERT=y, lets have it always on
-	display_alert "Disabling module signing / debug / auto version" "armbian-kernel" "debug"
+	display_alert "Disabling module signing / debug / auto version" "atrios-kernel" "debug"
 	opts_n+=("SECURITY_LOCKDOWN_LSM")                 # Disables Linux Security Module lockdown mode
 	opts_n+=("MODULE_SIG")                            # No use signing modules
 	opts_n+=("MODULE_SIG_ALL")                        # No use auto-signing modules
 	opts_n+=("MODULE_SIG_FORCE")                      # No forcing of module sign verification
 	opts_n+=("IMA_APPRAISE_MODSIG")                   # No appraisal module-style either
 	# DONE: Disable: version shenanigans
-	opts_n+=("LOCALVERSION_AUTO")                     # This causes a mismatch between what Armbian wants and what make produces.
+	opts_n+=("LOCALVERSION_AUTO")                     # This causes a mismatch between what AtriOS wants and what make produces.
 	opts_val["LOCALVERSION"]='""'                     # Must be empty; make is later invoked with LOCALVERSION and it adds up
 }
 
 # Forces 48-bit virtual and physical addressing on ARM64 architectures.
 # Ensures consistent memory addressing across all ARM64 builds by setting
 # both virtual address (VA) and physical address (PA) bits to 48.
-function armbian_kernel_config__force_pa_va_48_bits_on_arm64() {
+function atrios_kernel_config__force_pa_va_48_bits_on_arm64() {
 	if [[ "${ARCH}" == "arm64" ]]; then
 		opts_y+=("ARM64_VA_BITS_48")                  # Forces 48-bit virtual addressing
 		opts_val["ARM64_PA_BITS"]="48"                # Sets 48-bit physical addressing
@@ -109,7 +109,7 @@ function armbian_kernel_config__force_pa_va_48_bits_on_arm64() {
 #
 # Returns:
 #   0 on successful configuration application.
-function armbian_kernel_config__600_enable_ebpf_and_btf_info() {
+function atrios_kernel_config__600_enable_ebpf_and_btf_info() {
 	if [[ "${KERNEL_BTF}" == "no" ]]; then # If user is explicit by passing "KERNEL_BTF=no", then actually disable all debug info.
 		display_alert "Disabling eBPF and BTF info for kernel" "as requested by KERNEL_BTF=no" "info"
 		opts_y+=("DEBUG_INFO_NONE")                   # Enable the "none" option
@@ -176,7 +176,7 @@ function armbian_kernel_config__600_enable_ebpf_and_btf_info() {
 #   ZRAM_WRITEBACK           - Allows idle compressed pages to be written to backing storage
 #   ZRAM_MEMORY_TRACKING     - Enables memory usage statistics for ZRAM devices
 #   ZRAM_BACKEND_*           - Various compression algorithms (LZ4, LZ4HC, ZSTD, DEFLATE, 842, LZO)
-function armbian_kernel_config__enable_zram_support() {
+function atrios_kernel_config__enable_zram_support() {
 	opts_y+=("ZSWAP")                                 # Enables compressed swap space in memory
 	opts_y+=("ZSWAP_ZPOOL_DEFAULT_ZBUD")              # Sets default compression pool for ZSWAP to ZBUD
 	opts_m+=("ZSMALLOC")                              # Enables compressed memory allocator
@@ -201,7 +201,7 @@ function armbian_kernel_config__enable_zram_support() {
 #   - Network address translation (NAT)
 #   - Packet filtering and matching rules
 #   - IP sets for efficient packet matching
-function armbian_kernel_config__select_nftables() {
+function atrios_kernel_config__select_nftables() {
 	# Bridge and basic netfilter infrastructure
 	opts_m+=("BRIDGE_NETFILTER")                      # Enables netfilter support for the bridge
 	# IPv6 netfilter modules
@@ -423,7 +423,7 @@ function armbian_kernel_config__select_nftables() {
 #   BRIDGE_EBT_BROUTE        - Ethernet bridge broute table (for redirecting)
 #   BRIDGE_EBT_T_FILTER      - Ethernet bridge filter table
 #   BRIDGE_EBT_T_NAT         - Ethernet bridge NAT table
-function armbian_kernel_config__enable_netfilter_xtables_legacy() {
+function atrios_kernel_config__enable_netfilter_xtables_legacy() {
 	if linux-version compare "${KERNEL_MAJOR_MINOR}" ge 6.18; then
 		display_alert "Enabling netfilter xtables legacy support" "kernel >= 6.18" "debug"
 		opts_y+=("NETFILTER_XTABLES_LEGACY")          # Enables legacy iptables support
@@ -442,7 +442,7 @@ function armbian_kernel_config__enable_netfilter_xtables_legacy() {
 # required for boot (as of 2026-01).
 #
 # Kernel family maintainers can override this function by calling:
-#   extension_hook_opt_out "armbian_kernel_config__enable_various_filesystems"
+#   extension_hook_opt_out "atrios_kernel_config__enable_various_filesystems"
 #
 # Filesystems enabled:
 #   BTRFS_FS          - Btrfs filesystem with copy-on-write and snapshots
@@ -453,7 +453,7 @@ function armbian_kernel_config__enable_netfilter_xtables_legacy() {
 #   BTRFS_FS_POSIX_ACL - POSIX Access Control Lists for Btrfs
 #   EXT4_FS_POSIX_ACL  - POSIX Access Control Lists for ext4
 #   EXT4_FS_SECURITY   - Security extensions for ext4
-function armbian_kernel_config__enable_various_filesystems() {
+function atrios_kernel_config__enable_various_filesystems() {
 	opts_m+=("BTRFS_FS")                              # Enables Btrfs filesystem (copy-on-write, snapshots)
 	opts_y+=("BTRFS_FS_POSIX_ACL")                    # Enables POSIX ACL support for Btrfs
 	opts_y+=("EXT4_FS")                               # Enables ext4 filesystem support
@@ -468,7 +468,7 @@ function armbian_kernel_config__enable_various_filesystems() {
 #   components. These settings ensure that the kernel is properly configured to support containerized environments.
 # ATTENTION: filesystems like EXT4 and BTRFS are now omitted, so it's each kernel's .config responsibility to enable
 #            them as builtin or modules as each sees fit.
-function armbian_kernel_config__enable_docker_support() {
+function atrios_kernel_config__enable_docker_support() {
 	# Cgroup (control group) subsystem - essential for container resource management
 	opts_y+=("BLK_CGROUP")                            # Enables block layer control groups (cgroups)
 	opts_y+=("BLK_DEV_THROTTLING")                    # Enables block device IO throttling
@@ -561,7 +561,7 @@ function armbian_kernel_config__enable_docker_support() {
 # Options enabled:
 #   IKCONFIG - Embeds the complete .config into the kernel image
 #   IKCONFIG_PROC - Exposes the config through /proc/config.gz (deprecated name: IKPROC)
-function armbian_kernel_config__enable_config_access_in_live_system() {
+function atrios_kernel_config__enable_config_access_in_live_system() {
 	opts_y+=("IKCONFIG")                              # Embeds kernel config into the kernel image for extraction
 	opts_y+=("IKCONFIG_PROC")                         # Enables access to kernel config through /proc/config.gz
 }
@@ -570,7 +570,7 @@ function armbian_kernel_config__enable_config_access_in_live_system() {
 # GPIO_SYSFS allows userspace access to GPIO pins through the sysfs interface,
 # useful for embedded systems and hardware hacking. This was disabled due to
 # conflicts with debug options when EXPERT mode was not enabled.
-function armbian_kernel_config__restore_enable_gpio_sysfs() {
+function atrios_kernel_config__restore_enable_gpio_sysfs() {
 	opts_y+=("GPIO_SYSFS")                            # Re-enables sysfs GPIO interface for userspace control
 }
 
@@ -589,7 +589,7 @@ function armbian_kernel_config__restore_enable_gpio_sysfs() {
 #
 # Options enabled:
 #   NTSYNC - Windows NT synchronization primitives driver
-function armbian_kernel_config__enable_ntsync() {
+function atrios_kernel_config__enable_ntsync() {
 	if linux-version compare "${KERNEL_MAJOR_MINOR}" ge 6.14; then
 		if [[ "${BRANCH}" =~ 'vendor' ]]; then
 			display_alert "Skipping NTSYNC for vendor kernel" "${BRANCH} branch, ${KERNEL_MAJOR_MINOR} version" "debug"
@@ -693,7 +693,7 @@ function kernel_config_set_val() {
 #   opts_m                         - Array of options to enable as modules
 #   opts_val                       - Associative array of option=value pairs
 #   kernel_config_modifying_hashes - Array to store configuration changes for hashing
-function armbian_kernel_config_apply_opts_from_arrays() {
+function atrios_kernel_config_apply_opts_from_arrays() {
 	declare opt_y opt_val opt_n opt_m
 
 	# First pass: Add all changes to the hashing array for version calculation

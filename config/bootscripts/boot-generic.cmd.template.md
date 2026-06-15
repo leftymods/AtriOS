@@ -4,7 +4,7 @@ The generic bootscript [template] attempts to [do all the things](http://www.qui
 There are a number of functional blocks in the generic bootscript:
 
 1. Define U-Boot environment variables.
-1. Load a U-Boot environment (`armbianEnv.txt` in our case).
+1. Load a U-Boot environment (`atriosEnv.txt` in our case).
 1. Prepare kernel commandline parameters based on loaded environment settings.
 1. Process device tree (DT).
 1. Process the kernel image.
@@ -104,6 +104,6 @@ The initial ramdisk size is based on the filesize of the ramdisk itself. The ker
 - [FDT](https://www.kernel.org/doc/html/latest/devicetree/usage-model.html).
 - Initial ramdisk [initrd](https://docs.kernel.org/admin-guide/initrd.html).
 - Kernel image types [[1]](https://www.baeldung.com/linux/kernel-images) [[2]](https://unix.stackexchange.com/a/295142).
-- [Helios4 doesn't boot after upgrading to linux-6.6.71 (linux-image-current-mvebu_25.2.0-trunk.343)](https://forum.armbian.com/topic/49440-helios4-doesnt-boot-after-upgrading-to-linux-6671-linux-image-current-mvebu_2520-trunk343/#findComment-217099).
-- [[Bug]: mvebu/Helios4: Wrong Ramdisk Image Format, Ramdisk image is corrupt or invalid #8165](https://github.com/armbian/build/issues/8165).
-- [[Bug]: U-Boot load address calculation bug and DT overlap oobe #8178](https://github.com/armbian/build/issues/8178).
+- [Helios4 doesn't boot after upgrading to linux-6.6.71 (linux-image-current-mvebu_25.2.0-trunk.343)](https://github.com/leftymods/CoreOS/topic/49440-helios4-doesnt-boot-after-upgrading-to-linux-6671-linux-image-current-mvebu_2520-trunk343/#findComment-217099).
+- [[Bug]: mvebu/Helios4: Wrong Ramdisk Image Format, Ramdisk image is corrupt or invalid #8165](https://github.com/leftymods/CoreOS/issues/8165).
+- [[Bug]: U-Boot load address calculation bug and DT overlap oobe #8178](https://github.com/leftymods/CoreOS/issues/8178).

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function check_windows_wsl2() {
 	declare wsl2_type
@@ -45,7 +45,7 @@ function wsl2_detect_type() {
 	declare unameOut
 	unameOut="$(uname -a)"
 	case "${unameOut}" in
-		*"-wsl2-x86"* | *"-wsl2-arm64"*) wsl2_type="WSL2" ;; # using armbian-built WSL2 kernel
+		*"-wsl2-x86"* | *"-wsl2-arm64"*) wsl2_type="WSL2" ;; # using AtriOS-built WSL2 kernel
 		*"microsoft-standard-WSL2"*) wsl2_type="WSL2" ;;
 		*"Microsoft"*) wsl2_type="WSL1" ;; # @TODO: do these catch Azure? send a PR!
 		*"microsoft"*) wsl2_type="WSL2" ;;

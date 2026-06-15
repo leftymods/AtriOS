@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 
 # This file is SOURCED by the Mekotronics board files, and thus has the same restrictions as board files.
 # Especifically, the family code (rockchip64_common) will both require and override a bunch of stuff.

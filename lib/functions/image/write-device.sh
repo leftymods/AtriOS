@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # @TODO: make usable as a separate tool as well
 function write_image_to_device() {
@@ -45,7 +45,7 @@ function write_image_to_device() {
 				display_alert "Writing failed" "${image_file}" "err"
 			fi
 		fi
-	elif armbian_is_running_in_container; then
+	elif AtriOS_is_running_in_container; then
 		if [[ -n ${device} ]]; then
 			# display warning when we want to write sd card under Docker
 			display_alert "Can't write to ${device}" "Under Docker" "wrn"

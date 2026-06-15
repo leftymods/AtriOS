@@ -1,10 +1,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (c) 2013-2023 Igor Pecovnik, igor@armbian.com
+# Copyright (c) 2013-2023 Igor Pecovnik, igor@AtriOS.com
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 #
 UBOOT_TARGET_MAP="${UBOOT_TARGET_MAP:-u-boot-dtb.img;;u-boot.bin.sd.bin:u-boot.bin u-boot-dtb.img}"
 BOOTSCRIPT="boot-meson64.cmd:boot.cmd"
@@ -48,7 +48,7 @@ case $BRANCH in
 esac
 
 # Use custom vendor driver for wireless rtl88x2cs
-# See https://github.com/armbian/build/pull/6227
+# See https://github.com/leftymods/CoreOS/pull/6227
 function custom_kernel_config__enable_rtl88x2cs_driver() {
 	opts_m+=("CONFIG_RTL8822CS")
 }

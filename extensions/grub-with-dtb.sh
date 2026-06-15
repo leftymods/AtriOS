@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 # `grub-with-dtb` is a superset of `grub`, but hacked to boot using DeviceTree.
@@ -22,14 +22,14 @@ function extension_prepare_config__prepare_grub_with_dtb() {
 }
 
 # Hack the bsp-cli to:
-# - write the BOOT_FDT_FILE information to a configuration file. (/etc/armbian-grub-with-dtb)
+# - write the BOOT_FDT_FILE information to a configuration file. (/etc/AtriOS-grub-with-dtb)
 # - add a kernel install/upgrade hook to automatically deploy the DTB file to the boot partition, in a way that
-#   works across Debian and Ubuntu. it reads /etc/armbian-grub-with-dtb and puts symlinks or copies in /boot/dtb-<kernel-version>
+#   works across Debian and Ubuntu. it reads /etc/AtriOS-grub-with-dtb and puts symlinks or copies in /boot/dtb-<kernel-version>
 function post_family_tweaks_bsp__add_grub_with_dtb_config_file() {
 	: "${destination:?}"
 	display_alert "Extension: ${EXTENSION}: Adding grub-with-dtb config file" "${BOARD}" "info"
 	# maybe add this to conffiles?
-	cat <<- EOD > "${destination}"/etc/armbian-grub-with-dtb
+	cat <<- EOD > "${destination}"/etc/AtriOS-grub-with-dtb
 		BOOT_FDT_FILE="${BOOT_FDT_FILE:-"${GRUB_FDT_FILE}"}"
 	EOD
 }
@@ -38,27 +38,27 @@ function post_family_tweaks_bsp__add_grub_with_dtb_kernel_hook() {
 	: "${destination:?}"
 	display_alert "Extension: ${EXTENSION}: Adding grub-with-dtb kernel hook" "${BOARD}" "info"
 	run_host_command_logged mkdir -p "${destination}"/etc/kernel/postinst.d
-	cat <<- 'EOD' > "${destination}"/etc/kernel/postinst.d/armbian-grub-with-dtb
+	cat <<- 'EOD' > "${destination}"/etc/kernel/postinst.d/AtriOS-grub-with-dtb
 		#! /bin/bash
 		set -e
 
 		declare kversion="$1" # # We're passed the version of the kernel being installed
-		echo "Armbian: installing DTB for GRUB: $kversion" >&2
+		echo "AtriOS: installing DTB for GRUB: $kversion" >&2
 
-		if [[ -f /etc/armbian-grub-with-dtb ]]; then
-			echo "Armbian: /etc/armbian-grub-with-dtb found, installing DTB for GRUB" >&2
+		if [[ -f /etc/AtriOS-grub-with-dtb ]]; then
+			echo "AtriOS: /etc/AtriOS-grub-with-dtb found, installing DTB for GRUB" >&2
 			declare BOOT_FDT_FILE
-			source /etc/armbian-grub-with-dtb
-			declare target_dtb_file="/boot/armbian-dtb-${kversion}"
+			source /etc/AtriOS-grub-with-dtb
+			declare target_dtb_file="/boot/AtriOS-dtb-${kversion}"
 			declare source_dtb_file="/usr/lib/linux-image-${kversion}/${BOOT_FDT_FILE}"
-			echo "Armbian: installing DTB for GRUB: $source_dtb_file -> $target_dtb_file" >&2
+			echo "AtriOS: installing DTB for GRUB: $source_dtb_file -> $target_dtb_file" >&2
 			cp -v "${source_dtb_file}" "${target_dtb_file}"
-			echo "Armbian: installing DTB for GRUB: done." >&2
+			echo "AtriOS: installing DTB for GRUB: done." >&2
 		else
-			echo "Armbian: /etc/armbian-grub-with-dtb not found, skipping DTB for GRUB" >&2
+			echo "AtriOS: /etc/AtriOS-grub-with-dtb not found, skipping DTB for GRUB" >&2
 		fi
 	EOD
-	run_host_command_logged chmod -v +x "${destination}"/etc/kernel/postinst.d/armbian-grub-with-dtb
+	run_host_command_logged chmod -v +x "${destination}"/etc/kernel/postinst.d/AtriOS-grub-with-dtb
 }
 
 # `grub_early_config` and `grub_late_config` and `grub_pre_install` are hooks exposed by the `grub` extension
@@ -71,12 +71,12 @@ function grub_early_config__deploy_dtb_for_grub() {
 	run_host_command_logged chmod -v +x "${MOUNT}"/etc/grub.d/09_linux_with_dtb.sh
 }
 
-function grub_pre_install__force_run_kernel_hook_for_armbian_dtb() {
+function grub_pre_install__force_run_kernel_hook_for_AtriOS_dtb() {
 	# Run the kernel hook to deploy the DTB file to the boot partition.
 	# This is done forcibly here during `grub_pre_install`, since the kernel hook is deployed in the bsp-cli package
 	# which is only deployed after the linux-image package is installed and thus is not run.
 	display_alert "Extension: ${EXTENSION}: Deploying DTB for GRUB for image build" "${BOARD}" "info"
-	chroot_custom "${MOUNT}" 'for k in $(linux-version list); do /etc/kernel/postinst.d/armbian-grub-with-dtb "$k"; done'
+	chroot_custom "${MOUNT}" 'for k in $(linux-version list); do /etc/kernel/postinst.d/AtriOS-grub-with-dtb "$k"; done'
 }
 
 function grub_late_config__check_dtb_in_grub_cfg() {

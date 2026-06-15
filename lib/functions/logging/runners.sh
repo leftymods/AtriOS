@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # All those runner helper functions have a particular non-quoting style.
 # callers might need to force quote with bash's @Q modifier.
@@ -75,7 +75,7 @@ function chroot_sdcard_apt_get() {
 	#     automatically manage the contents of /var/lib/apt/lists to ensure that obsolete files are erased. The only
 	#     reason to turn it off is if you frequently change your sources list. Configuration Item:
 	#     APT::Get::List-Cleanup.
-	apt_params+=(-o "APT::Get::List-Cleanup=0") # Armbian frequently changes ours sources list; it's dynamic via aggregation
+	apt_params+=(-o "APT::Get::List-Cleanup=0") # AtriOS frequently changes ours sources list; it's dynamic via aggregation
 
 	if [[ "${DONT_MAINTAIN_APT_CACHE:-no}" == "yes" ]]; then
 		# Configure Clean-Installed to off

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 function determine_artifacts_to_build_for_image() {
 	# outer scope: declare -a artifacts_to_build=()
 	if [[ "${BOOTCONFIG}" != "none" ]]; then
@@ -15,7 +15,7 @@ function determine_artifacts_to_build_for_image() {
 		artifacts_to_build+=("kernel")
 	fi
 
-	if [[ "${INSTALL_ARMBIAN_FIRMWARE:-yes}" == "yes" ]]; then
+	if [[ "${INSTALL_AtriOS_FIRMWARE:-yes}" == "yes" ]]; then
 		if [[ ${BOARD_FIRMWARE_INSTALL:-""} == "-full" ]]; then
 			artifacts_to_build+=("full_firmware")
 		else
@@ -44,7 +44,7 @@ function determine_artifacts_to_build_for_image() {
 	# Userspace, BOARD+BRANCH specific (not RELEASE)
 	artifacts_to_build+=("atrios-bsp-cli")
 
-	# Desktop packages are now installed by armbian-config (module_desktops)
+	# Desktop packages are now installed by atrios-config (module_desktops)
 	# during rootfs creation in distro-agnostic.sh. No per-DE artifact to build.
 
 	# If we're only dumping the config, include the rootfs artifact.

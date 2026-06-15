@@ -1,6 +1,6 @@
 #
 # SPDX-License-Identifier: GPL-2.0
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 
 # This writes the SyterKit bootloader img to the image.
 function post_umount_final_image__write_syterkit_to_image() {

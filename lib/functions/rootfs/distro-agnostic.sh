@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function bootscript_export_display_console() {
 	unset BOOTSCRIPT_TEMPLATE__DISPLAY_CONSOLE
@@ -169,7 +169,7 @@ function install_distribution_agnostic() {
 	# Copy systemwide aliases to root user too
 	cp "${SRC}"/packages/bsp/common/etc/skel/.bash_aliases "${SDCARD}"/root/
 
-	# display welcome message at first root login which is ready by /usr/sbin/armbian/armbian-firstlogin
+	# display welcome message at first root login which is ready by /usr/sbin/atrios/atrios-firstlogin
 	touch "${SDCARD}"/root/.not_logged_in_yet
 
 	# use user provided firstboot config
@@ -247,13 +247,13 @@ function install_distribution_agnostic() {
 
 		if [[ -n $BOOTENV_FILE ]]; then
 			if [[ -f $USERPATCHES_PATH/bootenv/$BOOTENV_FILE ]]; then
-				run_host_command_logged cp -pv "$USERPATCHES_PATH/bootenv/${BOOTENV_FILE}" "${SDCARD}"/boot/armbianEnv.txt
+				run_host_command_logged cp -pv "$USERPATCHES_PATH/bootenv/${BOOTENV_FILE}" "${SDCARD}"/boot/atriosEnv.txt
 			elif [[ -f $SRC/config/bootenv/$BOOTENV_FILE ]]; then
-				run_host_command_logged cp -pv "${SRC}/config/bootenv/${BOOTENV_FILE}" "${SDCARD}"/boot/armbianEnv.txt
+				run_host_command_logged cp -pv "${SRC}/config/bootenv/${BOOTENV_FILE}" "${SDCARD}"/boot/atriosEnv.txt
 			fi
 		fi
 
-		# TODO: modify $bootscript_dst or armbianEnv.txt to make NFS boot universal
+		# TODO: modify $bootscript_dst or atriosEnv.txt to make NFS boot universal
 		# instead of copying sunxi-specific template
 		if [[ $ROOTFS_TYPE == nfs ]]; then
 			display_alert "Copying NFS boot script template"
@@ -264,19 +264,19 @@ function install_distribution_agnostic() {
 			fi
 		fi
 
-		if [[ -n $OVERLAY_PREFIX && -f "${SDCARD}"/boot/armbianEnv.txt ]]; then
-			display_alert "Adding to armbianEnv.txt" "overlay_prefix=$OVERLAY_PREFIX" "debug"
-			run_host_command_logged echo "overlay_prefix=$OVERLAY_PREFIX" ">>" "${SDCARD}"/boot/armbianEnv.txt
+		if [[ -n $OVERLAY_PREFIX && -f "${SDCARD}"/boot/atriosEnv.txt ]]; then
+			display_alert "Adding to atriosEnv.txt" "overlay_prefix=$OVERLAY_PREFIX" "debug"
+			run_host_command_logged echo "overlay_prefix=$OVERLAY_PREFIX" ">>" "${SDCARD}"/boot/atriosEnv.txt
 		fi
 
-		if [[ -n $DEFAULT_OVERLAYS && -f "${SDCARD}"/boot/armbianEnv.txt ]]; then
-			display_alert "Adding to armbianEnv.txt" "overlays=${DEFAULT_OVERLAYS//,/ }" "debug"
-			run_host_command_logged echo "overlays=${DEFAULT_OVERLAYS//,/ }" ">>" "${SDCARD}"/boot/armbianEnv.txt
+		if [[ -n $DEFAULT_OVERLAYS && -f "${SDCARD}"/boot/atriosEnv.txt ]]; then
+			display_alert "Adding to atriosEnv.txt" "overlays=${DEFAULT_OVERLAYS//,/ }" "debug"
+			run_host_command_logged echo "overlays=${DEFAULT_OVERLAYS//,/ }" ">>" "${SDCARD}"/boot/atriosEnv.txt
 		fi
 
-		if [[ -n $BOOT_FDT_FILE && -f "${SDCARD}"/boot/armbianEnv.txt ]]; then
-			display_alert "Adding to armbianEnv.txt" "fdtfile=${BOOT_FDT_FILE}" "debug"
-			run_host_command_logged echo "fdtfile=${BOOT_FDT_FILE}" ">>" "${SDCARD}/boot/armbianEnv.txt"
+		if [[ -n $BOOT_FDT_FILE && -f "${SDCARD}"/boot/atriosEnv.txt ]]; then
+			display_alert "Adding to atriosEnv.txt" "fdtfile=${BOOT_FDT_FILE}" "debug"
+			run_host_command_logged echo "fdtfile=${BOOT_FDT_FILE}" ">>" "${SDCARD}/boot/atriosEnv.txt"
 		fi
 
 	fi
@@ -395,12 +395,12 @@ function install_distribution_agnostic() {
 		Called after packages, u-boot, kernel and headers installed in the chroot, but before the BSP is installed.
 	POST_INSTALL_KERNEL_DEBS
 
-	# install armbian-firmware by default. Set BOARD_FIRMWARE_INSTALL="-full" to install full firmware variant
-	if [[ "${INSTALL_ARMBIAN_FIRMWARE:-yes}" == "yes" ]]; then
+	# install atrios-firmware by default. Set BOARD_FIRMWARE_INSTALL="-full" to install full firmware variant
+	if [[ "${INSTALL_ATRIOS_FIRMWARE:-yes}" == "yes" ]]; then
 		if [[ ${BOARD_FIRMWARE_INSTALL:-""} == "-full" ]]; then
-			install_artifact_deb_chroot "armbian-firmware-full"
+			install_artifact_deb_chroot "atrios-firmware-full"
 		else
-			install_artifact_deb_chroot "armbian-firmware"
+			install_artifact_deb_chroot "atrios-firmware"
 		fi
 	fi
 
@@ -421,7 +421,7 @@ function install_distribution_agnostic() {
 		chroot_sdcard_apt_get_remove --auto-remove plymouth 2>/dev/null || true
 	fi
 
-	# freeze armbian packages
+	# freeze AtriOS packages
 	if [[ "${BSPFREEZE:-"no"}" == yes ]]; then
 		display_alert "Freezing AtriOS packages" "$BOARD" "info"
 		declare -g -A image_artifacts_debs_installed # global scope, set in main_default_build_packages()
@@ -443,7 +443,7 @@ function install_distribution_agnostic() {
 	run_host_command_logged rm -fv "${SDCARD}"/root/*.deb
 
 	# copy boot splash images
-	run_host_command_logged cp -v "${SRC}"/packages/blobs/splash/armbian-u-boot.bmp "${SDCARD}"/boot/boot.bmp
+	run_host_command_logged cp -v "${SRC}"/packages/blobs/splash/atrios-u-boot.bmp "${SDCARD}"/boot/boot.bmp
 
 	# execute $LINUXFAMILY-specific tweaks
 	if [[ $(type -t family_tweaks) == function ]]; then
@@ -460,24 +460,24 @@ function install_distribution_agnostic() {
 
 	# enable additional services, if they exist.
 	display_alert "Enabling AtriOS services" "systemd" "info"
-	if [[ -f "${SDCARD}"/lib/systemd/system/armbian-firstrun.service ]]; then
-		# Note: armbian-firstrun starts before the user has a chance to edit the env file's values.
+	if [[ -f "${SDCARD}"/lib/systemd/system/atrios-firstrun.service ]]; then
+		# Note: atrios-firstrun starts before the user has a chance to edit the env file's values.
 		# Exceptionaly, the env file can be edited during image build time
 		if test -n "$OPENSSHD_REGENERATE_HOST_KEYS"; then
-			sed -i "s/\(^OPENSSHD_REGENERATE_HOST_KEYS *= *\).*/\1$OPENSSHD_REGENERATE_HOST_KEYS/" "${SDCARD}"/etc/default/armbian-firstrun
+			sed -i "s/\(^OPENSSHD_REGENERATE_HOST_KEYS *= *\).*/\1$OPENSSHD_REGENERATE_HOST_KEYS/" "${SDCARD}"/etc/default/atrios-firstrun
 		fi
-		chroot_sdcard systemctl --no-reload enable armbian-firstrun.service
+		chroot_sdcard systemctl --no-reload enable atrios-firstrun.service
 	fi
-	[[ -f "${SDCARD}"/lib/systemd/system/armbian-zram-config.service ]] && chroot_sdcard systemctl --no-reload enable armbian-zram-config.service
-	[[ -f "${SDCARD}"/lib/systemd/system/armbian-hardware-optimize.service ]] && chroot_sdcard systemctl --no-reload enable armbian-hardware-optimize.service
-	[[ -f "${SDCARD}"/lib/systemd/system/armbian-ramlog.service ]] && chroot_sdcard systemctl --no-reload enable armbian-ramlog.service
-	[[ -f "${SDCARD}"/lib/systemd/system/armbian-resize-filesystem.service ]] && chroot_sdcard systemctl --no-reload enable armbian-resize-filesystem.service
-	[[ -f "${SDCARD}"/lib/systemd/system/armbian-hardware-monitor.service ]] && chroot_sdcard systemctl --no-reload enable armbian-hardware-monitor.service
-	[[ -f "${SDCARD}"/lib/systemd/system/armbian-led-state.service ]] && chroot_sdcard systemctl --no-reload enable armbian-led-state.service
+	[[ -f "${SDCARD}"/lib/systemd/system/atrios-zram-config.service ]] && chroot_sdcard systemctl --no-reload enable atrios-zram-config.service
+	[[ -f "${SDCARD}"/lib/systemd/system/atrios-hardware-optimize.service ]] && chroot_sdcard systemctl --no-reload enable atrios-hardware-optimize.service
+	[[ -f "${SDCARD}"/lib/systemd/system/atrios-ramlog.service ]] && chroot_sdcard systemctl --no-reload enable atrios-ramlog.service
+	[[ -f "${SDCARD}"/lib/systemd/system/atrios-resize-filesystem.service ]] && chroot_sdcard systemctl --no-reload enable atrios-resize-filesystem.service
+	[[ -f "${SDCARD}"/lib/systemd/system/atrios-hardware-monitor.service ]] && chroot_sdcard systemctl --no-reload enable atrios-hardware-monitor.service
+	[[ -f "${SDCARD}"/lib/systemd/system/atrios-led-state.service ]] && chroot_sdcard systemctl --no-reload enable atrios-led-state.service
 
 	# switch to beta repository at this stage if building nightly images
-	if [[ $IMAGE_TYPE == nightly && -f "${SDCARD}"/etc/apt/sources.list.d/armbian.sources ]]; then
-		sed -i 's/apt/beta/' "${SDCARD}"/etc/apt/sources.list.d/armbian.sources
+	if [[ $IMAGE_TYPE == nightly && -f "${SDCARD}"/etc/apt/sources.list.d/atrios.sources ]]; then
+		sed -i 's/apt/beta/' "${SDCARD}"/etc/apt/sources.list.d/atrios.sources
 	fi
 
 	# fix for https://bugs.launchpad.net/ubuntu/+source/blueman/+bug/1542723 @TODO: from ubuntu 15. maybe gone?
@@ -547,16 +547,16 @@ function install_distribution_agnostic() {
 		run_host_command_logged cp -v "${SRC}/packages/blobs/asound.state/${ASOUND_STATE}" "${SDCARD}"/var/lib/alsa/asound.state
 	fi
 
-	# save initial armbian-release state
+	# save initial atrios-release state
 	cp "${SDCARD}"/etc/atrios-release "${SDCARD}"/etc/atrios-image-release
 
 	# save list of enabled extensions for this image
-	echo "EXTENSIONS='${ENABLE_EXTENSIONS}'" >> "${SDCARD}"/etc/armbian-image-release
+	echo "EXTENSIONS='${ENABLE_EXTENSIONS}'" >> "${SDCARD}"/etc/atrios-image-release
 
 	# store vendor pretty name to image only. We don't need to save this in BSP upgrade
 	# files. Vendor should be only defined at build image stage.
 	[[ -z $VENDORPRETTYNAME ]] && VENDORPRETTYNAME="${VENDOR}"
-	echo "VENDORPRETTYNAME='$VENDORPRETTYNAME'" >> "${SDCARD}"/etc/armbian-image-release
+	echo "VENDORPRETTYNAME='$VENDORPRETTYNAME'" >> "${SDCARD}"/etc/atrios-image-release
 
 	# DNS fix. package resolvconf is not available everywhere
 	if [[ -d "${SDCARD}/etc/resolvconf/resolv.conf.d" && -n "$NAMESERVER" ]]; then
@@ -583,9 +583,9 @@ function install_distribution_agnostic() {
 	# Show logo
 	if [[ $PLYMOUTH == yes ]]; then
 		if [[ $BOOT_LOGO == yes || $BOOT_LOGO == desktop && $BUILD_DESKTOP == yes ]]; then
-			[[ -f "${SDCARD}"/boot/armbianEnv.txt ]] && grep -q '^bootlogo' "${SDCARD}"/boot/armbianEnv.txt &&
-				sed -i 's/^bootlogo.*/bootlogo=true/' "${SDCARD}"/boot/armbianEnv.txt ||
-				echo 'bootlogo=true' >> "${SDCARD}"/boot/armbianEnv.txt
+			[[ -f "${SDCARD}"/boot/atriosEnv.txt ]] && grep -q '^bootlogo' "${SDCARD}"/boot/atriosEnv.txt &&
+				sed -i 's/^bootlogo.*/bootlogo=true/' "${SDCARD}"/boot/atriosEnv.txt ||
+				echo 'bootlogo=true' >> "${SDCARD}"/boot/atriosEnv.txt
 
 			[[ -f "${SDCARD}"/boot/boot.ini ]] &&
 				sed -i 's/^setenv bootlogo.*/setenv bootlogo "true"/' "${SDCARD}"/boot/boot.ini

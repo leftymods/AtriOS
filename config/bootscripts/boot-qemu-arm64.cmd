@@ -15,7 +15,7 @@ load ${devtype} ${devnum}:${distro_bootpart} ${kernel_addr_r} ${prefix}vmlinuz
 load ${devtype} ${devnum}:${distro_bootpart} ${ramdisk_addr_r} ${prefix}uInitrd
 
 # boot params
-# @TODO: armbianEnv.txt, etc.
+# @TODO: atriosEnv.txt, etc.
 setenv bootargs root=LABEL=armbi_root ro console=ttyAMA0
 
 booti ${kernel_addr_r} ${ramdisk_addr_r} ${fdt_addr}

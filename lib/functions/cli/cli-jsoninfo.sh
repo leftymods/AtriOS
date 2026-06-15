@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function cli_json_info_pre_run() {
 	# "gimme root on a Linux machine"
@@ -28,7 +28,7 @@ function cli_json_info_run() {
 
 		declare INFO_TOOLS_DIR="${SRC}"/lib/tools/info
 
-		display_alert "Here we go" "generating JSON info :: ${ARMBIAN_COMMAND} " "info"
+		display_alert "Here we go" "generating JSON info :: ${AtriOS_COMMAND} " "info"
 
 		# Targets inventory. Will do all-by-all if no targets file is provided.
 		declare TARGETS_FILE="${TARGETS_FILE-"${USERPATCHES_PATH}/${TARGETS_FILENAME:-"targets.yaml"}"}"
@@ -43,7 +43,7 @@ function cli_json_info_run() {
 		mkdir -p "${BASE_INFO_OUTPUT_DIR}"
 
 		# `gha-template` does not depend on the rest of the info-gatherer, so we can run it first and return.
-		if [[ "${ARMBIAN_COMMAND}" == "gha-template" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "gha-template" ]]; then
 			# If we have userpatches/gha/chunks, run the workflow template utility
 			declare user_gha_dir="${USERPATCHES_PATH}/gha"
 			declare wf_template_dir="${user_gha_dir}/chunks"
@@ -69,7 +69,7 @@ function cli_json_info_run() {
 		fi
 
 		# debs-to-repo-download is also isolated from the rest. It does depend on the debs-to-repo-info, but that's prepared beforehand in a standard pipeline run.
-		if [[ "${ARMBIAN_COMMAND}" == "debs-to-repo-download" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "debs-to-repo-download" ]]; then
 			display_alert "Downloading debs" "debs-to-repo-download" "info"
 			declare DEBS_TO_REPO_INFO_FILE="${BASE_INFO_OUTPUT_DIR}/debs-to-repo-info.json"
 			if [[ ! -f "${DEBS_TO_REPO_INFO_FILE}" ]]; then
@@ -87,7 +87,7 @@ function cli_json_info_run() {
 		fi
 
 		# debs-to-repo-download is also isolated from the rest. It does depend on the debs-to-repo-info, but that's prepared beforehand in a standard pipeline run.
-		if [[ "${ARMBIAN_COMMAND}" == "debs-to-repo-reprepro" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "debs-to-repo-reprepro" ]]; then
 			display_alert "Generating rerepro publishing script" "debs-to-repo-reprepro" "info"
 			declare DEBS_TO_REPO_INFO_FILE="${BASE_INFO_OUTPUT_DIR}/debs-to-repo-info.json"
 			if [[ ! -f "${DEBS_TO_REPO_INFO_FILE}" ]]; then
@@ -127,8 +127,8 @@ function cli_json_info_run() {
 		# the configng cache is populated before userspace-inventory.py
 		# runs, otherwise the desktop build matrix will be empty.
 		if [[ ! -f "${ALL_USERSPACE_INVENTORY_FILE}" ]]; then
-			display_alert "Fetching armbian-configng" "for desktop inventory" "info"
-			fetch_from_repo "https://github.com/armbian/configng" "armbian-configng" "branch:main"
+			display_alert "Fetching atrios-configng" "for desktop inventory" "info"
+			fetch_from_repo "https://github.com/leftymods/configng" "atrios-configng" "branch:main"
 			display_alert "Generating userspace inventory" "all_userspace_inventory.json" "info"
 			run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/userspace-inventory.py ">" "${ALL_USERSPACE_INVENTORY_FILE}"
 		fi
@@ -139,7 +139,7 @@ function cli_json_info_run() {
 			run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/board-inventory.py ">" "${ALL_BOARDS_ALL_BRANCHES_INVENTORY_FILE}"
 		fi
 
-		if [[ "${ARMBIAN_COMMAND}" == "inventory" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "inventory" ]]; then
 			display_alert "Done with" "inventory" "info"
 			return 0
 		fi
@@ -164,7 +164,7 @@ function cli_json_info_run() {
 			unset TARGETS_FILTER_INCLUDE
 		fi
 
-		if [[ "${ARMBIAN_COMMAND}" == "targets-composed" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "targets-composed" ]]; then
 			display_alert "Done with" "targets-dashboard" "info"
 			return 0
 		fi
@@ -183,14 +183,14 @@ function cli_json_info_run() {
 			run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/json2csv.py "<" "${IMAGE_INFO_FILE}" ">" ${IMAGE_INFO_CSV_FILE}
 		fi
 
-		if [[ "${ARMBIAN_COMMAND}" == "inventory-boards" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "inventory-boards" ]]; then
 			display_alert "Preparing" "inventory-boards" "info"
 			run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/inventory-boards-csv.py "<" "${IMAGE_INFO_FILE}" ">" ${INVENTORY_BOARDS_CSV_FILE}
 			display_alert "Done with" "inventory-boards: ${INVENTORY_BOARDS_CSV_FILE}" "info"
 			exit 0
 		fi
 
-		if [[ "${ARMBIAN_COMMAND}" == "targets-dashboard" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "targets-dashboard" ]]; then
 			display_alert "To load the OpenSearch dashboards:" "
 				pip3 install opensearch-py # install needed lib to talk to OpenSearch
 				sysctl -w vm.max_map_count=262144 # raise limited needed by OpenSearch
@@ -211,14 +211,14 @@ function cli_json_info_run() {
 			run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/artifact-reducer.py "${IMAGE_INFO_FILE}" ">" "${REDUCED_ARTIFACTS_FILE}"
 
 			# Simple jq to get reduced kernels, with board and branch coordinates and number of images for each; NDJSON (newline-delimited JSON) format.
-			jq -c '.[] | select(.artifact_name == "kernel") | {"vars": .original_inputs.vars,"kernel":.inputs.LINUXFAMILY,"needed_by":.needed_by,"ARMBIAN_KERNEL_DEB_NAME":.inputs.ARMBIAN_KERNEL_DEB_NAME,"LINUXCONFIG":.inputs.LINUXCONFIG,"KERNELSOURCE":.inputs.KERNELSOURCE,"KERNELBRANCH":.inputs.KERNELBRANCH} | {"BOARD":.vars.BOARD,"BRANCH":.vars.BRANCH,"kernel":.kernel,"needed_by":.needed_by,"ARMBIAN_KERNEL_DEB_NAME":.ARMBIAN_KERNEL_DEB_NAME,"LINUXCONFIG":.LINUXCONFIG,"KERNELSOURCE":.KERNELSOURCE,"KERNELBRANCH":.KERNELBRANCH}' < "${REDUCED_ARTIFACTS_FILE}" > "${REDUCED_KERNELS_FILE}"
+			jq -c '.[] | select(.artifact_name == "kernel") | {"vars": .original_inputs.vars,"kernel":.inputs.LINUXFAMILY,"needed_by":.needed_by,"AtriOS_KERNEL_DEB_NAME":.inputs.AtriOS_KERNEL_DEB_NAME,"LINUXCONFIG":.inputs.LINUXCONFIG,"KERNELSOURCE":.inputs.KERNELSOURCE,"KERNELBRANCH":.inputs.KERNELBRANCH} | {"BOARD":.vars.BOARD,"BRANCH":.vars.BRANCH,"kernel":.kernel,"needed_by":.needed_by,"AtriOS_KERNEL_DEB_NAME":.AtriOS_KERNEL_DEB_NAME,"LINUXCONFIG":.LINUXCONFIG,"KERNELSOURCE":.KERNELSOURCE,"KERNELBRANCH":.KERNELBRANCH}' < "${REDUCED_ARTIFACTS_FILE}" > "${REDUCED_KERNELS_FILE}"
 
 			# Similar, but for u-boot's.
 			jq -c '.[] | select(.artifact_name == "uboot") | {"vars": .original_inputs.vars,"needed_by":.needed_by} | {"BOARD":.vars.BOARD,"BRANCH":.vars.BRANCH,"needed_by":.needed_by}' < "${REDUCED_ARTIFACTS_FILE}" > "${REDUCED_UBOOTS_FILE}"
 
 			# Kernels: find duplicate LINUXCONFIG's across the kernels, which is a mistake. Each LINUXFAMILY should have its own LINUXCONFIG, otherwise rewrites will go insane.
 			display_alert "Checking for duplicate LINUXCONFIG's across kernels" "kernel-dup-linuxconfig-check" "info"
-			jq -s 'to_entries | map(.value) | group_by(.LINUXCONFIG) | map(select(length > 1)) | map({LINUXCONFIG: .[0].LINUXCONFIG,duplicates: map({BOARD, ARMBIAN_KERNEL_DEB_NAME, BRANCH, KERNELSOURCE, KERNELBRANCH})})' "${REDUCED_KERNELS_FILE}" > "${REDUCED_KERNELS_DUPLICATE_LINUXCONFIG_FILE}"
+			jq -s 'to_entries | map(.value) | group_by(.LINUXCONFIG) | map(select(length > 1)) | map({LINUXCONFIG: .[0].LINUXCONFIG,duplicates: map({BOARD, AtriOS_KERNEL_DEB_NAME, BRANCH, KERNELSOURCE, KERNELBRANCH})})' "${REDUCED_KERNELS_FILE}" > "${REDUCED_KERNELS_DUPLICATE_LINUXCONFIG_FILE}"
 
 			# if "${REDUCED_KERNELS_DUPLICATE_LINUXCONFIG_FILE}" is larger than 3 bytes, we have duplicates; spit an error (don't exit)
 			if [[ $(stat -c%s "${REDUCED_KERNELS_DUPLICATE_LINUXCONFIG_FILE}") -gt 3 ]]; then
@@ -229,7 +229,7 @@ function cli_json_info_run() {
 			fi
 		fi
 
-		if [[ "${ARMBIAN_COMMAND}" == "inventory-artifacts" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "inventory-artifacts" ]]; then
 			display_alert "Done with" "inventory-artifacts" "info"
 			return 0
 		fi
@@ -254,7 +254,7 @@ function cli_json_info_run() {
 			run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/outdated-artifact-image-reducer.py "${ARTIFACTS_INFO_UPTODATE_FILE}" "${IMAGE_INFO_FILE}" ">" "${OUTDATED_ARTIFACTS_IMAGES_FILE}"
 		fi
 
-		if [[ "${ARMBIAN_COMMAND}" == "targets" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "targets" ]]; then
 			display_alert "Done with" "targets" "info"
 			return 0
 		fi
@@ -268,7 +268,7 @@ function cli_json_info_run() {
 		display_alert "Generating deb-to-repo JSON output" "output-debs-to-repo-json" "info"
 		# This produces debs-to-repo-info.json
 		run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/output-debs-to-repo-json.py "${BASE_INFO_OUTPUT_DIR}" "${OUTDATED_ARTIFACTS_IMAGES_FILE}"
-		if [[ "${ARMBIAN_COMMAND}" == "debs-to-repo-json" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "debs-to-repo-json" ]]; then
 			display_alert "Done with" "output-debs-to-repo-json" "ext"
 			return 0
 		fi
@@ -278,7 +278,7 @@ function cli_json_info_run() {
 		# One for artifacts. One for images.
 		# If the image or artifact is up-to-date, it is still included in matrix, but the job is skipped.
 		# If any of the matrixes is bigger than 255 items, an error is generated.
-		if [[ "${ARMBIAN_COMMAND}" == "gha-matrix" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "gha-matrix" ]]; then
 			if [[ "${CLEAN_MATRIX:-"yes"}" != "no" ]]; then
 				display_alert "Cleaning GHA matrix output" "clean-matrix" "info"
 				run_host_command_logged rm -fv "${BASE_INFO_OUTPUT_DIR}"/gha-*-matrix.json
@@ -307,7 +307,7 @@ function cli_json_info_run() {
 		fi
 
 		### a secondary stage, which only makes sense to be run inside GHA, and as such should be split in a different CLI or under a flag.
-		if [[ "${ARMBIAN_COMMAND}" == "gha-workflow" ]]; then
+		if [[ "${AtriOS_COMMAND}" == "gha-workflow" ]]; then
 			# GHA Workflow output. A delusion. Maybe.
 			display_alert "Generating GHA workflow" "output-gha-workflow :: complete" "info"
 			declare GHA_WORKFLOW_FILE="${BASE_INFO_OUTPUT_DIR}/gha-workflow.yaml"

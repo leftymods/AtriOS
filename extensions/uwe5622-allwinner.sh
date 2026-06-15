@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
-# Copyright (c) 2023 Armbian
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# Copyright (c) 2023 AtriOS
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 function post_family_config__add_uwe5622_modules() {

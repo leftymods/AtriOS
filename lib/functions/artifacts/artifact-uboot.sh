@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function artifact_uboot_config_dump() {
 	artifact_input_variables[BOOTSOURCE]="${BOOTSOURCE}"
@@ -20,7 +20,7 @@ function artifact_uboot_prepare_version() {
 	artifact_version="undetermined"        # outer scope
 	artifact_version_reason="undetermined" # outer scope
 
-	# Prepare the version, "sans-repos": just the armbian/build repo contents are available.
+	# Prepare the version, "sans-repos": just the AtriOS/build repo contents are available.
 	# It is OK to reach out to the internet for a curl or ls-remote, but not for a git clone/fetch.
 
 	# - Given BOOTSOURCE and BOOTBRANCH, get:
@@ -186,7 +186,7 @@ function artifact_uboot_build_from_sources() {
 }
 
 function artifact_uboot_cli_adapter_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -195,19 +195,19 @@ function artifact_uboot_cli_adapter_pre_run() {
 function artifact_uboot_cli_adapter_config_prep() {
 	# Sanity check / cattle guard
 	# If UBOOT_CONFIGURE=yes, or CREATE_PATCHES=yes, user must have used the correct CLI commands, and only add those params.
-	if [[ "${UBOOT_CONFIGURE}" == "yes" && ("${ARMBIAN_COMMAND}" != "uboot-config") ]]; then
-		exit_with_error "UBOOT_CONFIGURE=yes is not supported anymore. Please use the new 'uboot-config' CLI command. Current command: '${ARMBIAN_COMMAND}'"
+	if [[ "${UBOOT_CONFIGURE}" == "yes" && ("${AtriOS_COMMAND}" != "uboot-config") ]]; then
+		exit_with_error "UBOOT_CONFIGURE=yes is not supported anymore. Please use the new 'uboot-config' CLI command. Current command: '${AtriOS_COMMAND}'"
 	fi
 
-	if [[ "${CREATE_PATCHES}" == "yes" && "${ARMBIAN_COMMAND}" != "uboot-patch" ]]; then
-		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'uboot-patch' CLI command. Current command: '${ARMBIAN_COMMAND}'"
+	if [[ "${CREATE_PATCHES}" == "yes" && "${AtriOS_COMMAND}" != "uboot-patch" ]]; then
+		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'uboot-patch' CLI command. Current command: '${AtriOS_COMMAND}'"
 	fi
 
 	use_board="yes" prep_conf_main_minimal_ni < /dev/null # no stdin for this, so it bombs if tries to be interactive.
 }
 
 function artifact_uboot_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/armbian/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
 }
 
 function artifact_uboot_is_available_in_local_cache() {

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function display_alert() {
 	# If asked, avoid any fancy ANSI escapes completely. For python-driven log collection. Formatting could be improved.
@@ -178,8 +178,8 @@ function display_alert() {
 	fi
 
 	# Log to journald, if asked to.
-	if [[ "${ARMBIAN_LOGS_TO_JOURNAL}" == "yes" ]]; then
-		echo -e "${level}: ${1} [ ${2} ]" | sed 's/\x1b\[[0-9;]*m//g' | systemd-cat --identifier="${ARMBIAN_LOGS_JOURNAL_IDENTIFIER:-armbian}"
+	if [[ "${AtriOS_LOGS_TO_JOURNAL}" == "yes" ]]; then
+		echo -e "${level}: ${1} [ ${2} ]" | sed 's/\x1b\[[0-9;]*m//g' | systemd-cat --identifier="${AtriOS_LOGS_JOURNAL_IDENTIFIER:-AtriOS}"
 	fi
 
 	local CALLER_PID="${BASHPID}"

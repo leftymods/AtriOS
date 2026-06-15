@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function artifact_atrios-bsp-cli_config_dump() {
 	artifact_input_variables[BOARD]="${BOARD}"
@@ -39,7 +39,7 @@ function artifact_atrios-bsp-cli_prepare_version() {
 	get_bootscript_info # fills in bootscript_info array
 
 	# Hash variables/bootscripts that affect the contents of bsp-cli package.
-	# Those contain /armbian a lot, so don't normalize them.
+	# Those contain /AtriOS a lot, so don't normalize them.
 	declare -a vars_to_hash_no_normalize=(
 		"bootscript_file_contents: ${bootscript_info[bootscript_file_contents]}"
 		"bootenv_file_contents: ${bootscript_info[bootenv_file_contents]}"
@@ -64,7 +64,7 @@ function artifact_atrios-bsp-cli_prepare_version() {
 		"OVERLAY_DIR: ${OVERLAY_DIR}"                                 # /etc/atrios-release
 		"KERNEL_TARGET: ${KERNEL_TARGET}"                             # /etc/atrios-release
 		"KERNEL_TEST_TARGET: ${KERNEL_TEST_TARGET}"                   # /etc/atrios-release
-		"BOOT_SOC: ${BOOT_SOC}"                                       # /etc/atrios-release # See https://github.com/armbian/build/pull/6411
+		"BOOT_SOC: ${BOOT_SOC}"                                       # /etc/atrios-release # See https://github.com/leftymods/CoreOS/pull/6411
 		"hash_vars_no_normalize: ${hash_vars_no_normalize}"           # The non-normalized part, above
 	)
 	declare hash_variables="undetermined" # will be set by calculate_hash_for_variables(), which normalizes the input
@@ -94,7 +94,7 @@ function artifact_atrios-bsp-cli_prepare_version() {
 	artifact_version="${fake_unchanging_base_version}-PC${packages_config_hash_short}-V${var_config_hash_short}-H${hash_hooks_short}-B${bash_hash_short}"
 
 	declare -a reasons=(
-		"Armbian package atrios-bsp-cli"
+		"AtriOS package atrios-bsp-cli"
 		"BOARD \"${BOARD}\""
 		"BRANCH \"${BRANCH}\""
 		"EXTRA_BSP_NAME \"${EXTRA_BSP_NAME}\""
@@ -135,7 +135,7 @@ function artifact_atrios-bsp-cli_build_from_sources() {
 }
 
 function artifact_atrios-bsp-cli_cli_adapter_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -147,7 +147,7 @@ function artifact_atrios-bsp-cli_cli_adapter_config_prep() {
 }
 
 function artifact_atrios-bsp-cli_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/armbian/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
 }
 
 function artifact_atrios-bsp-cli_is_available_in_local_cache() {

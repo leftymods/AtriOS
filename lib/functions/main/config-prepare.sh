@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Full version, for building a full image (with BOARD); possibly interactive.
 function prep_conf_main_build_single() {
@@ -111,7 +111,7 @@ function config_source_board_file() {
 		done
 	done
 
-	# BOARD_TYPE is included in /etc/armbian-release and used for stuff board-side; make it global and readonly
+	# BOARD_TYPE is included in /etc/atrios-release and used for stuff board-side; make it global and readonly
 	declare -g -r BOARD_TYPE="${first_board_type_found}" # so userpatches can't change support status of existing boards
 
 	declare -a sourced_board_configs=()
@@ -289,16 +289,16 @@ function config_post_main() {
 				display_alert "Using kernel extra dir: '${KERNEL_EXTRA_DIR}'" "LINUXSOURCEDIR: ${LINUXSOURCEDIR}" "debug"
 			fi
 		else
-			declare -g KERNEL_HAS_WORKING_HEADERS="yes" # I assume non-Armbian kernels have working headers, eg: Debian/Ubuntu generic do.
+			declare -g KERNEL_HAS_WORKING_HEADERS="yes" # I assume non-AtriOS kernels have working headers, eg: Debian/Ubuntu generic do.
 		fi
 	else
 		display_alert "Skipping kernel config" "skip_kernel=yes" "debug"
 	fi
 
 	if [[ -n "${BOOTCONFIG}" ]] && [[ "${BOOTCONFIG}" != "none" ]]; then
-		declare -g ARMBIAN_WILL_BUILD_UBOOT=yes
+		declare -g AtriOS_WILL_BUILD_UBOOT=yes
 	else
-		declare -g ARMBIAN_WILL_BUILD_UBOOT=no
+		declare -g AtriOS_WILL_BUILD_UBOOT=no
 	fi
 
 	# Do some sanity checks for userspace stuff, if RELEASE/DESKTOP_ENVIRONMENT is set.
@@ -329,7 +329,7 @@ function set_distribution_status() {
 		DISTRIBUTION_STATUS="$(cat "${distro_support_desc_filepath}")"
 	fi
 
-	[[ "${DISTRIBUTION_STATUS}" != "supported" ]] && [[ "${EXPERT}" != "yes" ]] && exit_with_error "Armbian ${RELEASE} is unsupported and, therefore, only available to experts (EXPERT=yes)"
+	[[ "${DISTRIBUTION_STATUS}" != "supported" ]] && [[ "${EXPERT}" != "yes" ]] && exit_with_error "AtriOS ${RELEASE} is unsupported and, therefore, only available to experts (EXPERT=yes)"
 
 	return 0 # due to last stmt above being a shortcircuit conditional
 }
@@ -363,7 +363,7 @@ function check_config_userspace_release_and_desktop() {
 				exit_with_error "DESKTOP_ENVIRONMENT is set, but BUILD_DESKTOP is not ==yes - please fix your parameters."
 			fi
 			# Validation of (RELEASE, ARCH, DESKTOP_ENVIRONMENT) support is
-			# deferred to armbian-config's module_desktops install call in
+			# deferred to atrios-config's module_desktops install call in
 			# distro-agnostic.sh — it checks the YAML definitions and
 			# fails with a clear message if the combo isn't covered.
 		fi
@@ -375,7 +375,7 @@ function check_config_userspace_release_and_desktop() {
 function fix_userspace_packages_release_and_distro() {
 	display_alert "fix_userspace_packages_release_and_distro" "For distro '${DISTRIBUTION}' release '${RELEASE}'" "debug"
 
-	# Some old hack from the past, not sure if it's still needed. Originally from https://github.com/armbian/build/pull/5881
+	# Some old hack from the past, not sure if it's still needed. Originally from https://github.com/leftymods/CoreOS/pull/5881
 	if [[ $RELEASE == trixie || $ARCH == riscv64 ]]; then remove_packages "cpufrequtils"; fi # this will remove from rootfs as well
 
 	# Debian: no need for this package in the rootfs, as it provides add-apt-repository which is not used on our Debian builds

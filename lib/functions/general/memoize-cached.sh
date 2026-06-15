@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # This does many tricks. Beware.
 # Also, 'memoize' is a misnomer. It's more like 'cache'.
@@ -48,7 +48,7 @@ function run_memoized() {
 	# Try non-blocking flock first
 	if ! flock -n "${lock_fd}"; then
 		# Lock is held by another process, inform user and wait with periodic feedback
-		display_alert "Waiting for lock" "another build may be running; check: docker ps -a | grep armbian" "info"
+		display_alert "Waiting for lock" "another build may be running; check: docker ps -a | grep AtriOS" "info"
 
 		declare -i lock_wait_interval=${MEMOIZE_FLOCK_WAIT_INTERVAL:-10}  # seconds between retries/messages
 		declare -i lock_max_wait=${MEMOIZE_FLOCK_MAX_WAIT:-0}             # 0 = infinite (default for compatibility)
@@ -65,7 +65,7 @@ function run_memoized() {
 
 				# Check max wait timeout (0 = infinite)
 				if [[ "${lock_max_wait}" -gt 0 && "${lock_total_wait}" -ge "${lock_max_wait}" ]]; then
-					display_alert "Lock wait timeout" "exceeded ${lock_max_wait}s; check for stale containers: docker ps -a | grep armbian" "err"
+					display_alert "Lock wait timeout" "exceeded ${lock_max_wait}s; check for stale containers: docker ps -a | grep AtriOS" "err"
 					exit_with_error "flock() timed out after ${lock_total_wait}s - possible stale build process"
 				fi
 			fi

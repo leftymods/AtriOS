@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # This is a re-imagining of mkdebian and builddeb from the kernel tree.
 
@@ -13,7 +13,7 @@
 # `u-boot-menu`, `grub2`, and others, so we gotta stick to their conventions.
 
 # The main difference is that this is NOT invoked from KBUILD's Makefile, but instead
-# directly by Armbian, with references to the dirs where KBUILD's
+# directly by AtriOS, with references to the dirs where KBUILD's
 # `make install dtbs_install modules_install headers_install` have already successfully been run.
 
 # This will create a SET of packages. It should always create these:
@@ -23,7 +23,7 @@
 
 # So this will handle
 # - Creating .deb package skeleton dir (mktemp)
-# - Moving/copying around of KBUILD installed stuff for Debian/Ubuntu/Armbian standard locations, in the correct packages
+# - Moving/copying around of KBUILD installed stuff for Debian/Ubuntu/AtriOS standard locations, in the correct packages
 # - Fixing the symlinks to stuff so they fit a target system.
 # - building the .debs.
 
@@ -108,7 +108,7 @@ function create_kernel_deb() {
 	# Generate copyright file
 	mkdir -p "${package_directory}/usr/share/doc/${package_name}"
 	cat <<- COPYRIGHT > "${package_directory}/usr/share/doc/${package_name}/copyright"
-		This is a packaged Armbian patched version of the Linux kernel.
+		This is a packaged AtriOS patched version of the Linux kernel.
 
 		The sources may be found at most Linux archive sites, including:
 		https://www.kernel.org/pub/linux/kernel
@@ -159,15 +159,15 @@ function kernel_package_hook_helper() {
 
 	cat >> "${package_DEBIAN_dir}/${script}" <<- EOT
 		#!/bin/bash
-		echo "Armbian '${package_name}' for '${kernel_version_family}': '${script}' starting."
+		echo "AtriOS '${package_name}' for '${kernel_version_family}': '${script}' starting."
 		set -e # Error control
 
 		function is_boot_dev_vfat() {
 			# When installing these packages during image build, /boot is not mounted, and will most definitely not be vfat.
 			# Use an environment variable to signal that it _will_ be a fat32, so symlinks are not created.
 			# This is passed by install_deb_chroot() explicitly via the runners.
-			if [[ "\${ARMBIAN_IMAGE_BUILD_BOOTFS_TYPE:-"unknown"}" == "fat" ]]; then
-				echo "Armbian: ARMBIAN_IMAGE_BUILD_BOOTFS_TYPE: '\${ARMBIAN_IMAGE_BUILD_BOOTFS_TYPE:-"not set"}'"
+			if [[ "\${AtriOS_IMAGE_BUILD_BOOTFS_TYPE:-"unknown"}" == "fat" ]]; then
+				echo "AtriOS: AtriOS_IMAGE_BUILD_BOOTFS_TYPE: '\${AtriOS_IMAGE_BUILD_BOOTFS_TYPE:-"not set"}'"
 				return 0
 			fi
 			if ! mountpoint -q /boot; then
@@ -187,7 +187,7 @@ function kernel_package_hook_helper() {
 		$(cat "${contents}")
 
 		set +x # Disable debugging
-		echo "Armbian '${package_name}' for '${kernel_version_family}': '${script}' finishing."
+		echo "AtriOS '${package_name}' for '${kernel_version_family}': '${script}' finishing."
 		true
 	EOT
 	chmod 775 "${package_DEBIAN_dir}/${script}"
@@ -259,15 +259,15 @@ function kernel_package_callback_linux_image() {
 		Package: ${package_name}
 		Version: ${artifact_version}
 		Source: linux-${kernel_version}
-		Armbian-Kernel-Version: ${kernel_version}
-		Armbian-Kernel-Version-Family: ${kernel_version_family}
+		AtriOS-Kernel-Version: ${kernel_version}
+		AtriOS-Kernel-Version-Family: ${kernel_version_family}
 		Architecture: ${ARCH}
 		Maintainer: ${MAINTAINER} <${MAINTAINERMAIL}>
 		Section: kernel
 		Priority: optional
 		Depends: initramfs-tools | linux-initramfs-tool
-		Provides: linux-image, linux-image-armbian, armbian-$BRANCH, wireguard-modules
-		Description: Armbian Linux $BRANCH kernel image $kernel_version_family
+		Provides: linux-image, linux-image-atrios, AtriOS-$BRANCH, wireguard-modules
+		Description: AtriOS Linux $BRANCH kernel image $kernel_version_family
 		 This package contains the Linux kernel, modules and corresponding other files.
 		 ${artifact_version_reason:-"${kernel_version_family}"}
 	CONTROL_FILE
@@ -303,10 +303,10 @@ function kernel_package_callback_linux_image() {
 				cat <<- HOOK_FOR_LINK_TO_LAST_INSTALLED_KERNEL # image_name="${NAME_KERNEL}", above
 					touch /boot/.next
 					if is_boot_dev_vfat; then
-						echo "Armbian: FAT32 /boot: move last-installed kernel to '$image_name'..."
+						echo "AtriOS: FAT32 /boot: move last-installed kernel to '$image_name'..."
 						mv -v /${installed_image_path} /boot/${image_name}
 					else
-						echo "Armbian: update last-installed kernel symlink to '$image_name'..."
+						echo "AtriOS: update last-installed kernel symlink to '$image_name'..."
 						ln -sfv $(basename "${installed_image_path}") /boot/$image_name
 					fi
 				HOOK_FOR_LINK_TO_LAST_INSTALLED_KERNEL
@@ -317,7 +317,7 @@ function kernel_package_callback_linux_image() {
 					# "install" or "upgrade" are decided in a very contrived way by Debian (".fresh-install" file)
 					# do NOT do this if /boot is a vfat, though.
 					if ! is_boot_dev_vfat; then
-						echo "Armbian: Debian compat: linux-update-symlinks install ${kernel_version_family} ${installed_image_path}"
+						echo "AtriOS: Debian compat: linux-update-symlinks install ${kernel_version_family} ${installed_image_path}"
 						linux-update-symlinks install "${kernel_version_family}" "${installed_image_path}" || true
 					fi
 				HOOK_FOR_DEBIAN_COMPAT_SYMLINK
@@ -343,8 +343,8 @@ function kernel_package_callback_linux_dtb() {
 		Package: ${package_name}
 		Architecture: ${ARCH}
 		Priority: optional
-		Provides: linux-dtb, linux-dtb-armbian, armbian-$BRANCH
-		Description: Armbian Linux $BRANCH DTBs in /boot/dtb-${kernel_version_family}
+		Provides: linux-dtb, linux-dtb-atrios, AtriOS-$BRANCH
+		Description: AtriOS Linux $BRANCH DTBs in /boot/dtb-${kernel_version_family}
 		 This package contains device tree blobs from the Linux kernel, version ${kernel_version_family}
 		 ${artifact_version_reason:-"${kernel_version_family}"}
 	CONTROL_FILE
@@ -360,10 +360,10 @@ function kernel_package_callback_linux_dtb() {
 		cat <<- EOT
 			cd /boot
 			if ! is_boot_dev_vfat; then
-				echo "Armbian: DTB: symlinking /boot/dtb to /boot/dtb-${kernel_version_family}..."
+				echo "AtriOS: DTB: symlinking /boot/dtb to /boot/dtb-${kernel_version_family}..."
 				ln -sfTv "dtb-${kernel_version_family}" dtb
 			else
-				echo "Armbian: DTB: FAT32: moving /boot/dtb-${kernel_version_family} to /boot/dtb ..."
+				echo "AtriOS: DTB: FAT32: moving /boot/dtb-${kernel_version_family} to /boot/dtb ..."
 				mv -v "dtb-${kernel_version_family}" dtb
 			fi
 		EOT
@@ -417,7 +417,7 @@ function kernel_package_callback_linux_headers() {
 		find . -name "bitsperlong.h" -type f
 
 		# tools/include/tools has the byteshift utilities shared between kernel proper and the build scripts/tools.
-		# This replaces 'headers-debian-byteshift.patch' which was used for years in Armbian.
+		# This replaces 'headers-debian-byteshift.patch' which was used for years in AtriOS.
 		find tools -type f       # all tools; will trim a bit later
 		find arch/x86/lib/insn.c # required by objtool stuff...
 
@@ -482,14 +482,14 @@ function kernel_package_callback_linux_headers() {
 	# include/config/auto.conf + include/config/ marker files (used by kbuild make rules), as well as
 	# include/generated/rustc_cfg (used by Rust builds).
 	# All of these are build artifacts and must describe the compiled kernel, not the target host.
-	# See: https://github.com/armbian/build/issues/9425
+	# See: https://github.com/leftymods/CoreOS/issues/9425
 	if [[ -f "${kernel_work_dir}/include/config/auto.conf" ]]; then
 		run_host_command_logged mkdir -p "${headers_target_dir}/include/generated"
 		local _sidecar_paths=("include/config")
 		[[ -f "${kernel_work_dir}/include/generated/autoconf.h" ]] && _sidecar_paths+=("include/generated/autoconf.h")
 		[[ -f "${kernel_work_dir}/include/generated/rustc_cfg" ]] && _sidecar_paths+=("include/generated/rustc_cfg")
 		run_host_command_logged tar -C "${kernel_work_dir}" -czf \
-			"${headers_target_dir}/include/generated/.armbian-build.tar.gz" \
+			"${headers_target_dir}/include/generated/.atrios-build.tar.gz" \
 			"${_sidecar_paths[@]}"
 	fi
 
@@ -498,7 +498,7 @@ function kernel_package_callback_linux_headers() {
 		display_alert "Checking for binaries in kernel headers" "${headers_target_dir}" "debug"
 		(
 			cd "${headers_target_dir}" || exit 33
-			find . -type f | grep -v -e "include/config/" -e "include/generated/\.armbian-build\.tar\.gz" -e "\.h$" -e ".c$" -e "Makefile$" -e "Kconfig$" -e "Kbuild$" -e "\.cocci$" | xargs file | grep -v -e "ASCII" -e "script text" -e "empty" -e "Unicode text" -e "symbolic link" -e "CSV text" -e "SAS 7+" || true
+			find . -type f | grep -v -e "include/config/" -e "include/generated/\.AtriOS-build\.tar\.gz" -e "\.h$" -e ".c$" -e "Makefile$" -e "Kconfig$" -e "Kbuild$" -e "\.cocci$" | xargs file | grep -v -e "ASCII" -e "script text" -e "empty" -e "Unicode text" -e "symbolic link" -e "CSV text" -e "SAS 7+" || true
 		)
 	fi
 
@@ -521,9 +521,9 @@ function kernel_package_callback_linux_headers() {
 		Package: ${package_name}
 		Architecture: ${ARCH}
 		Priority: optional
-		Provides: linux-headers (= ${kernel_version}), linux-headers-armbian, armbian-$BRANCH
+		Provides: linux-headers (= ${kernel_version}), linux-headers-atrios, AtriOS-$BRANCH
 		Depends: make, gcc, libc6-dev, bison, flex, libssl-dev, libelf-dev, pahole | dwarves
-		Description: Armbian Linux $BRANCH headers ${kernel_version_family}
+		Description: AtriOS Linux $BRANCH headers ${kernel_version_family}
 		 This package provides kernel header files for ${kernel_version_family}
 		 .
 		 This is useful for DKMS and building of external modules.
@@ -582,10 +582,10 @@ function kernel_package_callback_linux_headers() {
 		cat <<- EOT_POSTINST_FINISH
 			echo "Done compiling kernel-headers tools (${kernel_version_family})."
 
-			# Restore build-time config after all make steps. See: https://github.com/armbian/build/issues/9425
-			if [[ -f include/generated/.armbian-build.tar.gz ]]; then
-				tar -C . -xzf include/generated/.armbian-build.tar.gz
-				rm -f include/generated/.armbian-build.tar.gz
+			# Restore build-time config after all make steps. See: https://github.com/leftymods/CoreOS/issues/9425
+			if [[ -f include/generated/.atrios-build.tar.gz ]]; then
+				tar -C . -xzf include/generated/.atrios-build.tar.gz
+				rm -f include/generated/.atrios-build.tar.gz
 			fi
 		EOT_POSTINST_FINISH
 	)
@@ -610,7 +610,7 @@ function kernel_package_callback_linux_libc_dev() {
 		Provides: linux-libc-dev
 		Conflicts: linux-libc-dev
 		Architecture: ${ARCH}
-		Description: Armbian Linux support headers for userspace development
+		Description: AtriOS Linux support headers for userspace development
 		 This package provides userspaces headers from the Linux kernel.  These headers
 		 are used by the installed headers for GNU glibc and other system libraries.
 		Multi-Arch: same

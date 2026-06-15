@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 PREV_KERNEL_PATCH_DIR=none
@@ -11,7 +11,7 @@ function extension_prepare_config__prepare_kernel_patches() {
 		exit_with_error "allwinner-kernel-bump extension must only be used with allwinner boards with edge kernel"
 	fi
 
-	if [[ ${ARMBIAN_RELAUNCHED} == "yes" ]]; then
+	if [[ ${AtriOS_RELAUNCHED} == "yes" ]]; then
 		display_alert "allwinner-kernel-bump" "Checking new kernel version" "info"
 		PREV_KERNEL_PATCH_DIR=${SRC}/patch/kernel/${KERNELPATCHDIR}
 		declare -g KERNELBRANCH="branch:master"
@@ -24,8 +24,8 @@ function extension_prepare_config__prepare_kernel_patches() {
 }
 
 function extension_finish_config__prepare_megous_patches() {
-	if [[ ${ARMBIAN_RELAUNCHED} == "yes" ]]; then
-		declare bare_tree_done_marker_file=".git/armbian-bare-tree-done"
+	if [[ ${AtriOS_RELAUNCHED} == "yes" ]]; then
+		declare bare_tree_done_marker_file=".git/atrios-bare-tree-done"
 		declare kernel_git_bare_tree
 		declare git_bundles_dir
 		declare git_kernel_ball_fn
@@ -91,6 +91,6 @@ function extension_finish_config__prepare_megous_patches() {
 		display_alert "allwinner-kernel-bump" "Generating series.conf file" "info"
 		run_host_command_logged cat "${patch_dir_base}/series.megous" ">>" "${patch_dir_base}/series.conf"
 		run_host_command_logged cat "${patch_dir_base}/series.fixes" ">>" "${patch_dir_base}/series.conf"
-		run_host_command_logged cat "${patch_dir_base}/series.armbian" ">>" "${patch_dir_base}/series.conf"
+		run_host_command_logged cat "${patch_dir_base}/series.AtriOS" ">>" "${patch_dir_base}/series.conf"
 	fi
 }

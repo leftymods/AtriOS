@@ -34,7 +34,7 @@ function post_build_image__900_convert_to_abl_img() {
 	rm "${DESTIMG}/${version}.img"
 	display_alert "Replace root partition uuid from ${old_rootfs_image_uuid} to ${new_rootfs_image_uuid} in /etc/fstab" "${EXTENSION}" "info"
 	sed -i "s|${old_rootfs_image_uuid}|${new_rootfs_image_uuid}|g" "${new_rootfs_image_mount_dir}/etc/fstab"
-	source "${new_rootfs_image_mount_dir}/boot/armbianEnv.txt"
+	source "${new_rootfs_image_mount_dir}/boot/atriosEnv.txt"
 	declare -g bootimg_cmdline="${BOOTIMG_CMDLINE_EXTRA} root=UUID=${new_rootfs_image_uuid} slot_suffix=${abl_boot_partition_label#boot} ${extraargs}"
 
 	if [[ ${#ABL_DTB_LIST[@]} -ne 0 ]]; then

@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # Those are convenience helpers for creating sub-dirs, for each usage, in WORKDIR.
 # They also setup a cleanup trap, and allow early calling of the cleanup handler.

@@ -4,12 +4,12 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 function uboot_prepare_bare_repo() {
 	uboot_git_bare_tree="${SRC}/cache/git-bare/u-boot" # sets the outer scope variable
-	declare uboot_git_bare_tree_done_marker="${uboot_git_bare_tree}/.git/armbian-bare-tree-done"
+	declare uboot_git_bare_tree_done_marker="${uboot_git_bare_tree}/.git/atrios-bare-tree-done"
 
 	if [[ ! -d "${uboot_git_bare_tree}" || ! -f "${uboot_git_bare_tree_done_marker}" ]]; then
 		if [[ -d "${uboot_git_bare_tree}" ]]; then

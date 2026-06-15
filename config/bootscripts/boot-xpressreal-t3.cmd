@@ -17,8 +17,8 @@ setenv extraboardargs "uio_pdrv_genirq.of_id=generic-uio firmware_class.path=/li
 test -n "${distro_bootpart}" || distro_bootpart=1
 echo "Boot script loaded from ${devtype} ${devnum}:${distro_bootpart}"
 
-if test -e ${devtype} ${devnum}:${distro_bootpart} ${prefix}armbianEnv.txt; then
-	load ${devtype} ${devnum}:${distro_bootpart} ${load_addr} ${prefix}armbianEnv.txt
+if test -e ${devtype} ${devnum}:${distro_bootpart} ${prefix}atriosEnv.txt; then
+	load ${devtype} ${devnum}:${distro_bootpart} ${load_addr} ${prefix}atriosEnv.txt
 	env import -t ${load_addr} ${filesize}
 fi
 

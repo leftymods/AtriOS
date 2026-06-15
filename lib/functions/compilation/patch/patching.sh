@@ -4,8 +4,8 @@
 #
 # Copyright (c) 2025-2026 leftymods
 #
-# This file is a part of the Armbian Build Framework
-# https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework
+# https://github.com/leftymods/CoreOS/
 
 # advanced_patch <patch_kind> <{patch_dir}> <board> <target> <branch> <description>
 #
@@ -120,7 +120,7 @@ function userpatch_create() {
 		"-1" "HEAD" "--stdout"
 		"--unified=5"    # force 5 lines of diff context
 		"--keep-subject" # do not add a prefix to the subject "[PATCH] "
-		'--signature' "'Created with Armbian build tools https://github.com/armbian/build'"
+		'--signature' "'Created with AtriOS build tools https://github.com/AtriOS/build'"
 		'--stat=120'            # 'wider' stat output; default is 80
 		'--stat-graph-width=10' # shorten the diffgraph graph part, it's too long
 		"--zero-commit"         # Output an all-zero hash in each patch’s From header instead of the hash of the commit.
@@ -136,7 +136,7 @@ function userpatch_create() {
 	# create commit to start from clean source; don't fail.
 	display_alert "Creating commit to start from clean source" "" "info"
 	run_host_command_logged git "${common_git_params[@]}" add . "||" true
-	run_host_command_logged git "${common_git_params[@]}" commit -q -m "'Previous changes made by Armbian'" "||" true
+	run_host_command_logged git "${common_git_params[@]}" commit -q -m "'Previous changes made by AtriOS'" "||" true
 
 	display_alert "Patches will be created" "with the following maintainer information" "info"
 	display_alert "MAINTAINER (Real name): " "${MAINTAINER}" "info"
@@ -148,7 +148,7 @@ function userpatch_create() {
 
 	# prompt to alter source
 	display_alert "Make your changes in this directory:" "$(pwd)" "wrn"
-	if [[ "${ARMBIAN_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
 		display_alert "You are running in a container" "Path shown above might not match host system, be aware." "wrn"
 	fi
 

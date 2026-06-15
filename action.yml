@@ -1,111 +1,111 @@
-name: "Rebuild Armbian"
-author: "https://github.com/armbian"
-description: "Build Armbian Linux"
+name: "Rebuild AtriOS"
+author: "https://github.com/leftymods"
+description: "Build AtriOS Linux"
 inputs:
 
-  armbian_token:
+  atrios_token:
     description: "GitHub installation access token"
     required: true
 
-  armbian_runner_clean:
+  atrios_runner_clean:
     description: "Make some space on GH runners"
     required: false
     default: ""
 
-  armbian_artifacts:
+  atrios_artifacts:
     description: "Upload PATH"
     required: false
     default: "build/output/images/"
 
-  armbian_target:
+  atrios_target:
     description: "Build image or kernel"
     required: false
     default: "kernel"
 
-  armbian_branch:
+  atrios_branch:
     description: "Choose framework branch"
     required: false
     default: "main"
 
-  armbian_kernel_branch:
+  atrios_kernel_branch:
     description: "Choose kernel branch"
     required: false
     default: "current"
 
-  armbian_release:
+  atrios_release:
     description: "Choose userspace release"
     required: false
     default: "noble"
 
-  armbian_version:
+  atrios_version:
     description: "Set different version"
     required: false
     default: ""
 
-  armbian_board:
+  atrios_board:
     description: "Select hardware platform"
     required: false
     default: "uefi-x86"
 
-  armbian_ui:
-    description: "Armbian user interface"
+  atrios_ui:
+    description: "AtriOS user interface"
     required: false
     default: "minimal"
 
-  armbian_compress:
-    description: "Armbian compress method"
+  atrios_compress:
+    description: "AtriOS compress method"
     required: false
     default: "sha,img,xz"
 
-  armbian_extensions:
-    description: "Armbian lists of extensions"
+  atrios_extensions:
+    description: "AtriOS lists of extensions"
     required: false
     default: ""
 
-  armbian_pgp_key:
-    description: "Armbian PGP key"
+  atrios_pgp_key:
+    description: "AtriOS PGP key"
     required: false
     default: ""
 
-  armbian_pgp_password:
-    description: "Armbian PGP password"
+  atrios_pgp_password:
+    description: "AtriOS PGP password"
     required: false
     default: ""
 
-  armbian_release_title:
-    description: "Armbian image"
+  atrios_release_title:
+    description: "AtriOS image"
     required: false
-    default: "Armbian image"
+    default: "AtriOS image"
 
-  armbian_release_body:
-    description: "Armbian images"
+  atrios_release_body:
+    description: "AtriOS images"
     required: false
-    default: "Build with [Armbian tools](https://github.com/armbian/build)"
+    default: "Build with [AtriOS tools](https://github.com/leftymods/CoreOS)"
 
-  armbian_release_tag:
-    description: "Armbian release tag"
+  atrios_release_tag:
+    description: "AtriOS release tag"
     required: false
     default: ""
 
-  armbian_release_prerelease:
+  atrios_release_prerelease:
     description: "Publish the GitHub release as a pre-release. Useful for matrix builds: leave as 'true' while images are still being uploaded, then promote to a regular release with `gh release edit <tag> --prerelease=false --latest` once all assets land."
     required: false
     default: "false"
 
-  armbian_download_base_url:
+  atrios_download_base_url:
     description: "Base URL where the published images live (used to construct file_url / redi_url in the assets manifest)"
     required: false
-    default: "https://dl.armbian.com"
+    default: ""
 
-  armbian_download_repository:
+  atrios_download_repository:
     description: "Repository segment under <download_base>/<board>/<repo>/ (e.g. 'archive', 'nightly'). Set to empty string for a flat URL shape <download_base>/<filename> — useful when images are published directly to a GitHub release. In flat mode redi_url* mirror file_url* (no separate redirector exists)."
     required: false
-    default: "archive"
+    default: ""
 
-  armbian_index_url:
-    description: "URL of the canonical armbian-images.json used to enrich each entry's company_name / company_website / company_logo by board_slug. Set to empty string to skip enrichment."
+  atrios_index_url:
+    description: "URL of the canonical atrios-images.json used to enrich each entry's company_name / company_website / company_logo by board_slug. Set to empty string to skip enrichment."
     required: false
-    default: "https://github.armbian.com/armbian-images.json"
+    default: ""
 
 runs:
   using: "composite"
@@ -113,7 +113,7 @@ runs:
   steps:
 
     - name: Free Github Runner
-      if: ${{ inputs.armbian_runner_clean != '' }}
+      if: ${{ inputs.atrios_runner_clean != '' }}
       uses: descriptinc/free-disk-space@1b4b157593c6801212a2ed488c205e0a810b4592 # main
       with:
         android: true
@@ -124,42 +124,26 @@ runs:
         swap-storage: true
 
     - name: "Import GPG key"
-      if: ${{ inputs.armbian_pgp_key != '' }}
+      if: ${{ inputs.atrios_pgp_key != '' }}
       uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
       with:
-        gpg_private_key: ${{ inputs.armbian_pgp_key }}
-        passphrase: ${{ inputs.armbian_pgp_password }}
+        gpg_private_key: ${{ inputs.atrios_pgp_key }}
+        passphrase: ${{ inputs.atrios_pgp_password }}
 
-    - name: "Checkout Armbian os"
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      with:
-        repository: armbian/os
-        fetch-depth: 1
-        clean: false
-        path: os
-
-    - name: "Checkout Armbian build framework"
-      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      with:
-        repository: armbian/build
-        ref: ${{ inputs.armbian_branch }}
-        clean: false
-        path: build
-
-    - name: "Checkout customisations"
+    - name: "Checkout AtriOS build framework"
       uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         fetch-depth: 0
         clean: false
-        path: custom
+        path: build
 
     - shell: bash
       run: |
 
         # Resolve base version (prefer workflow input if provided)
-        BASE_VERSION="${{ inputs.armbian_version }}"
+        BASE_VERSION="${{ inputs.atrios_version }}"
         if [ -z "$BASE_VERSION" ]; then
-          BASE_VERSION="$(jq -r '.version' os/stable.json)"
+          BASE_VERSION="$(cat build/VERSION)"
         fi
 
         # Preserve optional 'v' prefix but strip it for math
@@ -181,30 +165,23 @@ runs:
         NEXT_VERSION="${PREFIX}${MAJOR}.${MINOR}.${NEXT_PATCH}"
 
         {
-          echo "ARMBIAN_VERSION=${NEXT_VERSION}"
+          echo "ATRIOS_VERSION=${NEXT_VERSION}"
         } >> "$GITHUB_ENV"
-
-        # copy os userpatches and custom
-        mkdir -pv build/userpatches
-        rsync -av os/userpatches/. build/userpatches/
-        if [[ -d custom/userpatches ]]; then
-          rsync -av custom/userpatches/. build/userpatches/
-        fi
 
     - shell: bash
       run: |
 
         # userspace decode
-        if [[ "${{ inputs.armbian_ui }}" == minimal ]]; then
+        if [[ "${{ inputs.atrios_ui }}" == minimal ]]; then
           BUILD_DESKTOP="no"
           BUILD_MINIMAL="yes"
-        elif [[ "${{ inputs.armbian_ui }}" == server ]]; then
+        elif [[ "${{ inputs.atrios_ui }}" == server ]]; then
           BUILD_DESKTOP="no"
           BUILD_MINIMAL="no"
         else
           BUILD_DESKTOP="yes"
           BUILD_MINIMAL="no"
-          DESKTOP_ENVIRONMENT="${{ inputs.armbian_ui }}"
+          DESKTOP_ENVIRONMENT="${{ inputs.atrios_ui }}"
           DESKTOP_TIER="mid"
         fi
 
@@ -216,40 +193,40 @@ runs:
         sudo chown -R $USER:$USER .
 
         # execute build command
-        ./compile.sh "${{ inputs.armbian_target }}" \
-        REVISION="${{ env.ARMBIAN_VERSION }}" \
-        BOARD="${{ inputs.armbian_board }}" \
-        BRANCH="${{ inputs.armbian_kernel_branch }}" \
-        RELEASE="${{ inputs.armbian_release }}" \
+        ./compile.sh "${{ inputs.atrios_target }}" \
+        REVISION="${{ env.ATRIOS_VERSION }}" \
+        BOARD="${{ inputs.atrios_board }}" \
+        BRANCH="${{ inputs.atrios_kernel_branch }}" \
+        RELEASE="${{ inputs.atrios_release }}" \
         KERNEL_CONFIGURE="no" \
         BUILD_DESKTOP="${BUILD_DESKTOP}" \
         BUILD_MINIMAL="${BUILD_MINIMAL}" \
         DESKTOP_ENVIRONMENT="${DESKTOP_ENVIRONMENT}" \
         DESKTOP_TIER="${DESKTOP_TIER}" \
-        ENABLE_EXTENSIONS="${{ inputs.armbian_extensions }}" \
-        COMPRESS_OUTPUTIMAGE="${{ inputs.armbian_compress }}" \
+        ENABLE_EXTENSIONS="${{ inputs.atrios_extensions }}" \
+        COMPRESS_OUTPUTIMAGE="${{ inputs.atrios_compress }}" \
         SHARE_LOG="yes" \
         EXPERT="yes"
 
     - name: Sign
       shell: bash
-      if: ${{ inputs.armbian_pgp_password != '' }}
+      if: ${{ inputs.atrios_pgp_password != '' }}
       run: |
-        printf '%s' "${{ inputs.armbian_pgp_password }}" | \
+        printf '%s' "${{ inputs.atrios_pgp_password }}" | \
         gpg --passphrase-fd 0 --armor --detach-sign --pinentry-mode loopback --batch --yes \
         build/output/images/*.img*.xz
 
     - name: "Generate release assets manifest"
       shell: bash
       env:
-        ARMBIAN_VERSION: ${{ env.ARMBIAN_VERSION }}
-        ARMBIAN_BOARD: ${{ inputs.armbian_board }}
-        ARMBIAN_RELEASE: ${{ inputs.armbian_release }}
-        ARMBIAN_KERNEL_BRANCH: ${{ inputs.armbian_kernel_branch }}
-        ARMBIAN_UI: ${{ inputs.armbian_ui }}
-        ARMBIAN_DOWNLOAD_BASE_URL: ${{ inputs.armbian_download_base_url }}
-        ARMBIAN_DOWNLOAD_REPOSITORY: ${{ inputs.armbian_download_repository }}
-        ARMBIAN_INDEX_URL: ${{ inputs.armbian_index_url }}
+        ATRIOS_VERSION: ${{ env.ATRIOS_VERSION }}
+        ATRIOS_BOARD: ${{ inputs.atrios_board }}
+        ATRIOS_RELEASE: ${{ inputs.atrios_release }}
+        ATRIOS_KERNEL_BRANCH: ${{ inputs.atrios_kernel_branch }}
+        ATRIOS_UI: ${{ inputs.atrios_ui }}
+        ATRIOS_DOWNLOAD_BASE_URL: ${{ inputs.atrios_download_base_url }}
+        ATRIOS_DOWNLOAD_REPOSITORY: ${{ inputs.atrios_download_repository }}
+        ATRIOS_INDEX_URL: ${{ inputs.atrios_index_url }}
       run: |
         set -euo pipefail
         python3 - <<'PY'
@@ -261,21 +238,11 @@ runs:
         IMAGES_DIR = Path("build/output/images")
         INFO_JSON  = Path("build/output/info/image-info.json")
 
-        DOWNLOAD_BASE = os.environ.get("ARMBIAN_DOWNLOAD_BASE_URL", "https://dl.armbian.com").rstrip("/")
-        # strip("/") so "archive/", "/archive/", or "/" all behave correctly:
-        # avoids double-slashes in composed URLs and lets a slash-only value
-        # collapse to "" (which selects the flat-URL shape below).
-        DOWNLOAD_REPO = os.environ.get("ARMBIAN_DOWNLOAD_REPOSITORY", "archive").strip("/")
-        INDEX_URL     = os.environ.get("ARMBIAN_INDEX_URL", "https://github.armbian.com/armbian-images.json")
-        VERSION_ENV   = os.environ.get("ARMBIAN_VERSION", "")
+        DOWNLOAD_BASE = os.environ.get("ATRIOS_DOWNLOAD_BASE_URL", "").rstrip("/")
+        DOWNLOAD_REPO = os.environ.get("ATRIOS_DOWNLOAD_REPOSITORY", "").strip("/")
+        INDEX_URL     = os.environ.get("ATRIOS_INDEX_URL", "")
+        VERSION_ENV   = os.environ.get("ATRIOS_VERSION", "")
 
-        # Image format extensions: (full_ext, image_format) pairs. full_ext
-        # lands in the `file_extension` JSON field (e.g. "img.qcow2.xz");
-        # image_format groups variants of the same product (raw vs qcow2 vs
-        # hyperv) for de-dup. Same (stem, image_format) collapses to one
-        # entry preferring xz > zst > raw uncompressed (EXTS is ordered that
-        # way so first-seen wins); different image_format coexist as
-        # separate entries.
         EXTS = (
             ("img.qcow2.xz",   "img.qcow2"),
             ("img.qcow2.zst",  "img.qcow2"),
@@ -291,36 +258,25 @@ runs:
             ("img",            "img"),
         )
 
-        # image_format -> redi_url variant suffix (canonical generator
-        # appends "-qcow2" / "-hyperv" to the friendly redirect path so a
-        # board can serve multiple formats at distinct URLs).
         FORMAT_SUFFIX = {"img.qcow2": "qcow2", "img.vhdx": "vhdx", "hyperv.zip": "hyperv"}
 
-        # Filename: Armbian[-unofficial]_{version}_{Board}_{distro}_{branch}_{kernel}[_{variant[.app]}]
-        # Variant token is optional (some legacy / hand-crafted builds omit it).
         FNAME_RE = re.compile(
-            r"^(?P<prefix>Armbian(?:-\w+)?)_(?P<version>[^_]+)_(?P<board>[^_]+)_"
+            r"^(?P<prefix>AtriOS(?:-\w+)?)_(?P<version>[^_]+)_(?P<board>[^_]+)_"
             r"(?P<distro>[^_]+)_(?P<branch>[^_]+)_(?P<kernel>[^_]+)"
             r"(?:_(?P<variant>[^.]+(?:\.[^.]+)?))?$"
         )
 
-        # Fields copied verbatim from the canonical published index when the
-        # slug is present there. Local image-info.json wins per-field for the
-        # board_* fields; company_* and platinum_* are only sourced here.
         ENRICHMENT_FIELDS = (
             "board_name", "board_vendor", "board_support", "board_introduced",
             "company_name", "company_website", "company_logo",
             "platinum", "platinum_expired", "platinum_until",
         )
 
-        # ── Loaders ──────────────────────────────────────────────────────────
         def load_enrichment(url):
-            """Fetch the canonical index and build slug -> enrichment-fields
-            map. Best-effort: silently skips on any failure."""
             if not url:
                 return {}
             try:
-                req = urllib.request.Request(url, headers={"User-Agent": "armbian-build-action"})
+                req = urllib.request.Request(url, headers={"User-Agent": "atrios-build-action"})
                 with urllib.request.urlopen(req, timeout=30) as resp:
                     data = json.load(resp)
             except Exception as e:
@@ -335,8 +291,6 @@ runs:
             return out
 
         def load_board_meta(path):
-            """Read BOARD_TOP_LEVEL_VARS slug -> board_* fields from the
-            build framework's image-info.json (written before this step runs)."""
             if not path.is_file():
                 return {}
             try:
@@ -359,19 +313,7 @@ runs:
                 }
             return out
 
-        # ── Filename parser ──────────────────────────────────────────────────
         def parse_name(stem):
-            """Extract version/board_slug/distro/branch/kernel/variant/app
-            from a filename stem (no extension). Returns None if no match.
-
-            Variant token can carry .application (e.g. "minimal.hyperv").
-            Kernel field can carry a -suffix: "6.18.26-sdk", "6.6.0-rc1-sdk".
-            Strip only the LAST dash-segment so multi-dash kernels preserve
-            any intermediate tag (e.g. rc1) in kernel_version. Treat the
-            stripped suffix as file_application iff every char is a letter
-            (sdk, omv, kali, …); pre-release tags like "rc5" carry digits
-            and stay attached.
-            """
             m = FNAME_RE.match(stem)
             if not m:
                 return None
@@ -395,30 +337,13 @@ runs:
                 "file_application": file_application,
             }
 
-        # ── URL composition ──────────────────────────────────────────────────
         def signature_urls(base):
-            """Return (base, base.asc, base.sha, ""). The build never
-            produces a .torrent for the assets it ships, so the torrent
-            slot is always empty — the field is kept for schema parity
-            with the canonical armbian-images.json index.
-            """
             return base, f"{base}.asc", f"{base}.sha", ""
 
         def build_urls(parsed, image_format, img_name):
-            """Compose file_url + redi_url (each with its .asc/.sha
-            siblings; torrent slot is always empty — see signature_urls).
-
-            Two URL shapes, selected by DOWNLOAD_REPO:
-              non-empty -> {base}/{board}/{repo}/{filename}    dl.armbian.com style
-              empty     -> {base}/{filename}                   flat (e.g. GitHub releases)
-            Flat mode mirrors redi_url* onto file_url* since there is no
-            separate redirector.
-            """
             slug = parsed["board_slug"]
             if DOWNLOAD_REPO:
                 file_urls = signature_urls(f"{DOWNLOAD_BASE}/{slug}/{DOWNLOAD_REPO}/{img_name}")
-                # redi_variant: variant[-{format|app}]. Format suffix wins
-                # over app when both apply (canonical convention).
                 redi_variant = parsed["variant"]
                 tail = FORMAT_SUFFIX.get(image_format) or parsed["file_application"]
                 if tail:
@@ -431,11 +356,7 @@ runs:
             file_urls = signature_urls(f"{DOWNLOAD_BASE}/{img_name}")
             return file_urls, file_urls
 
-        # ── Walk image dir, build manifest ───────────────────────────────────
         def collect_candidates():
-            """Walk IMAGES_DIR, group files by (stem, image_format). Within
-            each group keep the most-compressed form (EXTS is ordered xz >
-            zst > raw, first-seen wins)."""
             out = {}
             for ext, image_format in EXTS:
                 for f in IMAGES_DIR.glob(f"*.{ext}"):
@@ -457,7 +378,6 @@ runs:
                 build_urls(parsed, image_format, img.name)
             return {
                 "board_slug":          slug,
-                # local image-info.json wins per-field; published index fills the rest.
                 "board_name":          meta.get("board_name")       or enrich.get("board_name", ""),
                 "board_vendor":        meta.get("board_vendor")     or enrich.get("board_vendor", ""),
                 "board_support":       meta.get("board_support")    or enrich.get("board_support", ""),
@@ -465,7 +385,7 @@ runs:
                 "company_name":        enrich.get("company_name", ""),
                 "company_website":     enrich.get("company_website", ""),
                 "company_logo":        enrich.get("company_logo", ""),
-                "armbian_version":     parsed["version"] or VERSION_ENV,
+                "atrios_version":      parsed["version"] or VERSION_ENV,
                 "file_url":            file_url,
                 "file_url_asc":        file_asc,
                 "file_url_sha":        file_sha,
@@ -490,17 +410,11 @@ runs:
             }
 
         def write_manifest(asset):
-            """One manifest per image, '<image_filename>.assets.json'.
-            Image filenames are guaranteed unique across this build call
-            and across parallel matrix cells, so the manifest filename is
-            too. Schema {"assets": [...]} so consumers expecting the array
-            (e.g. `jq -s 'map(.assets) | flatten'`) keep working."""
             img_name = Path(asset["file_url"]).name
             out = IMAGES_DIR / f"{img_name}.assets.json"
             out.write_text(json.dumps({"assets": [asset]}, indent=2) + "\n")
             print(f"Wrote {out}")
 
-        # ── Main ─────────────────────────────────────────────────────────────
         enrichment = load_enrichment(INDEX_URL)
         board_meta = load_board_meta(INFO_JSON)
         candidates = collect_candidates()
@@ -525,20 +439,19 @@ runs:
 
     - uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
       with:
-        tag: ${{ inputs.armbian_release_tag != '' && inputs.armbian_release_tag || env.ARMBIAN_VERSION }}
-        name: "${{ inputs.armbian_release_title }}"
-        artifacts: "${{ inputs.armbian_artifacts }}*"
+        tag: ${{ inputs.atrios_release_tag != '' && inputs.atrios_release_tag || env.ATRIOS_VERSION }}
+        name: "${{ inputs.atrios_release_title }}"
+        artifacts: "${{ inputs.atrios_artifacts }}*"
         allowUpdates: true
         removeArtifacts: false
         replacesArtifacts: true
         makeLatest: true
-        prerelease: ${{ inputs.armbian_release_prerelease }}
+        prerelease: ${{ inputs.atrios_release_prerelease }}
         artifactErrorsFailBuild: true
-        token: "${{ inputs.armbian_token }}"
+        token: "${{ inputs.atrios_token }}"
         body: |
-          ${{ inputs.armbian_release_body }}
+          ${{ inputs.atrios_release_body }}
 
 branding:
   icon: "check"
   color: "red"
-

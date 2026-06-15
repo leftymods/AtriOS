@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
-# This file is a part of the Armbian Build Framework https://github.com/armbian/build/
+# This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
 #
 
 # tl;dr: this artifact is a replacement for the original distro's base-files.
@@ -131,18 +131,18 @@ function compile_atrios-base-files() {
 
 	# Attention: this is just a few base changes that don't involve "$REVISION".
 	# More are done in reversion_atrios-base-files_deb_contents()
-	cat <<- EOD >> "${destination}/etc/dpkg/origins/armbian"
+	cat <<- EOD >> "${destination}/etc/dpkg/origins/AtriOS"
 		Vendor: ${VENDOR}
 		Vendor-URL: ${VENDORURL}
 		Bugs: ${VENDORBUGS}
 		Parent: ${DISTRIBUTION}
 	EOD
-	# Add armbian to the package conf files.
-	sed -i '/\/etc\/dpkg\/origins\/debian/a \/etc\/dpkg\/origins\/armbian' "${destination}"/DEBIAN/conffiles
+	# Add AtriOS to the package conf files.
+	sed -i '/\/etc\/dpkg\/origins\/debian/a \/etc\/dpkg\/origins\/AtriOS' "${destination}"/DEBIAN/conffiles
 
 	# Fix symlinking in postinst for Debian and Ubuntu. They have to point towards AtriOS, AtriOS parent is Debian or Ubuntu -> Debian
-	sed -i -E -e "s/\origins\/ubuntu|debian/origins\/armbian/g" "${destination}"/DEBIAN/postinst
-	sed -i -E -e "s/ln -sf ubuntu|debian/ln -sf armbian/g" "${destination}"/DEBIAN/postinst
+	sed -i -E -e "s/\origins\/ubuntu|debian/origins\/AtriOS/g" "${destination}"/DEBIAN/postinst
+	sed -i -E -e "s/ln -sf ubuntu|debian/ln -sf AtriOS/g" "${destination}"/DEBIAN/postinst
 
 	# Create preinst file if not exists (Debian)
 	if [[ ! -e "${destination}"/DEBIAN/preinst ]]; then
@@ -171,7 +171,7 @@ function compile_atrios-base-files() {
 	# Replace Ubuntu logo files with symlinks to AtriOS's.
 	# Ubuntu hardcodes lookups for ubuntu-logo*.svg / ubuntu-logo*.png
 	# in GNOME Settings → About and other places. The AtriOS logos
-	# are shipped by armbian-bsp-cli (packages/bsp/common/usr/share/
+	# are shipped by atrios-bsp-cli (packages/bsp/common/usr/share/
 	# pixmaps/atrios-logo*). Since we own this base-files repack,
 	# we can safely replace the upstream files with relative symlinks.
 	if [[ -d "${destination}/usr/share/pixmaps" ]]; then
@@ -271,7 +271,7 @@ function reversion_atrios-base-files_deb_contents() {
 }
 
 function artifact_atrios-base-files_cli_adapter_pre_run() {
-	declare -g ARMBIAN_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -286,7 +286,7 @@ function artifact_atrios-base-files_cli_adapter_config_prep() {
 }
 
 function artifact_atrios-base-files_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/armbian/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
 }
 
 function artifact_atrios-base-files_is_available_in_local_cache() {
