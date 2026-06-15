@@ -9,7 +9,7 @@
 #
 import logging
 
-from . import atrios_utils as armbian_utils
+from . import atrios_utils as atrios_utils
 
 log: logging.Logger = logging.getLogger("md_asset_log")
 
