@@ -212,6 +212,7 @@ function kernel_prepare_bare_repo_from_oras_gitball() {
 			declare fetch_ref="${KERNELBRANCH##*:}"
 			display_alert "Fetching custom kernel into bare tree" "${KERNELSOURCE} ref: ${fetch_ref}" "info"
 			run_host_command_logged git -C "${kernel_git_bare_tree}" fetch --depth=1 origin "${fetch_ref}"
+			run_host_command_logged git -C "${kernel_git_bare_tree}" update-ref refs/heads/main FETCH_HEAD
 			run_host_command_logged touch "${kernel_git_bare_tree_done_marker}"
 			display_alert "Custom kernel bare tree ready" "${kernel_git_bare_tree}" "info"
 			return 0
