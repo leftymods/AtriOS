@@ -23,7 +23,7 @@ function obtain_and_check_host_release_and_arch() {
 			;;
 		*)
 			display_alert "Please read documentation to set up proper compilation environment"
-			display_alert "https://github.com/leftymods/CoreOSusing-atrios-tools/"
+			display_alert "https://github.com/leftymods/CoreOS/"
 			exit_with_error "Running this tool on '${HOSTARCH}' build host is not supported"
 			;;
 	esac

@@ -23,7 +23,7 @@ function fingerprint_image() {
 		Build date:     $(date +'%d.%m.%Y')
 		Sources:        ${BUILD_REPOSITORY_URL}
 		Sources rev:    ${BUILD_REPOSITORY_COMMIT}
-		Authors:        https://github.com/leftymods/CoreOSauthors
+		Authors:        https://github.com/leftymods/CoreOS
 		Maintainer:     ${MAINTAINER} <$MAINTAINERMAIL>
 		Support:        ${VENDORSUPPORT}
 	EOF

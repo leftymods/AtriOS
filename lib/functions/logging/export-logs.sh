@@ -169,7 +169,7 @@ function export_ansi_logs() {
 		display_alert "ANSI log file built; inspect it by running:" "less -RS ${target_relative_to_src}"
 
 		# Define here the paste servers to use, in order: each will be tried in sequence until one works
-		declare -a paste_servers=("paste.AtriOS.com" "paste.AtriOS.de" "paste.next.AtriOS.com" "paste.AtriOS.eu")
+		declare -a paste_servers=("pastebin.com" "0x0.st" "termbin.com")
 
 		# User can override by setting PASTE_SERVER_HOST=some.paste.server.com - it will be added as the first to try
 		if [[ "${PASTE_SERVER_HOST}" != "" ]]; then

@@ -123,13 +123,9 @@ function cli_json_info_run() {
 		declare OUTDATED_ARTIFACTS_IMAGES_FILE="${BASE_INFO_OUTPUT_DIR}/outdated-artifacts-images.json"
 
 		# Userspace inventory: RELEASES, and DESKTOPS and their possible ARCH'es, names, and support status.
-		# The desktop half comes from configng's YAML matrix — make sure
-		# the configng cache is populated before userspace-inventory.py
-		# runs, otherwise the desktop build matrix will be empty.
+		# configng repo is not ready yet; generate inventory without desktop matrix.
 		if [[ ! -f "${ALL_USERSPACE_INVENTORY_FILE}" ]]; then
-			display_alert "Fetching atrios-configng" "for desktop inventory" "info"
-			fetch_from_repo "https://github.com/leftymods/configng" "atrios-configng" "branch:main"
-			display_alert "Generating userspace inventory" "all_userspace_inventory.json" "info"
+			display_alert "Generating userspace inventory" "desktop matrix skipped (no configng)" "info"
 			run_host_command_logged "${PYTHON3_VARS[@]}" "${PYTHON3_INFO[BIN]}" "${INFO_TOOLS_DIR}"/userspace-inventory.py ">" "${ALL_USERSPACE_INVENTORY_FILE}"
 		fi
 

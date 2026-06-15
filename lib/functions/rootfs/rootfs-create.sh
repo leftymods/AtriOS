@@ -224,15 +224,11 @@ function create_new_rootfs_cache_via_debootstrap() {
 	run_host_command_logged rm -fv "${SDCARD}"/etc/resolv.conf
 	run_host_command_logged echo "nameserver $NAMESERVER" ">" "${SDCARD}"/etc/resolv.conf
 
-	# Install desktop via atrios-config INSIDE rootfs-create (before the
-	# cache tarball is saved) so desktop packages are included in the
-	# rootfs cache. The AtriOS apt repo was configured above by
-	# create_sources_list_and_deploy_repo_key, so atrios-config is
-	# installable from apt.leftymods.com at this point.
+	# Desktop installation via atrios-config is disabled until a custom
+	# configng repo is ready. For now, desktop packages must be handled
+	# via PACKAGE_LIST_BOARD or extensions.
 	if [[ $BUILD_DESKTOP == "yes" ]]; then
-		display_alert "Installing desktop via atrios-config" "${DESKTOP_ENVIRONMENT} tier=${DESKTOP_TIER:-mid}" "info"
-		chroot_sdcard_apt_get_install atrios-config
-		chroot_sdcard "SUDO_USER= DEBIAN_FRONTEND=noninteractive DIALOG=read atrios-config --api module_desktops install de=${DESKTOP_ENVIRONMENT} tier=${DESKTOP_TIER:-mid} mode=build"
+		display_alert "Skipping atrios-config desktop install" "not available yet" "wrn"
 	fi
 
 	# stage: check md5 sum of installed packages. Just in case. @TODO: rpardini: this should also be done when a cache is used, not only when it is created

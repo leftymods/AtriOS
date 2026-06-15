@@ -118,7 +118,7 @@ function fetch_distro_keyring() {
 			# github.com/atrios/atrios.github.io/ .github/workflows/generate-keyring-data.yaml
 				for p in debian-archive-keyring debian-ports-archive-keyring; do
 					# if we use http://, we'll get a 301 to https://, but this means we can't use a caching proxy like ACNG
-					PKG_URL="https://github.leftymods.com/keyrings/latest-${p}.deb"
+					PKG_URL="https://github.armbian.com/keyrings/latest-${p}.deb"
 					run_host_command_logged curl -fLOJ --output-dir "${CACHEDIR}" "${PKG_URL}" || \
 						exit_with_error "fetch_distro_keyring failed" "unable to download ${PKG_URL}"
 					KEYRING_DEB=$(basename "${PKG_URL}")
@@ -141,7 +141,7 @@ function fetch_distro_keyring() {
 			if [[ -e "${CACHEDIR}/ubuntu-archive-keyring.gpg" ]]; then
 				display_alert "fetch_distro_keyring($release)" "cache found, skipping" "info"
 			else
-				PKG_URL="https://github.leftymods.com/keyrings/latest-ubuntu-keyring.deb"
+				PKG_URL="https://github.armbian.com/keyrings/latest-ubuntu-keyring.deb"
 				run_host_command_logged curl -fLOJ --output-dir "${CACHEDIR}" "${PKG_URL}" || \
 					exit_with_error "fetch_distro_keyring failed" "unable to download ${PKG_URL}"
 				KEYRING_DEB=$(basename "${PKG_URL}")
@@ -297,32 +297,24 @@ function create_sources_list_and_deploy_repo_key() {
 	components+=("${RELEASE}-utils")   # utils contains packages Igor picks from other repos
 	components+=("${RELEASE}-desktop") # desktop contains packages Igor picks from other repos
 
-	# stage: add atrios repository and install key
-	# atrios_mirror="http://$([[ $BETA == yes ]] && echo "beta" || echo "apt").atrios.com"
-	declare atrios_mirror="apt.leftymods.com"
-	if [[ -n $LOCAL_MIRROR ]]; then
-		atrios_mirror="$LOCAL_MIRROR"
-	elif [[ $DOWNLOAD_MIRROR == "china" ]]; then
-		atrios_mirror="mirrors.tuna.tsinghua.edu.cn/atrios"
-	elif [[ $DOWNLOAD_MIRROR == "bfsu" ]]; then
-		atrios_mirror="mirrors.bfsu.edu.cn/atrios"
-	elif [[ $BETA == "yes" ]]; then
-		atrios_mirror="beta.leftymods.com"
-	fi
-	cat <<- EOF > "${basedir}"/etc/apt/sources.list.d/atrios.sources
-	Types: deb
-	URIs: http://${atrios_mirror}
-	Suites: $RELEASE
-	Components: ${components[*]}
-	Signed-By: ${APT_SIGNING_KEY_FILE}
-	EOF
+	# AtriOS apt repository is not configured yet.
+	# When ready, set LOCAL_MIRROR or uncomment below.
+	# declare atrios_mirror="${LOCAL_MIRROR:-apt.leftymods.com}"
+	# cat <<- EOF > "${basedir}"/etc/apt/sources.list.d/atrios.sources
+	# Types: deb
+	# URIs: http://${atrios_mirror}
+	# Suites: $RELEASE
+	# Components: ${components[*]}
+	# Signed-By: ${APT_SIGNING_KEY_FILE}
+	# EOF
+	:
 
 	# disable repo if DISTRIBUTION_STATUS==eos, or if SKIP_AtriOS_REPO==yes, or if when==image-early.
 	if [[ "${when}" == "image-early" ||
 		"$(cat "${SRC}/config/distributions/${RELEASE}/support")" == "eos" ||
 		"${SKIP_AtriOS_REPO}" == "yes" ]]; then
 		display_alert "Disabling AtriOS repo" "${ARCH}-${RELEASE} :: skip:${SKIP_AtriOS_REPO:-"no"} when:${when}" "info"
-		mv "${SDCARD}"/etc/apt/sources.list.d/atrios.sources "${SDCARD}"/etc/apt/sources.list.d/atrios.sources.disabled
+		[[ -f "${SDCARD}"/etc/apt/sources.list.d/atrios.sources ]] && mv "${SDCARD}"/etc/apt/sources.list.d/atrios.sources "${SDCARD}"/etc/apt/sources.list.d/atrios.sources.disabled
 	fi
 
 	declare CUSTOM_REPO_WHEN="${when}"
