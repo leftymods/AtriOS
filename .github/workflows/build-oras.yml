@@ -1,0 +1,68 @@
+name: "Build and Push Kernel ORAS Bundle"
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_major_minor:
+        description: "Kernel version (e.g. 6.18)"
+        required: true
+        default: "6.18"
+  schedule:
+    - cron: "0 3 * * 0"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push-oras:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build kernel shallow bundle
+        run: |
+          set -euo pipefail
+          KERNEL_MM="${{ inputs.kernel_major_minor || '6.18' }}"
+          BUNDLE_DIR="/tmp/linux-shallow-${KERNEL_MM}.git"
+          TAR_FILE="/tmp/linux-shallow-${KERNEL_MM}.git.tar"
+
+          # Clone shallow kernel tree
+          mkdir -p "${BUNDLE_DIR}"
+          git clone --depth=1 --branch "v${KERNEL_MM}" \
+            https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git \
+            "${BUNDLE_DIR}" 2>/dev/null || \
+          git clone --depth=1 --branch "linux-${KERNEL_MM}.y" \
+            https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git \
+            "${BUNDLE_DIR}"
+
+          # Create bare tar
+          cd "${BUNDLE_DIR}"
+          git init --bare /tmp/bare.git
+          git push /tmp/bare.git --all
+          git push /tmp/bare.git --tags
+          tar -cf "${TAR_FILE}" -C /tmp bare.git
+
+          # Push via ORAS
+          oras push "${REGISTRY}/${IMAGE_NAME}/kernel-git-shallow-${KERNEL_MM}:latest" \
+            --artifact-type application/vnd.atrios.kernel.shallow \
+            "${TAR_FILE}"
+
+          echo "Pushed ${REGISTRY}/${IMAGE_NAME}/kernel-git-shallow-${KERNEL_MM}:latest"
