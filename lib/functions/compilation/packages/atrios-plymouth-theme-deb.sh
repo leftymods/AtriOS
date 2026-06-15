@@ -13,12 +13,12 @@ compile_atrios-plymouth-theme() {
 	declare cleanup_id="" tmp_dir=""
 	prepare_temp_dir_in_workdir_and_schedule_cleanup "deb-atrios-plymouth-theme" cleanup_id tmp_dir # namerefs
 
-	declare plymouth_theme_AtriOS_dir="atrios-plymouth-theme"
-	mkdir -p "${tmp_dir}/${plymouth_theme_AtriOS_dir}"
+	declare plymouth_theme_atrios_dir="atrios-plymouth-theme"
+	mkdir -p "${tmp_dir}/${plymouth_theme_atrios_dir}"
 
-	run_host_command_logged mkdir -p "${tmp_dir}/${plymouth_theme_AtriOS_dir}"/{DEBIAN,usr/share/plymouth/themes/atrios}
+	run_host_command_logged mkdir -p "${tmp_dir}/${plymouth_theme_atrios_dir}"/{DEBIAN,usr/share/plymouth/themes/atrios}
 
-	cd "${tmp_dir}/${plymouth_theme_AtriOS_dir}" || exit_with_error "can't change directory"
+	cd "${tmp_dir}/${plymouth_theme_atrios_dir}" || exit_with_error "can't change directory"
 
 	# set up control file
 	cat <<- END > DEBIAN/control
@@ -33,29 +33,29 @@ compile_atrios-plymouth-theme() {
 	END
 
 	run_host_command_logged cp "${SRC}"/packages/plymouth-theme-atrios/debian/{postinst,prerm,postrm} \
-		"${tmp_dir}/${plymouth_theme_AtriOS_dir}"/DEBIAN/
-	chmod 755 "${tmp_dir}/${plymouth_theme_AtriOS_dir}"/DEBIAN/{postinst,prerm,postrm}
+		"${tmp_dir}/${plymouth_theme_atrios_dir}"/DEBIAN/
+	chmod 755 "${tmp_dir}/${plymouth_theme_atrios_dir}"/DEBIAN/{postinst,prerm,postrm}
 
 	# this requires `imagemagick`
 
 	run_host_command_logged convert -resize 256x256 \
 		"${SRC}"/packages/plymouth-theme-atrios/atrios-logo.png \
-		"${tmp_dir}/${plymouth_theme_AtriOS_dir}"/usr/share/plymouth/themes/atrios/bgrt-fallback.png
+		"${tmp_dir}/${plymouth_theme_atrios_dir}"/usr/share/plymouth/themes/atrios/bgrt-fallback.png
 
 	run_host_command_logged convert -resize 52x52 \
 		"${SRC}"/packages/plymouth-theme-atrios/spinner.gif \
-		"${tmp_dir}/${plymouth_theme_AtriOS_dir}"/usr/share/plymouth/themes/atrios/throbber-%04d.png
+		"${tmp_dir}/${plymouth_theme_atrios_dir}"/usr/share/plymouth/themes/atrios/throbber-%04d.png
 
 	run_host_command_logged cp "${SRC}"/packages/plymouth-theme-atrios/watermark.png \
-		"${tmp_dir}/${plymouth_theme_AtriOS_dir}"/usr/share/plymouth/themes/atrios/
+		"${tmp_dir}/${plymouth_theme_atrios_dir}"/usr/share/plymouth/themes/atrios/
 
 	run_host_command_logged cp "${SRC}"/packages/plymouth-theme-atrios/{bullet,capslock,entry,keyboard,keymap-render,lock}.png \
-		"${tmp_dir}/${plymouth_theme_AtriOS_dir}"/usr/share/plymouth/themes/atrios/
+		"${tmp_dir}/${plymouth_theme_atrios_dir}"/usr/share/plymouth/themes/atrios/
 
 	run_host_command_logged cp "${SRC}"/packages/plymouth-theme-atrios/atrios.plymouth \
-		"${tmp_dir}/${plymouth_theme_AtriOS_dir}"/usr/share/plymouth/themes/atrios/
+		"${tmp_dir}/${plymouth_theme_atrios_dir}"/usr/share/plymouth/themes/atrios/
 
-	dpkg_deb_build "${tmp_dir}/${plymouth_theme_AtriOS_dir}" "atrios-plymouth-theme"
+	dpkg_deb_build "${tmp_dir}/${plymouth_theme_atrios_dir}" "atrios-plymouth-theme"
 
 	done_with_temp_dir "${cleanup_id}" # changes cwd to "${SRC}" and fires the cleanup function early
 }

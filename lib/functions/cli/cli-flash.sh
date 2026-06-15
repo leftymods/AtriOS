@@ -8,7 +8,7 @@
 # https://github.com/leftymods/CoreOS/
 
 function cli_flash_pre_run() {
-	display_alert "cli_distccd_pre_run" "func cli_distccd_run :: ${AtriOS_COMMAND}" "warn"
+	display_alert "cli_distccd_pre_run" "func cli_distccd_run :: ${ATRIOS_COMMAND}" "warn"
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo

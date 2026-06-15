@@ -11,7 +11,7 @@ function cli_distccd_pre_run() {
 	: <<- 'HEADER'
 		Sets up an inline extension to include distccd in dependencies.
 	HEADER
-	display_alert "cli_distccd_pre_run" "func cli_distccd_run :: ${AtriOS_COMMAND}" "warn"
+	display_alert "cli_distccd_pre_run" "func cli_distccd_run :: ${ATRIOS_COMMAND}" "warn"
 
 	# When being relaunched in Docker, I wanna add port-forwardings to the distccd ports.
 	declare -g DOCKER_EXTRA_ARGS+=("-p" "3632:3632" "-p" "3633:3633")

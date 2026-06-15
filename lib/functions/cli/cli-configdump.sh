@@ -15,7 +15,7 @@ function cli_config_dump_json_run() {
 	# configuration etc - it initializes the extension manager
 	do_capturing_defs config_board_and_remove_useless < /dev/null # this sets CAPTURED_VARS_NAMES and CAPTURED_VARS_ARRAY; the < /dev/null is take away the terminal from stdin
 
-	if [[ "${AtriOS_COMMAND}" == "config-dump-no-json" ]]; then
+	if [[ "${ATRIOS_COMMAND}" == "config-dump-no-json" ]]; then
 		# for debugging the bash-declare-to-JSON parser
 		echo "${CAPTURED_VARS_ARRAY[@]}"
 		return 0

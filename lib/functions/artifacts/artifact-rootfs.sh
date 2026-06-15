@@ -120,7 +120,7 @@ function artifact_rootfs_build_from_sources() {
 }
 
 function artifact_rootfs_cli_adapter_pre_run() {
-	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -151,7 +151,7 @@ function artifact_rootfs_cli_adapter_config_prep() {
 	declare -g -r RELEASE="${RELEASE}" # make readonly for finding who tries to change it
 	declare -g -r NEEDS_BINFMT="yes"   # make sure binfmts are installed during prepare_host_interactive
 
-	# Don't force SKIP_AtriOS_REPO=yes for rootfs artifact builds anymore.
+	# Don't force SKIP_ATRIOS_REPO=yes for rootfs artifact builds anymore.
 	# The new desktop install path (module_desktops install mode=build,
 	# invoked from rootfs-create.sh) needs apt.leftymods.com's
 	# <release>-utils (atrios-config itself) and <release>-desktop
@@ -159,8 +159,8 @@ function artifact_rootfs_cli_adapter_config_prep() {
 	# while the rootfs is being assembled. Default to "no" (repo ON)
 	# and let boards/userpatches opt out explicitly if they still need
 	# the repo-free rootfs behaviour for whatever reason.
-	declare -g SKIP_AtriOS_REPO="${SKIP_AtriOS_REPO:-no}"
-	declare -g -r SKIP_AtriOS_REPO # make it readonly to ensure sanity if hooks try to change it
+	declare -g SKIP_ATRIOS_REPO="${SKIP_ATRIOS_REPO:-no}"
+	declare -g -r SKIP_ATRIOS_REPO # make it readonly to ensure sanity if hooks try to change it
 
 	track_general_config_variables "in artifact_rootfs_cli_adapter_config_prep"
 

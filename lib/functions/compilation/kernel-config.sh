@@ -34,7 +34,7 @@ function kernel_config() {
 
 	if [[ "${KERNEL_CONFIGURE}" == "yes" ]]; then
 		# Start interactive config menu unless running rewrite-kernel-config
-		if [[ "${AtriOS_COMMAND}" != "rewrite-kernel-config" ]]; then
+		if [[ "${ATRIOS_COMMAND}" != "rewrite-kernel-config" ]]; then
 			# This piece is interactive, no logging
 			display_alert "Starting (interactive) kernel ${KERNEL_MENUCONFIG:-menuconfig}" "${LINUXCONFIG}" "debug"
 			run_kernel_make_dialog "${KERNEL_MENUCONFIG:-menuconfig}"
@@ -105,7 +105,7 @@ function call_extensions_kernel_config() {
 	fi
 
 	# Run the core-AtriOS config modifications here, built-in extensions:
-	call_extension_method "AtriOS_kernel_config" <<- 'AtriOS_KERNEL_CONFIG'
+	call_extension_method "atrios_kernel_config" <<- 'ATRIOS_KERNEL_CONFIG'
 		*AtriOS-core default hook point for pre-olddefconfig Kernel config modifications*
 		NOT for user consumption. Do NOT use this hook, this is internal to AtriOS.
 		Instead, use `custom_kernel_config` which runs later and can undo anything done by this step.
@@ -113,7 +113,7 @@ function call_extensions_kernel_config() {
 		Therefore, please check with "if [[ -f .config ]]; then" if you want to modify the kernel config.
 		Either way, the hook _must_ add representative changes to the `kernel_config_modifying_hashes` array, for kernel config hashing.
 		Please note: Manually changing options doesn't check the validity of the .config file. Check for warnings in your build log.
-	AtriOS_KERNEL_CONFIG
+	ATRIOS_KERNEL_CONFIG
 
 	# Custom hooks receive a clean / updated config; depending on their modifications, they may need to run olddefconfig again.
 	call_extension_method "custom_kernel_config" <<- 'CUSTOM_KERNEL_CONFIG'
@@ -128,7 +128,7 @@ function call_extensions_kernel_config() {
 	CUSTOM_KERNEL_CONFIG
 
 	# Apply the modifications set in the arrays/dict
-	AtriOS_kernel_config_apply_opts_from_arrays
+	atrios_kernel_config_apply_opts_from_arrays
 }
 
 function kernel_config_finalize() {

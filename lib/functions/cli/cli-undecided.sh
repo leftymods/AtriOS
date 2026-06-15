@@ -10,7 +10,7 @@
 function cli_undecided_pre_run() {
 	# If undecided, run the 'build' command.
 	display_alert "cli_undecided_pre_run" "func cli_undecided_pre_run go to build" "debug"
-	AtriOS_CHANGE_COMMAND_TO="build"
+	ATRIOS_CHANGE_COMMAND_TO="build"
 }
 
 function cli_undecided_run() {

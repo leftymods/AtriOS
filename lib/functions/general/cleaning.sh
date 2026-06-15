@@ -69,10 +69,10 @@ function general_cleaning() {
 function clean_deprecated_mountpoints() {
 	# Cleaning of old, deprecated mountpoints; only done if not running under Docker.
 	# mountpoints under Docker manifest as volumes, and as such can't be cleaned this way.
-	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" != "yes" ]]; then
-		prepare_AtriOS_mountpoints_description_dict
+	if [[ "${ATRIOS_RUNNING_IN_CONTAINER}" != "yes" ]]; then
+		prepare_atrios_mountpoints_description_dict
 		local mountpoint=""
-		for mountpoint in "${AtriOS_MOUNTPOINTS_DEPRECATED[@]}"; do
+		for mountpoint in "${ATRIOS_MOUNTPOINTS_DEPRECATED[@]}"; do
 			local mountpoint_dir="${SRC}/${mountpoint}"
 			display_alert "Considering cleaning deprecated mountpoint" "${mountpoint_dir}" "debug"
 			if [[ -d "${mountpoint_dir}" ]]; then

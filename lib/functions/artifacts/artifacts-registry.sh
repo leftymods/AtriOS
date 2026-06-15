@@ -7,9 +7,9 @@
 # This file is a part of the AtriOS Build Framework
 # https://github.com/leftymods/CoreOS/
 
-function AtriOS_register_artifacts() {
+function atrios_register_artifacts() {
 
-	declare -g -A AtriOS_ARTIFACTS_TO_HANDLERS_DICT=(
+	declare -g -A ATRIOS_ARTIFACTS_TO_HANDLERS_DICT=(
 		# deb-tar
 		["kernel"]="kernel"
 

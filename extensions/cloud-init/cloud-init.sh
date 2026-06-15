@@ -55,7 +55,7 @@ function pre_customize_image__inject_cloud_init_config() {
 }
 
 # @TODO: would be better to have "AtriOS first run" as an extension that can be disabled
-function pre_customize_image__disable_AtriOS_first_run() {
+function pre_customize_image__disable_atrios_first_run() {
 	display_alert "Extension: ${EXTENSION}: Disabling" "AtriOS firstrun" "info"
 
 	# Clean up default profile and network
@@ -66,7 +66,7 @@ function pre_customize_image__disable_AtriOS_first_run() {
 	rm -f "${SDCARD}"/etc/systemd/network/*.network || true
 
 	# cleanup -- cloud-init makes some AtriOS stuff actually get in the way
-	[[ -f "${SDCARD}/boot/AtriOS_first_run.txt.template" ]] && rm -f "${SDCARD}/boot/AtriOS_first_run.txt.template"
+	[[ -f "${SDCARD}/boot/atrios_first_run.txt.template" ]] && rm -f "${SDCARD}/boot/atrios_first_run.txt.template"
 	[[ -f "${SDCARD}/root/.not_logged_in_yet" ]] && rm -f "${SDCARD}/root/.not_logged_in_yet"
 
 }

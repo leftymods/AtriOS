@@ -135,7 +135,7 @@ function artifact_atrios-bsp-cli_build_from_sources() {
 }
 
 function artifact_atrios-bsp-cli_cli_adapter_pre_run() {
-	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo

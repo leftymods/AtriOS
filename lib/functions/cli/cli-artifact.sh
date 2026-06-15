@@ -8,7 +8,7 @@
 # https://github.com/leftymods/CoreOS/
 
 function cli_artifact_pre_run() {
-	case "${AtriOS_COMMAND}" in
+	case "${ATRIOS_COMMAND}" in
 		download-artifact)
 			display_alert "download-only mode:" "won't build '${WHAT}'" "info"
 			declare -g DONT_BUILD_ARTIFACTS="${WHAT}"
@@ -47,7 +47,7 @@ function cli_artifact_run() {
 
 	declare deploy_to_remote="no"
 
-	case "${AtriOS_COMMAND}" in
+	case "${ATRIOS_COMMAND}" in
 		download-artifact)
 			display_alert "Running in download-artifact mode" "download-artifact" "ext"
 			;;

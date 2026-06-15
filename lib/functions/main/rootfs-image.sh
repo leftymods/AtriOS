@@ -55,7 +55,7 @@ function build_rootfs_and_image() {
 	LOG_SECTION="post_repo_apt_update" do_with_logging post_repo_apt_update
 
 	## stage: further customization; hooks only run _with_ AtriOS repo enabled, or not at all.
-	if [[ "${SKIP_AtriOS_REPO}" != "yes" ]]; then
+	if [[ "${SKIP_ATRIOS_REPO}" != "yes" ]]; then
 		LOG_SECTION="post_AtriOS_repo_customize_image" do_with_logging run_hooks_post_AtriOS_repo_customize_image
 	fi
 

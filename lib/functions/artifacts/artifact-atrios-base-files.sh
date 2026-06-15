@@ -271,7 +271,7 @@ function reversion_atrios-base-files_deb_contents() {
 }
 
 function artifact_atrios-base-files_cli_adapter_pre_run() {
-	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo

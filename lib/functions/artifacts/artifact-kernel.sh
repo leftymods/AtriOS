@@ -11,7 +11,7 @@ function artifact_kernel_config_dump() {
 	# BOARD is NOT included. See explanation below.
 	artifact_input_variables[LINUXFAMILY]="${LINUXFAMILY}"
 	artifact_input_variables[LINUXCONFIG]="${LINUXCONFIG}"
-	artifact_input_variables[AtriOS_KERNEL_DEB_NAME]="${LINUXFAMILY}-${BRANCH}"
+	artifact_input_variables[ATRIOS_KERNEL_DEB_NAME]="${LINUXFAMILY}-${BRANCH}"
 	artifact_input_variables[BRANCH]="${BRANCH}"
 	artifact_input_variables[KERNEL_MAJOR_MINOR]="${KERNEL_MAJOR_MINOR}"
 	artifact_input_variables[KERNELSOURCE]="${KERNELSOURCE}"
@@ -307,7 +307,7 @@ function artifact_kernel_build_from_sources() {
 }
 
 function artifact_kernel_cli_adapter_pre_run() {
-	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -316,12 +316,12 @@ function artifact_kernel_cli_adapter_pre_run() {
 function artifact_kernel_cli_adapter_config_prep() {
 	# Sanity check / cattle guard
 	# If KERNEL_CONFIGURE=yes, or CREATE_PATCHES=yes, user must have used the correct CLI commands, and only add those params.
-	if [[ "${KERNEL_CONFIGURE}" == "yes" && "${AtriOS_COMMAND}" != *kernel-config ]]; then
-		exit_with_error "KERNEL_CONFIGURE=yes is not supported anymore. Please use the new 'kernel-config' CLI command. Current command: '${AtriOS_COMMAND}'"
+	if [[ "${KERNEL_CONFIGURE}" == "yes" && "${ATRIOS_COMMAND}" != *kernel-config ]]; then
+		exit_with_error "KERNEL_CONFIGURE=yes is not supported anymore. Please use the new 'kernel-config' CLI command. Current command: '${ATRIOS_COMMAND}'"
 	fi
 
-	if [[ "${CREATE_PATCHES}" == "yes" && "${AtriOS_COMMAND}" != "kernel-patch" ]]; then
-		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'kernel-patch' CLI command. Current command: '${AtriOS_COMMAND}'"
+	if [[ "${CREATE_PATCHES}" == "yes" && "${ATRIOS_COMMAND}" != "kernel-patch" ]]; then
+		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'kernel-patch' CLI command. Current command: '${ATRIOS_COMMAND}'"
 	fi
 
 	use_board="yes" prep_conf_main_minimal_ni < /dev/null # no stdin for this, so it bombs if tries to be interactive.

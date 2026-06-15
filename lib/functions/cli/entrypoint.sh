@@ -9,9 +9,9 @@
 
 function cli_entrypoint() {
 	# array, readonly, global, for future reference, "exported" to shutup shellcheck
-	declare -rg -x -a AtriOS_ORIGINAL_ARGV=("${@}")
+	declare -rg -x -a ATRIOS_ORIGINAL_ARGV=("${@}")
 
-	if [[ "${AtriOS_ENABLE_CALL_TRACING}" == "yes" ]]; then
+	if [[ "${ATRIOS_ENABLE_CALL_TRACING}" == "yes" ]]; then
 		set -T # inherit return/debug traps
 		mkdir -p "${SRC}"/output/call-traces
 		echo -n "" > "${SRC}"/output/call-traces/calls.txt
@@ -23,8 +23,8 @@ function cli_entrypoint() {
 	# This would allow for custom commands and interceptors.
 
 	# Decide what we're gonna do. We've a few hardcoded, 1st-argument "commands".
-	declare -g -A AtriOS_COMMANDS_TO_HANDLERS_DICT AtriOS_COMMANDS_TO_VARS_DICT
-	AtriOS_register_commands # this defines the above two dictionaries
+	declare -g -A ATRIOS_COMMANDS_TO_HANDLERS_DICT ATRIOS_COMMANDS_TO_VARS_DICT
+	atrios_register_commands # this defines the above two dictionaries
 
 	# Process the command line, separating params (XX=YY) from non-params arguments.
 	# That way they can be set in any order.
@@ -35,13 +35,13 @@ function cli_entrypoint() {
 	# Now load the key=value pairs from cmdline into environment, before loading config or executing commands.
 	# This will be done _again_ later, to make sure cmdline params override config et al.
 	apply_cmdline_params_to_env "early" # which uses AtriOS_PARSED_CMDLINE_PARAMS
-	# From here on, no more ${1} or stuff. We've parsed it all into AtriOS_PARSED_CMDLINE_PARAMS or AtriOS_NON_PARAM_ARGS and AtriOS_COMMAND.
+	# From here on, no more ${1} or stuff. We've parsed it all into AtriOS_PARSED_CMDLINE_PARAMS or AtriOS_NON_PARAM_ARGS and ATRIOS_COMMAND.
 
 	# Re-initialize logging, to take into account the new environment after parsing cmdline params.
 	logging_init
 
 	declare -a -g AtriOS_CONFIG_FILES=()                                            # fully validated, complete paths to config files.
-	declare -g AtriOS_COMMAND_HANDLER="" AtriOS_COMMAND="" AtriOS_COMMAND_VARS="" # only valid command and handler will ever be set here.
+	declare -g ATRIOS_COMMAND_HANDLER="" ATRIOS_COMMAND="" ATRIOS_COMMAND_VARS="" # only valid command and handler will ever be set here.
 	declare -g AtriOS_HAS_UNKNOWN_ARG="no"                                          # if any unknown params, bomb.
 	for argument in "${AtriOS_NON_PARAM_ARGS[@]}"; do                               # loop over all non-param arguments, find commands and configs.
 		parse_each_cmdline_arg_as_command_param_or_config "${argument}"                 # sets all the vars above
@@ -56,9 +56,9 @@ function cli_entrypoint() {
 	# @TODO: Have a config that is always included? "${SRC}/userpatches/config-default.conf" ?
 
 	# If we don't have a command decided yet, use the undecided command.
-	if [[ "${AtriOS_COMMAND}" == "" ]]; then
+	if [[ "${ATRIOS_COMMAND}" == "" ]]; then
 		display_alert "No command found, using default" "undecided" "debug"
-		AtriOS_COMMAND="undecided"
+		ATRIOS_COMMAND="undecided"
 	fi
 
 	# If we don't have a command at this stage, we should default either to 'build' or 'docker', depending on OS.
@@ -67,20 +67,20 @@ function cli_entrypoint() {
 	# Also allows for launchers to keep themselves when re-launched, yet do something diferent. (eg: docker under docker does build).
 	# Or: build under Darwin does docker...
 	# each _pre_run can change the command and vars to run too, so do it in a loop until it stops changing.
-	declare -g AtriOS_CHANGE_COMMAND_TO="${AtriOS_COMMAND}"
-	while [[ "${AtriOS_CHANGE_COMMAND_TO}" != "" ]]; do
-		display_alert "Still a command to pre-run, this time:" "${AtriOS_CHANGE_COMMAND_TO}" "debug"
+	declare -g ATRIOS_CHANGE_COMMAND_TO="${ATRIOS_COMMAND}"
+	while [[ "${ATRIOS_CHANGE_COMMAND_TO}" != "" ]]; do
+		display_alert "Still a command to pre-run, this time:" "${ATRIOS_CHANGE_COMMAND_TO}" "debug"
 
-		declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="no" # reset this before every pre_run, so only the last one wins.
-		AtriOS_COMMAND="${AtriOS_CHANGE_COMMAND_TO}"
-		AtriOS_prepare_cli_command_to_run "${AtriOS_COMMAND}"
+		declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="no" # reset this before every pre_run, so only the last one wins.
+		ATRIOS_COMMAND="${ATRIOS_CHANGE_COMMAND_TO}"
+		AtriOS_prepare_cli_command_to_run "${ATRIOS_COMMAND}"
 
-		AtriOS_CHANGE_COMMAND_TO=""
+		ATRIOS_CHANGE_COMMAND_TO=""
 		AtriOS_cli_pre_run_command
 	done
 
 	declare -g DOCKER_NICE
-	if [[ "$AtriOS_COMMAND" == "docker" ]] || \
+	if [[ "$ATRIOS_COMMAND" == "docker" ]] || \
 		[[ -n "${AtriOS_PARSED_CMDLINE_PARAMS["PREFER_DOCKER"]}" && "${AtriOS_PARSED_CMDLINE_PARAMS["PREFER_DOCKER"]}" == "yes" ]] || \
 		[[ -n "${AtriOS_PARSED_CMDLINE_PARAMS["DOCKER_NICE"]}" ]]; then
 
@@ -122,36 +122,36 @@ function cli_entrypoint() {
 
 	# set unique mounting directory for this execution.
 	# basic deps, which include "uuidgen", will be installed _after_ this, so we gotta tolerate it not being there yet.
-	declare -g AtriOS_BUILD_UUID
-	if [[ "${AtriOS_BUILD_UUID}" != "" ]]; then
-		display_alert "Using passed-in AtriOS_BUILD_UUID" "${AtriOS_BUILD_UUID}" "debug"
+	declare -g ATRIOS_BUILD_UUID
+	if [[ "${ATRIOS_BUILD_UUID}" != "" ]]; then
+		display_alert "Using passed-in ATRIOS_BUILD_UUID" "${ATRIOS_BUILD_UUID}" "debug"
 	else
 		if command -v uuidgen 1> /dev/null; then
-			AtriOS_BUILD_UUID="$(uuidgen)"
+			ATRIOS_BUILD_UUID="$(uuidgen)"
 		else
 			display_alert "uuidgen not found" "uuidgen not installed yet" "info"
-			AtriOS_BUILD_UUID="no-uuidgen-yet-${RANDOM}-$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))"
+			ATRIOS_BUILD_UUID="no-uuidgen-yet-${RANDOM}-$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))$((1 + $RANDOM % 10))"
 		fi
-		display_alert "Generated AtriOS_BUILD_UUID" "${AtriOS_BUILD_UUID}" "debug"
+		display_alert "Generated ATRIOS_BUILD_UUID" "${ATRIOS_BUILD_UUID}" "debug"
 	fi
-	declare -g -r AtriOS_BUILD_UUID="${AtriOS_BUILD_UUID}" # Make read-only
-	display_alert "Build UUID:" "${AtriOS_BUILD_UUID}" "debug"
+	declare -g -r ATRIOS_BUILD_UUID="${ATRIOS_BUILD_UUID}" # Make read-only
+	display_alert "Build UUID:" "${ATRIOS_BUILD_UUID}" "debug"
 
 	# Super-global variables, used everywhere. The directories are NOT _created_ here, since this very early stage. They are all readonly, for sanity.
 	declare -g -r WORKDIR_BASE_TMP="${SRC}/.tmp" # a.k.a. ".tmp" dir. it is a shared base dir for all builds, but each build gets its own WORKDIR/TMPDIR.
 
-	declare -g -r WORKDIR="${WORKDIR_BASE_TMP}/work-${AtriOS_BUILD_UUID}"                         # WORKDIR at this stage. It will become TMPDIR later. It has special significance to `mktemp` and others!
-	declare -g -r LOGDIR="${WORKDIR_BASE_TMP}/logs-${AtriOS_BUILD_UUID}"                          # Will be initialized very soon, literally, below.
-	declare -g -r EXTENSION_MANAGER_TMP_DIR="${WORKDIR_BASE_TMP}/extensions-${AtriOS_BUILD_UUID}" # EXTENSION_MANAGER_TMP_DIR used to store extension-composed functions
+	declare -g -r WORKDIR="${WORKDIR_BASE_TMP}/work-${ATRIOS_BUILD_UUID}"                         # WORKDIR at this stage. It will become TMPDIR later. It has special significance to `mktemp` and others!
+	declare -g -r LOGDIR="${WORKDIR_BASE_TMP}/logs-${ATRIOS_BUILD_UUID}"                          # Will be initialized very soon, literally, below.
+	declare -g -r EXTENSION_MANAGER_TMP_DIR="${WORKDIR_BASE_TMP}/extensions-${ATRIOS_BUILD_UUID}" # EXTENSION_MANAGER_TMP_DIR used to store extension-composed functions
 
 	# @TODO: These are used only by rootfs/image actual build, move there...
-	declare -g -r SDCARD="${WORKDIR_BASE_TMP}/rootfs-${AtriOS_BUILD_UUID}" # SDCARD (which is NOT an sdcard, but will be, maybe, one day) is where we work the rootfs before final imaging. "rootfs" stage.
-	declare -g -r MOUNT="${WORKDIR_BASE_TMP}/mount-${AtriOS_BUILD_UUID}"   # MOUNT ("mounted on the loop") is the mounted root on final image (via loop). "image" stage
-	declare -g -r DESTIMG="${WORKDIR_BASE_TMP}/image-${AtriOS_BUILD_UUID}" # DESTIMG is where the backing image (raw, huge, sparse file) is kept (not the final destination)
+	declare -g -r SDCARD="${WORKDIR_BASE_TMP}/rootfs-${ATRIOS_BUILD_UUID}" # SDCARD (which is NOT an sdcard, but will be, maybe, one day) is where we work the rootfs before final imaging. "rootfs" stage.
+	declare -g -r MOUNT="${WORKDIR_BASE_TMP}/mount-${ATRIOS_BUILD_UUID}"   # MOUNT ("mounted on the loop") is the mounted root on final image (via loop). "image" stage
+	declare -g -r DESTIMG="${WORKDIR_BASE_TMP}/image-${ATRIOS_BUILD_UUID}" # DESTIMG is where the backing image (raw, huge, sparse file) is kept (not the final destination)
 
-	# Make sure AtriOS_LOG_CLI_ID is set, and unique, and readonly.
-	# Pre-runs might change it before this, but if not set, default to AtriOS_COMMAND.
-	declare -r -g AtriOS_LOG_CLI_ID="${AtriOS_LOG_CLI_ID:-${AtriOS_COMMAND}}"
+	# Make sure ATRIOS_LOG_CLI_ID is set, and unique, and readonly.
+	# Pre-runs might change it before this, but if not set, default to ATRIOS_COMMAND.
+	declare -r -g ATRIOS_LOG_CLI_ID="${ATRIOS_LOG_CLI_ID:-${ATRIOS_COMMAND}}"
 
 	# If we're on Linux & root, mount tmpfs on LOGDIR. This has it's own cleanup handler.
 	# It also _creates_ the LOGDIR, and the cleanup handler will delete.
@@ -162,7 +162,7 @@ function cli_entrypoint() {
 	add_cleanup_handler trap_handler_reset_output_owner # make sure output folder is owned by pre-sudo/pre-Docker user if that's the case
 
 	# @TODO: So gigantic contention point here about logging the basic deps installation.
-	if [[ "${AtriOS_COMMAND_REQUIRE_BASIC_DEPS}" == "yes" ]]; then
+	if [[ "${ATRIOS_COMMAND_REQUIRE_BASIC_DEPS}" == "yes" ]]; then
 		if [[ "${OFFLINE_WORK}" == "yes" ]]; then
 			display_alert "* " "You are working offline!"
 			display_alert "* " "Sources, time and host will not be checked"
@@ -204,9 +204,9 @@ function cli_entrypoint() {
 	# Early check for deprecations
 	error_if_lib_tag_set # make sure users are not thrown off by using old parameter which does nothing anymore; explain
 
-	display_alert "Executing final CLI command" "${AtriOS_COMMAND}" "debug"
+	display_alert "Executing final CLI command" "${ATRIOS_COMMAND}" "debug"
 	AtriOS_cli_run_command
-	display_alert "Done Executing final CLI command" "${AtriOS_COMMAND}" "debug"
+	display_alert "Done Executing final CLI command" "${ATRIOS_COMMAND}" "debug"
 
 	# Build done, run the cleanup handlers explicitly.
 	# This zeroes out the list of cleanups, so it"s not done again when the main script exits normally and trap = 0 runs.

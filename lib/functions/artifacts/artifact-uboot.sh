@@ -186,7 +186,7 @@ function artifact_uboot_build_from_sources() {
 }
 
 function artifact_uboot_cli_adapter_pre_run() {
-	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo
@@ -195,12 +195,12 @@ function artifact_uboot_cli_adapter_pre_run() {
 function artifact_uboot_cli_adapter_config_prep() {
 	# Sanity check / cattle guard
 	# If UBOOT_CONFIGURE=yes, or CREATE_PATCHES=yes, user must have used the correct CLI commands, and only add those params.
-	if [[ "${UBOOT_CONFIGURE}" == "yes" && ("${AtriOS_COMMAND}" != "uboot-config") ]]; then
-		exit_with_error "UBOOT_CONFIGURE=yes is not supported anymore. Please use the new 'uboot-config' CLI command. Current command: '${AtriOS_COMMAND}'"
+	if [[ "${UBOOT_CONFIGURE}" == "yes" && ("${ATRIOS_COMMAND}" != "uboot-config") ]]; then
+		exit_with_error "UBOOT_CONFIGURE=yes is not supported anymore. Please use the new 'uboot-config' CLI command. Current command: '${ATRIOS_COMMAND}'"
 	fi
 
-	if [[ "${CREATE_PATCHES}" == "yes" && "${AtriOS_COMMAND}" != "uboot-patch" ]]; then
-		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'uboot-patch' CLI command. Current command: '${AtriOS_COMMAND}'"
+	if [[ "${CREATE_PATCHES}" == "yes" && "${ATRIOS_COMMAND}" != "uboot-patch" ]]; then
+		exit_with_error "CREATE_PATCHES=yes is not supported anymore. Please use the new 'uboot-patch' CLI command. Current command: '${ATRIOS_COMMAND}'"
 	fi
 
 	use_board="yes" prep_conf_main_minimal_ni < /dev/null # no stdin for this, so it bombs if tries to be interactive.

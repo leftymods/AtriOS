@@ -51,7 +51,7 @@ update_initramfs() {
 
 	display_alert "computing initrd cache hash" "${chroot_target}" "debug"
 	mkdir -p "${SRC}/cache/initrd"
-	initrd_cache_current_manifest_filepath="${WORKDIR}/initrd.img-${initrd_kern_ver}.${AtriOS_BUILD_UUID}.manifest"
+	initrd_cache_current_manifest_filepath="${WORKDIR}/initrd.img-${initrd_kern_ver}.${ATRIOS_BUILD_UUID}.manifest"
 	initrd_cache_last_manifest_filepath="${SRC}/cache/initrd/initrd.manifest-${initrd_kern_ver}.last.manifest"
 	initrd_files_to_hash=("${chroot_target}/usr/bin/bash" "${chroot_target}/etc/initramfs")
 	initrd_files_to_hash+=("${chroot_target}/etc/initramfs-tools" "${chroot_target}/usr/share/initramfs-tools/")

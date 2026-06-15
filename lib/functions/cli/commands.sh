@@ -7,11 +7,11 @@
 # This file is a part of the AtriOS Build Framework
 # https://github.com/leftymods/CoreOS/
 
-function AtriOS_register_commands() {
-	# More than one command can map to the same handler. In that case, use AtriOS_COMMANDS_TO_VARS_DICT for specific vars.
-	# The handlers' functions "cli_${AtriOS_COMMAND_HANDLER}_pre_run" and "cli_${AtriOS_COMMAND_HANDLER}_run" get automatically called in "utils-cli.sh"
+function atrios_register_commands() {
+	# More than one command can map to the same handler. In that case, use ATRIOS_COMMANDS_TO_VARS_DICT for specific vars.
+	# The handlers' functions "cli_${ATRIOS_COMMAND_HANDLER}_pre_run" and "cli_${ATRIOS_COMMAND_HANDLER}_run" get automatically called in "utils-cli.sh"
 	# Example: For command "docker-purge", the handler is "docker", which means the functions "cli_docker_pre_run" and "cli_docker_run" inside "cli-docker.sh are automatically called by "utils-cli.sh"
-	declare -g -A AtriOS_COMMANDS_TO_HANDLERS_DICT=(
+	declare -g -A ATRIOS_COMMANDS_TO_HANDLERS_DICT=(
 		["docker"]="docker" # thus requires cli_docker_pre_run and cli_docker_run
 		["docker-purge"]="docker"
 		["dockerpurge"]="docker"
@@ -106,7 +106,7 @@ function AtriOS_register_commands() {
 	declare common_cli_artifact_interactive_vars="ARTIFACT_WILL_NOT_BUILD='yes' ARTIFACT_BUILD_INTERACTIVE='yes' ARTIFACT_IGNORE_CACHE='yes'"
 
 	# Vars to be set for each command. Optional.
-	declare -g -A AtriOS_COMMANDS_TO_VARS_DICT=(
+	declare -g -A ATRIOS_COMMANDS_TO_VARS_DICT=(
 		["docker-purge"]="DOCKER_SUBCMD='purge'"
 		["dockerpurge"]="DOCKER_SUBCMD='purge'"
 		["docker-shell"]="DOCKER_SUBCMD='shell'"
@@ -165,13 +165,13 @@ function AtriOS_register_commands() {
 		["undecided"]="UNDECIDED='yes'"
 	)
 	# Override the LOG_CLI_ID to change the log file name.
-	# Will be set to AtriOS_COMMAND if not set after all pre-runs done.
-	declare -g AtriOS_LOG_CLI_ID
+	# Will be set to ATRIOS_COMMAND if not set after all pre-runs done.
+	declare -g ATRIOS_LOG_CLI_ID
 
 	# Keep a running dict of params/variables. Can't repeat stuff here. Dict.
-	declare -g -A AtriOS_CLI_RELAUNCH_PARAMS=(["AtriOS_RELAUNCHED"]="yes")
-	declare -g -A AtriOS_CLI_RELAUNCH_ENVS=(["AtriOS_RELAUNCHED"]="yes")
+	declare -g -A ATRIOS_CLI_RELAUNCH_PARAMS=(["AtriOS_RELAUNCHED"]="yes")
+	declare -g -A ATRIOS_CLI_RELAUNCH_ENVS=(["AtriOS_RELAUNCHED"]="yes")
 
 	# Keep a running array of config files needed for relaunch.
-	declare -g -a AtriOS_CLI_RELAUNCH_CONFIGS=()
+	declare -g -a ATRIOS_CLI_RELAUNCH_CONFIGS=()
 }

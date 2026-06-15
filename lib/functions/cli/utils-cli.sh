@@ -28,7 +28,7 @@ function parse_cmdline_params() {
 			# Sanity check for the param name; it must be a valid bash variable name.
 			if [[ "${param_name}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
 				AtriOS_PARSED_CMDLINE_PARAMS["${param_name}"]="${param_value}" # For current run.
-				AtriOS_CLI_RELAUNCH_PARAMS["${param_name}"]="${param_value}"   # For relaunch.
+				ATRIOS_CLI_RELAUNCH_PARAMS["${param_name}"]="${param_value}"   # For relaunch.
 				display_alert "Command line: parsed parameter '$param_name' to" "${param_value_desc}" "debug"
 			else
 				exit_with_error "Invalid cmdline param '${param_name}=${param_value_desc}'"
@@ -76,41 +76,41 @@ function apply_cmdline_params_to_env() {
 function AtriOS_prepare_cli_command_to_run() {
 	local command_id="${1}"
 	display_alert "Preparing to run command" "${command_id}" "debug"
-	AtriOS_COMMAND="${command_id}"
-	AtriOS_COMMAND_HANDLER="${AtriOS_COMMANDS_TO_HANDLERS_DICT[${command_id}]}"
-	AtriOS_COMMAND_VARS="${AtriOS_COMMANDS_TO_VARS_DICT[${command_id}]}"
+	ATRIOS_COMMAND="${command_id}"
+	ATRIOS_COMMAND_HANDLER="${ATRIOS_COMMANDS_TO_HANDLERS_DICT[${command_id}]}"
+	ATRIOS_COMMAND_VARS="${ATRIOS_COMMANDS_TO_VARS_DICT[${command_id}]}"
 	# @TODO: actually set the vars...
 
 	local set_vars_for_command=""
-	if [[ "x${AtriOS_COMMAND_VARS}x" != "xx" ]]; then
+	if [[ "x${ATRIOS_COMMAND_VARS}x" != "xx" ]]; then
 		# Loop over them, expanding...
-		for var_piece in ${AtriOS_COMMAND_VARS}; do
+		for var_piece in ${ATRIOS_COMMAND_VARS}; do
 			local var_decl="declare -g ${var_piece};"
 			display_alert "Command handler: setting variable" "${var_decl}" "debug"
 			set_vars_for_command+=" ${var_decl}"
 		done
 	fi
 
-	local pre_run_function_name="cli_${AtriOS_COMMAND_HANDLER}_pre_run"
-	local run_function_name="cli_${AtriOS_COMMAND_HANDLER}_run"
+	local pre_run_function_name="cli_${ATRIOS_COMMAND_HANDLER}_pre_run"
+	local run_function_name="cli_${ATRIOS_COMMAND_HANDLER}_run"
 
 	# Reset the functions.
 	function AtriOS_cli_pre_run_command() {
-		display_alert "No pre-run function for command" "${AtriOS_COMMAND}" "warn"
+		display_alert "No pre-run function for command" "${ATRIOS_COMMAND}" "warn"
 	}
 	function AtriOS_cli_run_command() {
-		display_alert "No run function for command" "${AtriOS_COMMAND}" "warn"
+		display_alert "No run function for command" "${ATRIOS_COMMAND}" "warn"
 	}
 
 	# Materialize functions to call that specific command.
 	if [[ $(type -t "${pre_run_function_name}" || true) == function ]]; then
 		eval "$(
 			cat <<- EOF
-				display_alert "Setting up pre-run function for command" "${AtriOS_COMMAND}: ${pre_run_function_name}" "debug"
+				display_alert "Setting up pre-run function for command" "${ATRIOS_COMMAND}: ${pre_run_function_name}" "debug"
 				function AtriOS_cli_pre_run_command() {
-					# Set the variables defined in AtriOS_COMMAND_VARS
+					# Set the variables defined in ATRIOS_COMMAND_VARS
 					${set_vars_for_command}
-					display_alert "Calling pre-run function for command" "${AtriOS_COMMAND}: ${pre_run_function_name}" "debug"
+					display_alert "Calling pre-run function for command" "${ATRIOS_COMMAND}: ${pre_run_function_name}" "debug"
 					${pre_run_function_name}
 				}
 			EOF
@@ -120,11 +120,11 @@ function AtriOS_prepare_cli_command_to_run() {
 	if [[ $(type -t "${run_function_name}" || true) == function ]]; then
 		eval "$(
 			cat <<- EOF
-				display_alert "Setting up run function for command" "${AtriOS_COMMAND}: ${run_function_name}" "debug"
+				display_alert "Setting up run function for command" "${ATRIOS_COMMAND}: ${run_function_name}" "debug"
 				function AtriOS_cli_run_command() {
-					# Set the variables defined in AtriOS_COMMAND_VARS
+					# Set the variables defined in ATRIOS_COMMAND_VARS
 					${set_vars_for_command}
-					display_alert "Calling run function for command" "${AtriOS_COMMAND}: ${run_function_name}" "debug"
+					display_alert "Calling run function for command" "${ATRIOS_COMMAND}: ${run_function_name}" "debug"
 					${run_function_name}
 				}
 			EOF
@@ -137,9 +137,9 @@ function parse_each_cmdline_arg_as_command_param_or_config() {
 	local argument="${1}"
 
 	# lookup if it is a command.
-	if [[ -n "${AtriOS_COMMANDS_TO_HANDLERS_DICT[${argument}]}" ]]; then
+	if [[ -n "${ATRIOS_COMMANDS_TO_HANDLERS_DICT[${argument}]}" ]]; then
 		is_command="yes"
-		command_handler="${AtriOS_COMMANDS_TO_HANDLERS_DICT[${argument}]}"
+		command_handler="${ATRIOS_COMMANDS_TO_HANDLERS_DICT[${argument}]}"
 		display_alert "Found command!" "${argument} is handled by '${command_handler}'" "debug"
 	fi
 
@@ -165,14 +165,14 @@ function parse_each_cmdline_arg_as_command_param_or_config() {
 	elif [[ "${is_config}" == "yes" ]]; then # we have a config only
 		display_alert "Adding config file to list" "${config_file}" "debug"
 		AtriOS_CONFIG_FILES+=("${config_file}")      # full path to be sourced
-		AtriOS_CLI_RELAUNCH_CONFIGS+=("${argument}") # name reference to be relaunched
+		ATRIOS_CLI_RELAUNCH_CONFIGS+=("${argument}") # name reference to be relaunched
 	elif [[ "${is_command}" == "yes" ]]; then      # we have a command, only.
 		# sanity check. we can't have more than one command. decide!
-		if [[ -n "${AtriOS_COMMAND}" ]]; then
-			exit_with_error "You cannot specify more than one command. You have '${AtriOS_COMMAND}' and '${argument}'. Please decide which one you want to run and pass only that one."
+		if [[ -n "${ATRIOS_COMMAND}" ]]; then
+			exit_with_error "You cannot specify more than one command. You have '${ATRIOS_COMMAND}' and '${argument}'. Please decide which one you want to run and pass only that one."
 			exit 1
 		fi
-		AtriOS_COMMAND="${argument}" # too early for AtriOS_prepare_cli_command_to_run "${argument}"
+		ATRIOS_COMMAND="${argument}" # too early for AtriOS_prepare_cli_command_to_run "${argument}"
 	else
 		# We've an unknown argument. Alert now, bomb later.
 		AtriOS_HAS_UNKNOWN_ARG="yes"
@@ -181,43 +181,43 @@ function parse_each_cmdline_arg_as_command_param_or_config() {
 }
 
 # Produce relaunch parameters. Add the running configs, arguments, and command.
-# Declare and use AtriOS_CLI_FINAL_RELAUNCH_ARGS as "${AtriOS_CLI_FINAL_RELAUNCH_ARGS[@]}"
+# Declare and use ATRIOS_CLI_FINAL_RELAUNCH_ARGS as "${ATRIOS_CLI_FINAL_RELAUNCH_ARGS[@]}"
 # Also AtriOS_CLI_FINAL_RELAUNCH_ENVS as "${AtriOS_CLI_FINAL_RELAUNCH_ENVS[@]}"
 function produce_relaunch_parameters() {
-	declare -g -a AtriOS_CLI_FINAL_RELAUNCH_ARGS=()
+	declare -g -a ATRIOS_CLI_FINAL_RELAUNCH_ARGS=()
 	declare -g -a AtriOS_CLI_FINAL_RELAUNCH_ENVS=()
 
 	declare hide_repeat_params=()
 
-	# add the running parameters from AtriOS_CLI_RELAUNCH_PARAMS dict
-	for param in "${!AtriOS_CLI_RELAUNCH_PARAMS[@]}"; do
-		AtriOS_CLI_FINAL_RELAUNCH_ARGS+=("${param}=${AtriOS_CLI_RELAUNCH_PARAMS[${param}]}")
+	# add the running parameters from ATRIOS_CLI_RELAUNCH_PARAMS dict
+	for param in "${!ATRIOS_CLI_RELAUNCH_PARAMS[@]}"; do
+		ATRIOS_CLI_FINAL_RELAUNCH_ARGS+=("${param}=${ATRIOS_CLI_RELAUNCH_PARAMS[${param}]}")
 		# If the param is not a key of AtriOS_PARSED_CMDLINE_PARAMS (eg was added for re-launching), add it to the hide list
 		if [[ -z "${AtriOS_PARSED_CMDLINE_PARAMS[${param}]}" ]]; then
 			hide_repeat_params+=("${param}")
 		fi
 	done
 	# add the running configs
-	for config in "${AtriOS_CLI_RELAUNCH_CONFIGS[@]}"; do
-		AtriOS_CLI_FINAL_RELAUNCH_ARGS+=("${config}")
+	for config in "${ATRIOS_CLI_RELAUNCH_CONFIGS[@]}"; do
+		ATRIOS_CLI_FINAL_RELAUNCH_ARGS+=("${config}")
 	done
 	# add the command; defaults to the last command, but can be changed by the last pre-run.
 	if [[ -n "${AtriOS_CLI_RELAUNCH_COMMAND}" ]]; then
-		AtriOS_CLI_FINAL_RELAUNCH_ARGS+=("${AtriOS_CLI_RELAUNCH_COMMAND}")
+		ATRIOS_CLI_FINAL_RELAUNCH_ARGS+=("${AtriOS_CLI_RELAUNCH_COMMAND}")
 	else
-		AtriOS_CLI_FINAL_RELAUNCH_ARGS+=("${AtriOS_COMMAND}")
+		ATRIOS_CLI_FINAL_RELAUNCH_ARGS+=("${ATRIOS_COMMAND}")
 	fi
 
 	# These two envs are always included.
-	AtriOS_CLI_FINAL_RELAUNCH_ENVS+=("AtriOS_ORIGINAL_BUILD_UUID=${AtriOS_BUILD_UUID}")
-	AtriOS_CLI_FINAL_RELAUNCH_ENVS+=("AtriOS_HIDE_REPEAT_PARAMS=${hide_repeat_params[*]}")
+	AtriOS_CLI_FINAL_RELAUNCH_ENVS+=("AtriOS_ORIGINAL_BUILD_UUID=${ATRIOS_BUILD_UUID}")
+	AtriOS_CLI_FINAL_RELAUNCH_ENVS+=("ATRIOS_HIDE_REPEAT_PARAMS=${hide_repeat_params[*]}")
 
-	# Add all values from AtriOS_CLI_RELAUNCH_ENVS dict
-	for env in "${!AtriOS_CLI_RELAUNCH_ENVS[@]}"; do
-		AtriOS_CLI_FINAL_RELAUNCH_ENVS+=("${env}=${AtriOS_CLI_RELAUNCH_ENVS[${env}]}")
+	# Add all values from ATRIOS_CLI_RELAUNCH_ENVS dict
+	for env in "${!ATRIOS_CLI_RELAUNCH_ENVS[@]}"; do
+		AtriOS_CLI_FINAL_RELAUNCH_ENVS+=("${env}=${ATRIOS_CLI_RELAUNCH_ENVS[${env}]}")
 	done
 
-	display_alert "Produced relaunch args:" "AtriOS_CLI_FINAL_RELAUNCH_ARGS: ${AtriOS_CLI_FINAL_RELAUNCH_ARGS[*]}" "debug"
+	display_alert "Produced relaunch args:" "ATRIOS_CLI_FINAL_RELAUNCH_ARGS: ${ATRIOS_CLI_FINAL_RELAUNCH_ARGS[*]}" "debug"
 	display_alert "Produced relaunch envs:" "AtriOS_CLI_FINAL_RELAUNCH_ENVS: ${AtriOS_CLI_FINAL_RELAUNCH_ENVS[*]}" "debug"
 }
 
@@ -230,11 +230,11 @@ function cli_standard_relaunch_docker_or_sudo() {
 				exit_if_countdown_not_aborted 10 "directly called as root"
 			fi
 		fi
-		display_alert "Already running as root" "great, running '${AtriOS_COMMAND}' normally" "debug"
+		display_alert "Already running as root" "great, running '${ATRIOS_COMMAND}' normally" "debug"
 	else # not root.
 		# add params when relaunched under docker or sudo
-		AtriOS_CLI_RELAUNCH_PARAMS+=(["SET_OWNER_TO_UID"]="${EUID}") # Pass the current UID to any further relaunchings
-		AtriOS_CLI_RELAUNCH_PARAMS+=(["PREFER_DOCKER"]="no")         # make sure we don't loop forever when relaunching.
+		ATRIOS_CLI_RELAUNCH_PARAMS+=(["SET_OWNER_TO_UID"]="${EUID}") # Pass the current UID to any further relaunchings
+		ATRIOS_CLI_RELAUNCH_PARAMS+=(["PREFER_DOCKER"]="no")         # make sure we don't loop forever when relaunching.
 
 		# We've a few options.
 		# 1) We could check if Docker is working, and do everything under Docker. Users who can use Docker, can "become" root inside a container.
@@ -246,8 +246,8 @@ function cli_standard_relaunch_docker_or_sudo() {
 		if [[ "${DOCKER_INFO_OK}" == "yes" ]]; then
 			if [[ "${PREFER_DOCKER:-yes}" == "yes" ]]; then
 				display_alert "not root, but Docker is ready to go" "delegating to Docker" "debug"
-				AtriOS_CHANGE_COMMAND_TO="docker"
-				AtriOS_CLI_RELAUNCH_COMMAND="${AtriOS_COMMAND}" # add params when relaunched under docker
+				ATRIOS_CHANGE_COMMAND_TO="docker"
+				AtriOS_CLI_RELAUNCH_COMMAND="${ATRIOS_COMMAND}" # add params when relaunched under docker
 				return 0
 			else
 				display_alert "not root, but Docker is ready to go" "but PREFER_DOCKER is set to 'no', so can't use it" "warn"
@@ -270,11 +270,11 @@ function cli_standard_relaunch_docker_or_sudo() {
 		fi
 
 		display_alert "This script requires root privileges; Docker is unavailable" "trying to use sudo" "wrn"
-		declare -g AtriOS_CLI_FINAL_RELAUNCH_ARGS=()
+		declare -g ATRIOS_CLI_FINAL_RELAUNCH_ARGS=()
 		declare -g AtriOS_CLI_FINAL_RELAUNCH_ENVS=()
-		produce_relaunch_parameters # produces AtriOS_CLI_FINAL_RELAUNCH_ARGS and AtriOS_CLI_FINAL_RELAUNCH_ENVS
+		produce_relaunch_parameters # produces ATRIOS_CLI_FINAL_RELAUNCH_ARGS and AtriOS_CLI_FINAL_RELAUNCH_ENVS
 		# shellcheck disable=SC2093 # re-launching under sudo: replace the current shell, and never return.
-		exec sudo --preserve-env "${AtriOS_CLI_FINAL_RELAUNCH_ENVS[@]}" bash "${SRC}/compile.sh" "${AtriOS_CLI_FINAL_RELAUNCH_ARGS[@]}" # MARK: relaunch done here!
+		exec sudo --preserve-env "${AtriOS_CLI_FINAL_RELAUNCH_ENVS[@]}" bash "${SRC}/compile.sh" "${ATRIOS_CLI_FINAL_RELAUNCH_ARGS[@]}" # MARK: relaunch done here!
 		display_alert "AFTER SUDO!!!" "AFTER SUDO!!!" "warn"                                                                              # This should _never_ happen
 	fi
 }

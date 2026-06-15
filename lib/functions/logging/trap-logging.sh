@@ -46,7 +46,7 @@ function trap_handler_cleanup_logging() {
 		declare one_old_logfile old_logfile_fn target_archive_path="${target_path}"/archive
 		for one_old_logfile in "${existing_log_files_array[@]}"; do
 			old_logfile_fn="$(basename "${one_old_logfile}")"
-			if [[ "${old_logfile_fn}" == *${AtriOS_BUILD_UUID}* ]]; then
+			if [[ "${old_logfile_fn}" == *${ATRIOS_BUILD_UUID}* ]]; then
 				display_alert "Skipping archiving of current logfile" "${old_logfile_fn}" "cleanup"
 				continue
 			fi
@@ -88,13 +88,13 @@ function trap_handler_cleanup_logging() {
 	check_and_close_fd_13
 
 	# Export ANSI logs.
-	local target_file="${target_path}/log-${AtriOS_LOG_CLI_ID}-${AtriOS_BUILD_UUID}.log.ans"
+	local target_file="${target_path}/log-${ATRIOS_LOG_CLI_ID}-${ATRIOS_BUILD_UUID}.log.ans"
 	export_ansi_logs
 	reset_uid_owner "${target_file}"
 	local ansi_log_file="${target_file}"
 
 	# ASCII logs, via ansi2txt, if available.
-	local ascii_log_file="${target_path}/log-${AtriOS_LOG_CLI_ID}-${AtriOS_BUILD_UUID}.log"
+	local ascii_log_file="${target_path}/log-${ATRIOS_LOG_CLI_ID}-${ATRIOS_BUILD_UUID}.log"
 	if [[ -n "$(command -v ansi2txt)" ]]; then
 		ansi2txt < "${ansi_log_file}" >> "${ascii_log_file}"
 	fi
@@ -104,7 +104,7 @@ function trap_handler_cleanup_logging() {
 		display_alert "Not exporting Markdown logs to GitHub Actions" "GITHUB_ACTIONS: '${GITHUB_ACTIONS}', GHA_EXPORT_MD_SUMMARY: '${GHA_EXPORT_MD_SUMMARY}'" "debug"
 	else
 		# Export Markdown logs.
-		local target_file="${target_path}/summary-${AtriOS_LOG_CLI_ID}-${AtriOS_BUILD_UUID}.md"
+		local target_file="${target_path}/summary-${ATRIOS_LOG_CLI_ID}-${ATRIOS_BUILD_UUID}.md"
 		export_markdown_logs "${ascii_log_file}" # it might include the ASCII as well, if in GHA.
 		reset_uid_owner "${target_file}"
 		local markdown_log_file="${target_file}"
@@ -112,7 +112,7 @@ function trap_handler_cleanup_logging() {
 
 	# Export raw logs, in a tar. For development.
 	if [[ "${RAW_LOG:-no}" == "yes" ]]; then
-		local target_file="${target_path}/log-${AtriOS_LOG_CLI_ID}-${AtriOS_BUILD_UUID}.raw.tar"
+		local target_file="${target_path}/log-${ATRIOS_LOG_CLI_ID}-${ATRIOS_BUILD_UUID}.raw.tar"
 		export_raw_logs
 		reset_uid_owner "${target_file}"
 	fi

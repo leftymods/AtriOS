@@ -148,7 +148,7 @@ function userpatch_create() {
 
 	# prompt to alter source
 	display_alert "Make your changes in this directory:" "$(pwd)" "wrn"
-	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+	if [[ "${ATRIOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
 		display_alert "You are running in a container" "Path shown above might not match host system, be aware." "wrn"
 	fi
 

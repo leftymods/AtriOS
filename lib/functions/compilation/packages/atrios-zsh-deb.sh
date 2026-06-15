@@ -9,20 +9,20 @@
 
 compile_atrios-zsh() {
 	: "${artifact_version:?artifact_version is not set}"
-	: "${AtriOS_ZSH_BRANCH:?AtriOS_ZSH_BRANCH is not set}"
+	: "${ATRIOS_ZSH_BRANCH:?ATRIOS_ZSH_BRANCH is not set}"
 
 	declare cleanup_id="" tmp_dir=""
 	prepare_temp_dir_in_workdir_and_schedule_cleanup "deb-zsh" cleanup_id tmp_dir # namerefs
 
-	declare AtriOS_zsh_dir="atrios-zsh"
-	mkdir -p "${tmp_dir}/${AtriOS_zsh_dir}"
+	declare atrios_zsh_dir="atrios-zsh"
+	mkdir -p "${tmp_dir}/${atrios_zsh_dir}"
 
-	fetch_from_repo "$GITHUB_SOURCE/ohmyzsh/ohmyzsh" "oh-my-zsh" "${AtriOS_ZSH_BRANCH}"
+	fetch_from_repo "$GITHUB_SOURCE/ohmyzsh/ohmyzsh" "oh-my-zsh" "${ATRIOS_ZSH_BRANCH}"
 	fetch_from_repo "$GITHUB_SOURCE/mroth/evalcache" "evalcache" "branch:master"
 
-	mkdir -p "${tmp_dir}/${AtriOS_zsh_dir}"/{DEBIAN,etc/skel/,etc/oh-my-zsh/,/etc/skel/.oh-my-zsh/cache}
+	mkdir -p "${tmp_dir}/${atrios_zsh_dir}"/{DEBIAN,etc/skel/,etc/oh-my-zsh/,/etc/skel/.oh-my-zsh/cache}
 
-	cd "${tmp_dir}/${AtriOS_zsh_dir}" || exit_with_error "can't change directory"
+	cd "${tmp_dir}/${atrios_zsh_dir}" || exit_with_error "can't change directory"
 
 	# set up control file
 	cat <<- END > DEBIAN/control
@@ -53,37 +53,37 @@ compile_atrios-zsh() {
 		exit 0
 	END
 
-	cp -R "${SRC}"/cache/sources/oh-my-zsh "${tmp_dir}/${AtriOS_zsh_dir}"/etc/
-	cp -R "${SRC}"/cache/sources/evalcache "${tmp_dir}/${AtriOS_zsh_dir}"/etc/oh-my-zsh/plugins
+	cp -R "${SRC}"/cache/sources/oh-my-zsh "${tmp_dir}/${atrios_zsh_dir}"/etc/
+	cp -R "${SRC}"/cache/sources/evalcache "${tmp_dir}/${atrios_zsh_dir}"/etc/oh-my-zsh/plugins
 
 	# @TODO: do this properly (not-copy it to begin with)
-	rm -rf "${tmp_dir}/${AtriOS_zsh_dir}"/etc/.git "${tmp_dir}/${AtriOS_zsh_dir}"/etc/oh-my-zsh/plugins/.git
+	rm -rf "${tmp_dir}/${atrios_zsh_dir}"/etc/.git "${tmp_dir}/${atrios_zsh_dir}"/etc/oh-my-zsh/plugins/.git
 
-	cp "${tmp_dir}/${AtriOS_zsh_dir}"/etc/oh-my-zsh/templates/zshrc.zsh-template "${tmp_dir}/${AtriOS_zsh_dir}"/etc/skel/.zshrc
+	cp "${tmp_dir}/${atrios_zsh_dir}"/etc/oh-my-zsh/templates/zshrc.zsh-template "${tmp_dir}/${atrios_zsh_dir}"/etc/skel/.zshrc
 
-	chmod -R g-w,o-w "${tmp_dir}/${AtriOS_zsh_dir}"/etc/oh-my-zsh/
+	chmod -R g-w,o-w "${tmp_dir}/${atrios_zsh_dir}"/etc/oh-my-zsh/
 
 	# we have common settings
-	sed -i "s/^export ZSH=.*/export ZSH=\/etc\/oh-my-zsh/" "${tmp_dir}/${AtriOS_zsh_dir}"/etc/skel/.zshrc
+	sed -i "s/^export ZSH=.*/export ZSH=\/etc\/oh-my-zsh/" "${tmp_dir}/${atrios_zsh_dir}"/etc/skel/.zshrc
 
 	# user cache
-	sed -i "/^export ZSH=.*/a export ZSH_CACHE_DIR=~\/.oh-my-zsh\/cache" "${tmp_dir}/${AtriOS_zsh_dir}"/etc/skel/.zshrc
+	sed -i "/^export ZSH=.*/a export ZSH_CACHE_DIR=~\/.oh-my-zsh\/cache" "${tmp_dir}/${atrios_zsh_dir}"/etc/skel/.zshrc
 
 	# define theme
-	sed -i 's/^ZSH_THEME=.*/ZSH_THEME="mrtazz"/' "${tmp_dir}/${AtriOS_zsh_dir}"/etc/skel/.zshrc
+	sed -i 's/^ZSH_THEME=.*/ZSH_THEME="mrtazz"/' "${tmp_dir}/${atrios_zsh_dir}"/etc/skel/.zshrc
 
 	# disable auto update since we provide update via package
-	sed -i "s/^# zstyle ':omz:update' mode disabled.*/zstyle ':omz:update' mode disabled/g" "${tmp_dir}/${AtriOS_zsh_dir}"/etc/skel/.zshrc
+	sed -i "s/^# zstyle ':omz:update' mode disabled.*/zstyle ':omz:update' mode disabled/g" "${tmp_dir}/${atrios_zsh_dir}"/etc/skel/.zshrc
 
 	# define default plugins
-	sed -i 's/^plugins=.*/plugins=(evalcache git git-extras debian tmux screen history extract colorize web-search docker)/' "${tmp_dir}/${AtriOS_zsh_dir}"/etc/skel/.zshrc
+	sed -i 's/^plugins=.*/plugins=(evalcache git git-extras debian tmux screen history extract colorize web-search docker)/' "${tmp_dir}/${atrios_zsh_dir}"/etc/skel/.zshrc
 
 	# add collection of AtriOS BASH aliases also to ZSH. They are compatible
-	cat "${SRC}"/packages/bsp/common/etc/skel/.bash_aliases >> "${tmp_dir}/${AtriOS_zsh_dir}"/etc/skel/.zshrc
+	cat "${SRC}"/packages/bsp/common/etc/skel/.bash_aliases >> "${tmp_dir}/${atrios_zsh_dir}"/etc/skel/.zshrc
 
-	chmod 755 "${tmp_dir}/${AtriOS_zsh_dir}"/DEBIAN/postinst
+	chmod 755 "${tmp_dir}/${atrios_zsh_dir}"/DEBIAN/postinst
 
-	dpkg_deb_build "${tmp_dir}/${AtriOS_zsh_dir}" "atrios-zsh"
+	dpkg_deb_build "${tmp_dir}/${atrios_zsh_dir}" "atrios-zsh"
 
 	done_with_temp_dir "${cleanup_id}" # changes cwd to "${SRC}" and fires the cleanup function early
 }

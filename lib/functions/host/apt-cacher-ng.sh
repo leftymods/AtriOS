@@ -10,7 +10,7 @@
 # Management of apt-cacher-ng aka acng
 
 function acng_configure_and_restart_acng() {
-	if ! AtriOS_is_host_running_systemd; then return 0; fi # do nothing if host is not running systemd
+	if ! atrios_is_host_running_systemd; then return 0; fi # do nothing if host is not running systemd
 	[[ "${MANAGE_ACNG}" != "yes" ]] && return 0             # don't if told not to. NO_something=yes is very confusing, but kept for historical reasons
 
 	display_alert "Preparing acng configuration" "apt-cacher-ng" "info"

@@ -125,11 +125,11 @@ function produce_repeat_args_array() {
 	# Make it easy to repeat build by displaying build options used. Prepare array.
 	declare -a -g repeat_args=("./compile.sh")
 
-	# Parse AtriOS_HIDE_REPEAT_PARAMS which is a space separated list of parameters to hide.
+	# Parse ATRIOS_HIDE_REPEAT_PARAMS which is a space separated list of parameters to hide.
 	# It is created by produce_relaunch_parameters() in utils-cli.sh
 	declare -a params_to_hide=()
-	if [[ -n "${AtriOS_HIDE_REPEAT_PARAMS}" ]]; then
-		IFS=' ' read -r -a params_to_hide <<< "${AtriOS_HIDE_REPEAT_PARAMS}"
+	if [[ -n "${ATRIOS_HIDE_REPEAT_PARAMS}" ]]; then
+		IFS=' ' read -r -a params_to_hide <<< "${ATRIOS_HIDE_REPEAT_PARAMS}"
 	fi
 	display_alert "Hiding parameters from repeat build options" "${params_to_hide[*]}" "debug"
 
@@ -149,8 +149,8 @@ function produce_repeat_args_array() {
 		display_alert "Added repeat parameter" "'${param_name}'" "debug"
 	done
 
-	for param_name in "${!AtriOS_INTERACTIVE_CONFIGS[@]}"; do # add params produced during interactive configuration
-		repeat_params+=(["${param_name}"]="${AtriOS_INTERACTIVE_CONFIGS[${param_name}]}")
+	for param_name in "${!ATRIOS_INTERACTIVE_CONFIGS[@]}"; do # add params produced during interactive configuration
+		repeat_params+=(["${param_name}"]="${ATRIOS_INTERACTIVE_CONFIGS[${param_name}]}")
 		display_alert "Added repeat parameter from interactive config" "'${param_name}'" "debug"
 	done
 

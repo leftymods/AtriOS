@@ -24,7 +24,7 @@ function extension_finish_config__900_rkdevflash() {
 	declare -g -r rkdeveloptool_bin_path="${rkdeveloptool_dir}/rkdeveloptool"
 
 	# if under docker, exit_with_error; we can't get at the USB needed for rkdeveloptool.
-	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+	if [[ "${ATRIOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
 		exit_with_error "rkdevflash: running under Docker is not supported. rkdeveloptool requires direct access to the host USB devices."
 	fi
 

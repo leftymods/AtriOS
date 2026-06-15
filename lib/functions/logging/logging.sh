@@ -64,7 +64,7 @@ function logging_init() {
 		declare -g SHOW_LOG="${SHOW_LOG:-"yes"}" # if in CI/GHA, default to showing log
 	fi
 
-	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then # if in container, add a cyan "whale emoji" to the left marker wrapped in dark gray brackets
+	if [[ "${ATRIOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then # if in container, add a cyan "whale emoji" to the left marker wrapped in dark gray brackets
 		local container_emoji="🐳"                                #  🐳 or 🐋
 		declare -g left_marker="${gray_color}[${container_emoji}|${normal_color}"
 	elif [[ "$(uname -s)" == "Darwin" ]]; then # if on Mac, add a an apple emoji to the left marker wrapped in dark gray brackets

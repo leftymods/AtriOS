@@ -64,7 +64,7 @@ function extension_prepare_config__prepare_grub_standard() {
 	if [[ "${DISTRO_GENERIC_KERNEL}" == "yes" ]]; then
 		declare -g IMAGE_INSTALLED_KERNEL_VERSION="${DISTRO_KERNEL_VER}"
 		declare -g KERNELSOURCE='none'         # We need to be explicit we don't want a kernel built.
-		declare -g INSTALL_AtriOS_FIRMWARE=no # Should skip build and install of AtriOS-firmware.
+		declare -g INSTALL_ATRIOS_FIRMWARE=no # Should skip build and install of atrios-firmware.
 	else
 		declare -g KERNELDIR="linux-uefi-${LINUXFAMILY}" # Avoid sharing a source tree with others, until we know it's safe.
 		# Don't install anything. AtriOS handles everything.

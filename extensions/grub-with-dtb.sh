@@ -71,7 +71,7 @@ function grub_early_config__deploy_dtb_for_grub() {
 	run_host_command_logged chmod -v +x "${MOUNT}"/etc/grub.d/09_linux_with_dtb.sh
 }
 
-function grub_pre_install__force_run_kernel_hook_for_AtriOS_dtb() {
+function grub_pre_install__force_run_kernel_hook_for_atrios_dtb() {
 	# Run the kernel hook to deploy the DTB file to the boot partition.
 	# This is done forcibly here during `grub_pre_install`, since the kernel hook is deployed in the bsp-cli package
 	# which is only deployed after the linux-image package is installed and thus is not run.

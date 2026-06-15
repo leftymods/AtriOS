@@ -1,7 +1,7 @@
 # Create UFS aligned image (requires >= Debian 13 (Trixie) Host)
-# declare -g DOCKER_AtriOS_BASE_IMAGE=debian:trixie # Use this env variable manually
+# declare -g DOCKER_ATRIOS_BASE_IMAGE=debian:trixie # Use this env variable manually
 function extension_prepare_config__ufs {
-	display_alert "UFS extension" "checks: CONFIG_DEFS_ONLY:${CONFIG_DEFS_ONLY}, BUILDING_IMAGE:${BUILDING_IMAGE}, AtriOS_COMMAND:${AtriOS_COMMAND}" "debug"
+	display_alert "UFS extension" "checks: CONFIG_DEFS_ONLY:${CONFIG_DEFS_ONLY}, BUILDING_IMAGE:${BUILDING_IMAGE}, ATRIOS_COMMAND:${ATRIOS_COMMAND}" "debug"
 
 	# Skip version check if only generating config definitions, or if not building an image.
 	if [[ "${CONFIG_DEFS_ONLY}" != "yes" && "${BUILDING_IMAGE}" == "yes" ]]; then

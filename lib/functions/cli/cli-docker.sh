@@ -24,7 +24,7 @@ function cli_docker_pre_run() {
 	esac
 
 	# make sure we're not _ALREADY_ running under docker... otherwise eternal loop?
-	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+	if [[ "${ATRIOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
 		exit_with_error "asking for docker... inside docker. how did this happen? Tip: you don't need 'docker' to run atrios-build inside Docker; it's automatically detected and used when appropriate."
 	fi
 }
@@ -48,7 +48,7 @@ function cli_docker_run() {
 
 	LOG_SECTION="docker_cli_prepare" do_with_logging docker_cli_prepare
 
-	# Ensure Docker auto-pull cronjob is installed (controlled by AtriOS_DOCKER_AUTO_PULL flag)
+	# Ensure Docker auto-pull cronjob is installed (controlled by ATRIOS_DOCKER_AUTO_PULL flag)
 	# Only run this when not generating Dockerfile only
 	if [[ "${DOCKERFILE_GENERATE_ONLY}" != "yes" ]]; then
 		docker_ensure_auto_pull_cronjob
@@ -68,17 +68,17 @@ function cli_docker_run() {
 
 	LOG_SECTION="docker_cli_prepare_launch" do_with_logging docker_cli_prepare_launch
 
-	AtriOS_CLI_RELAUNCH_PARAMS+=(["SET_OWNER_TO_UID"]="${EUID}")                 # fix the owner of files to our UID
-	AtriOS_CLI_RELAUNCH_PARAMS+=(["AtriOS_BUILD_UUID"]="${AtriOS_BUILD_UUID}") # pass down our uuid to the docker instance
-	AtriOS_CLI_RELAUNCH_PARAMS+=(["SKIP_LOG_ARCHIVE"]="yes")                     # launched docker instance will not cleanup logs.
+	ATRIOS_CLI_RELAUNCH_PARAMS+=(["SET_OWNER_TO_UID"]="${EUID}")                 # fix the owner of files to our UID
+	ATRIOS_CLI_RELAUNCH_PARAMS+=(["ATRIOS_BUILD_UUID"]="${ATRIOS_BUILD_UUID}") # pass down our uuid to the docker instance
+	ATRIOS_CLI_RELAUNCH_PARAMS+=(["SKIP_LOG_ARCHIVE"]="yes")                     # launched docker instance will not cleanup logs.
 	if [[ -n "${DOCKER_NICE:-}" ]]; then
-		AtriOS_CLI_RELAUNCH_PARAMS+=(["DOCKER_NICE"]="${DOCKER_NICE}") # propagated `nice` value
+		ATRIOS_CLI_RELAUNCH_PARAMS+=(["DOCKER_NICE"]="${DOCKER_NICE}") # propagated `nice` value
 	fi
 
 	# Produce the re-launch params.
-	declare -g AtriOS_CLI_FINAL_RELAUNCH_ARGS=()
+	declare -g ATRIOS_CLI_FINAL_RELAUNCH_ARGS=()
 	declare -g AtriOS_CLI_FINAL_RELAUNCH_ENVS=()
-	produce_relaunch_parameters # produces AtriOS_CLI_FINAL_RELAUNCH_ARGS and AtriOS_CLI_FINAL_RELAUNCH_ENVS
+	produce_relaunch_parameters # produces ATRIOS_CLI_FINAL_RELAUNCH_ARGS and AtriOS_CLI_FINAL_RELAUNCH_ENVS
 
 	# Add the relaunch envs to DOCKER_ARGS.
 	for env in "${AtriOS_CLI_FINAL_RELAUNCH_ENVS[@]}"; do

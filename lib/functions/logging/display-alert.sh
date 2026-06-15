@@ -178,8 +178,8 @@ function display_alert() {
 	fi
 
 	# Log to journald, if asked to.
-	if [[ "${AtriOS_LOGS_TO_JOURNAL}" == "yes" ]]; then
-		echo -e "${level}: ${1} [ ${2} ]" | sed 's/\x1b\[[0-9;]*m//g' | systemd-cat --identifier="${AtriOS_LOGS_JOURNAL_IDENTIFIER:-AtriOS}"
+	if [[ "${ATRIOS_LOGS_TO_JOURNAL}" == "yes" ]]; then
+		echo -e "${level}: ${1} [ ${2} ]" | sed 's/\x1b\[[0-9;]*m//g' | systemd-cat --identifier="${ATRIOS_LOGS_JOURNAL_IDENTIFIER:-AtriOS}"
 	fi
 
 	local CALLER_PID="${BASHPID}"

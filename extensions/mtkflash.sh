@@ -27,7 +27,7 @@ function extension_finish_config__900_mtkflash() {
 	declare -g -r mtkflash_bin_path="${mtkflash_dir}/target/release/mtk-flash-${MTKFLASH_GIT_COMMIT}"
 
 	# if under docker, exit_with_error; we can't get at the USB needed.
-	if [[ "${AtriOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
+	if [[ "${ATRIOS_RUNNING_IN_CONTAINER}" == "yes" ]]; then
 		exit_with_error "mtkflash: running under Docker is not supported. it requires direct access to the host USB devices."
 	fi
 }

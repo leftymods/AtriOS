@@ -309,11 +309,11 @@ function create_sources_list_and_deploy_repo_key() {
 	# EOF
 	:
 
-	# disable repo if DISTRIBUTION_STATUS==eos, or if SKIP_AtriOS_REPO==yes, or if when==image-early.
+	# disable repo if DISTRIBUTION_STATUS==eos, or if SKIP_ATRIOS_REPO==yes, or if when==image-early.
 	if [[ "${when}" == "image-early" ||
 		"$(cat "${SRC}/config/distributions/${RELEASE}/support")" == "eos" ||
-		"${SKIP_AtriOS_REPO}" == "yes" ]]; then
-		display_alert "Disabling AtriOS repo" "${ARCH}-${RELEASE} :: skip:${SKIP_AtriOS_REPO:-"no"} when:${when}" "info"
+		"${SKIP_ATRIOS_REPO}" == "yes" ]]; then
+		display_alert "Disabling AtriOS repo" "${ARCH}-${RELEASE} :: skip:${SKIP_ATRIOS_REPO:-"no"} when:${when}" "info"
 		[[ -f "${SDCARD}"/etc/apt/sources.list.d/atrios.sources ]] && mv "${SDCARD}"/etc/apt/sources.list.d/atrios.sources "${SDCARD}"/etc/apt/sources.list.d/atrios.sources.disabled
 	fi
 
@@ -323,7 +323,7 @@ function create_sources_list_and_deploy_repo_key() {
 	call_extension_method "custom_apt_repo" <<- 'CUSTOM_APT_REPO'
 		*customize apt sources.list.d and/or deploy repo keys*
 		Called after core AtriOS has finished setting up SDCARD's debian.sources/ubuntu.sources and atrios.sources in /etc/apt/sources.list.d/.
-		If SKIP_AtriOS_REPO=yes, atrios.sources.disabled is present instead.
+		If SKIP_ATRIOS_REPO=yes, atrios.sources.disabled is present instead.
 		The global AtriOS GPG key has been deployed to SDCARD's ${APT_SIGNING_KEY_FILE}, de-armored.
 		You can implement this hook to add, remove, or modify sources.list.d entries, and/or deploy additional GPG keys.
 		Important: honor $CUSTOM_REPO_WHEN; if it's ==rootfs, don't add repos/components that carry the .debs produced by atrios/build.

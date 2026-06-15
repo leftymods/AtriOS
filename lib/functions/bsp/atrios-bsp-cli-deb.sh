@@ -432,7 +432,7 @@ function board_side_bsp_cli_postinst_base() {
 	# shellcheck source=/dev/null
 	[[ -f /etc/atrios-release ]] && . /etc/atrios-release
 
-	# AtriOS_PRETTY_NAME is now set in atrios-base-files.
+	# ATRIOS_PRETTY_NAME is now set in atrios-base-files.
 
 	# Force ramlog to be enabled if it exists. @TODO: why?
 	[[ -f /etc/lib/systemd/system/atrios-ramlog.service ]] && systemctl --no-reload enable atrios-ramlog.service

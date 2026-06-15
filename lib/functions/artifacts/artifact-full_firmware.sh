@@ -16,21 +16,21 @@ function artifact_full_firmware_prepare_version() {
 	artifact_version="undetermined"        # outer scope
 	artifact_version_reason="undetermined" # outer scope
 
-	local AtriOS_FIRMWARE_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/leftymods/firmware"}"
-	local AtriOS_FIRMWARE_BRANCH="branch:${AtriOS_FIRMWARE_GIT_BRANCH:-"master"}"
+	local ATRIOS_FIRMWARE_SOURCE="${ATRIOS_FIRMWARE_GIT_SOURCE:-"https://github.com/leftymods/firmware"}"
+	local ATRIOS_FIRMWARE_BRANCH="branch:${ATRIOS_FIRMWARE_GIT_BRANCH:-"master"}"
 
-	debug_var AtriOS_FIRMWARE_SOURCE
-	debug_var AtriOS_FIRMWARE_BRANCH
+	debug_var ATRIOS_FIRMWARE_SOURCE
+	debug_var ATRIOS_FIRMWARE_BRANCH
 	debug_var MAINLINE_FIRMWARE_SOURCE
 
 	declare short_hash_size=4
 
-	declare -A GIT_INFO_AtriOS_FIRMWARE=([GIT_SOURCE]="${AtriOS_FIRMWARE_SOURCE}" [GIT_REF]="${AtriOS_FIRMWARE_BRANCH}")
-	run_memoized GIT_INFO_AtriOS_FIRMWARE "git2info" memoized_git_ref_to_info
-	debug_dict GIT_INFO_AtriOS_FIRMWARE
+	declare -A GIT_INFO_ATRIOS_FIRMWARE=([GIT_SOURCE]="${ATRIOS_FIRMWARE_SOURCE}" [GIT_REF]="${ATRIOS_FIRMWARE_BRANCH}")
+	run_memoized GIT_INFO_ATRIOS_FIRMWARE "git2info" memoized_git_ref_to_info
+	debug_dict GIT_INFO_ATRIOS_FIRMWARE
 
 	# Sanity check, the SHA1 gotta be sane.
-	[[ "${GIT_INFO_AtriOS_FIRMWARE[SHA1]}" =~ ^[0-9a-f]{40}$ ]] || exit_with_error "SHA1 is not sane: '${GIT_INFO_AtriOS_FIRMWARE[SHA1]}'"
+	[[ "${GIT_INFO_ATRIOS_FIRMWARE[SHA1]}" =~ ^[0-9a-f]{40}$ ]] || exit_with_error "SHA1 is not sane: '${GIT_INFO_ATRIOS_FIRMWARE[SHA1]}'"
 
 	declare -A GIT_INFO_MAINLINE_FIRMWARE=([GIT_SOURCE]="${MAINLINE_FIRMWARE_SOURCE}" [GIT_REF]="branch:main")
 	run_memoized GIT_INFO_MAINLINE_FIRMWARE "git2info" memoized_git_ref_to_info
@@ -41,7 +41,7 @@ function artifact_full_firmware_prepare_version() {
 
 	declare fake_unchanging_base_version="1"
 
-	declare short_sha1="${GIT_INFO_AtriOS_FIRMWARE[SHA1]:0:${short_hash_size}}"
+	declare short_sha1="${GIT_INFO_ATRIOS_FIRMWARE[SHA1]:0:${short_hash_size}}"
 	declare short_sha1_mainline="${GIT_INFO_MAINLINE_FIRMWARE[SHA1]:0:${short_hash_size}}"
 
 	# get the hashes of the lib/ bash sources involved...
@@ -54,7 +54,7 @@ function artifact_full_firmware_prepare_version() {
 	artifact_version="${fake_unchanging_base_version}-SA${short_sha1}-SM${short_sha1_mainline}-B${bash_hash_short}"
 
 	declare -a reasons=(
-		"AtriOS firmware git revision \"${GIT_INFO_AtriOS_FIRMWARE[SHA1]}\""
+		"AtriOS firmware git revision \"${GIT_INFO_ATRIOS_FIRMWARE[SHA1]}\""
 		"Mainline firmware git revision \"${GIT_INFO_MAINLINE_FIRMWARE[SHA1]}\""
 		"framework bash hash \"${bash_hash}\""
 	)
@@ -76,7 +76,7 @@ function artifact_full_firmware_build_from_sources() {
 }
 
 function artifact_full_firmware_cli_adapter_pre_run() {
-	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 
 	# "gimme root on a Linux machine"
 	cli_standard_relaunch_docker_or_sudo

@@ -36,7 +36,7 @@ function prepare_tmpfs_for() {
 	if [[ "${OSTYPE}" != "linux"* ]] || [[ "${EUID}" -ne 0 ]]; then
 		display_alert "prepare_tmpfs_for: not on Linux or not root, skipping" "${tmpfs_name}" "cleanup"
 		cleanup_params+=("no_umount_tmpfs")
-	elif [[ "${AtriOS_INSIDE_DOCKERFILE_BUILD}" == "yes" ]]; then
+	elif [[ "${ATRIOS_INSIDE_DOCKERFILE_BUILD}" == "yes" ]]; then
 		display_alert "prepare_tmpfs_for: inside Dockerfile build, skipping" "${tmpfs_name}" "cleanup"
 		cleanup_params+=("no_umount_tmpfs")
 	elif [[ "${USE_TMPFS}" == "no" ]]; then

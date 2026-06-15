@@ -42,9 +42,9 @@ function compile_kernel() {
 	display_alert "Using Kernel git revision" "${kernel_git_revision} at '${kernel_base_revision_date}'"
 
 	# Call extension method to prepare extra sources
-	call_extension_method "kernel_copy_extra_sources" <<- 'AtriOS_KERNEL_SOURCES_EXTRA'
+	call_extension_method "kernel_copy_extra_sources" <<- 'ATRIOS_KERNEL_SOURCES_EXTRA'
 		*Hook to copy extra kernel sources to the kernel under compilation*
-	AtriOS_KERNEL_SOURCES_EXTRA
+	ATRIOS_KERNEL_SOURCES_EXTRA
 
 	# Possibly 'make clean'.
 	LOG_SECTION="kernel_maybe_clean" do_with_logging do_with_hooks kernel_maybe_clean
@@ -88,7 +88,7 @@ function compile_kernel() {
 
 	# Stop after configuring kernel, but only if using a specific CLI command ("kernel-config").
 	# Normal "KERNEL_CONFIGURE=yes" (during image build) is still allowed.
-	if [[ "${KERNEL_CONFIGURE}" == yes && "${AtriOS_COMMAND}" == *kernel-config ]]; then
+	if [[ "${KERNEL_CONFIGURE}" == yes && "${ATRIOS_COMMAND}" == *kernel-config ]]; then
 		display_alert "Stopping after configuring kernel" "" "cachehit"
 		return 0
 	fi

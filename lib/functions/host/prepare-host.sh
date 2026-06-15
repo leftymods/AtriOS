@@ -56,7 +56,7 @@ function prepare_host_noninteractive() {
 		display_alert "USE_LOCAL_APT_DEB_CACHE is set to 'no'" "not recommended" "wrn"
 	fi
 
-	if AtriOS_is_running_in_container; then
+	if atrios_is_running_in_container; then
 		display_alert "Running in container" "Adding provisions for container building" "info"
 		declare -g CONTAINER_COMPAT=yes # this controls mknod usage for loop devices.
 

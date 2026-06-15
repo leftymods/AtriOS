@@ -8,7 +8,7 @@
 # https://github.com/leftymods/CoreOS/
 
 function cli_patch_kernel_pre_run() {
-	declare -g AtriOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
+	declare -g ATRIOS_COMMAND_REQUIRE_BASIC_DEPS="yes" # Require prepare_host_basic to run before the command.
 	declare -g DOCKER_PASS_SSH_AGENT="yes"              # Pass SSH agent to docker
 	declare -g DOCKER_PASS_GIT="yes"                    # mount .git dir to docker; for archeology
 

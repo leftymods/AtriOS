@@ -509,10 +509,10 @@ function prepare_partitions() {
 	fi
 
 	if [[ $SRC_EXTLINUX != yes && -f $SDCARD/boot/atriosEnv.txt ]]; then
-		call_extension_method "image_specific_AtriOS_env_ready" <<- 'IMAGE_SPECIFIC_AtriOS_ENV_READY'
+		call_extension_method "image_specific_atrios_env_ready" <<- 'IMAGE_SPECIFIC_ATRIOS_ENV_READY'
 			*during image build, atriosEnv.txt is ready for image-specific customization (not in BSP)*
 			You can write to `"${SDCARD}/boot/atriosEnv.txt"` here, it is guaranteed to exist.
-		IMAGE_SPECIFIC_AtriOS_ENV_READY
+		IMAGE_SPECIFIC_ATRIOS_ENV_READY
 	fi
 
 	return 0 # there is a shortcircuit above! very tricky btw!

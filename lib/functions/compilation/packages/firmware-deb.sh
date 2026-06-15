@@ -18,13 +18,13 @@ function compile_firmware() {
 	declare fw_dir="atrios-firmware${FULL}"
 	mkdir -p "${fw_temp_dir}/${fw_dir}/lib/firmware"
 
-	local AtriOS_FIRMWARE_GIT_SOURCE="${AtriOS_FIRMWARE_GIT_SOURCE:-"https://github.com/leftymods/firmware"}"
-	local AtriOS_FIRMWARE_GIT_BRANCH="${AtriOS_FIRMWARE_GIT_BRANCH:-"master"}"
+	local ATRIOS_FIRMWARE_GIT_SOURCE="${ATRIOS_FIRMWARE_GIT_SOURCE:-"https://github.com/leftymods/firmware"}"
+	local ATRIOS_FIRMWARE_GIT_BRANCH="${ATRIOS_FIRMWARE_GIT_BRANCH:-"master"}"
 
 	# Fetch AtriOS firmware from git.
 	declare fetched_revision
-	do_checkout="no" fetch_from_repo "${AtriOS_FIRMWARE_GIT_SOURCE}" "atrios-firmware-git" "branch:${AtriOS_FIRMWARE_GIT_BRANCH}"
-	declare -r AtriOS_firmware_git_sha1="${fetched_revision}"
+	do_checkout="no" fetch_from_repo "${ATRIOS_FIRMWARE_GIT_SOURCE}" "atrios-firmware-git" "branch:${ATRIOS_FIRMWARE_GIT_BRANCH}"
+	declare -r atrios_firmware_git_sha1="${fetched_revision}"
 
 	declare extra_conflicts_comma=""
 	if [[ -n $FULL ]]; then
@@ -48,7 +48,7 @@ function compile_firmware() {
 	fi
 
 	# AtriOS firmware; this overwrites anything in the mainline firmware repo (if that was included, in the full version only)
-	run_host_command_logged git -C "${SRC}/cache/sources/atrios-firmware-git" archive --format=tar "${AtriOS_firmware_git_sha1}" "|" tar -C "${fw_temp_dir}/${fw_dir}/lib/firmware/" -xf -
+	run_host_command_logged git -C "${SRC}/cache/sources/atrios-firmware-git" archive --format=tar "${atrios_firmware_git_sha1}" "|" tar -C "${fw_temp_dir}/${fw_dir}/lib/firmware/" -xf -
 
 	# Show the size of the firmware directory in a tree if debugging
 	if [[ "${SHOW_DEBUG}" == "yes" ]]; then

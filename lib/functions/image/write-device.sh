@@ -45,7 +45,7 @@ function write_image_to_device() {
 				display_alert "Writing failed" "${image_file}" "err"
 			fi
 		fi
-	elif AtriOS_is_running_in_container; then
+	elif atrios_is_running_in_container; then
 		if [[ -n ${device} ]]; then
 			# display warning when we want to write sd card under Docker
 			display_alert "Can't write to ${device}" "Under Docker" "wrn"

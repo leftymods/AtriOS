@@ -11,7 +11,7 @@ function extension_prepare_config__prepare_kernel_patches() {
 		exit_with_error "allwinner-kernel-bump extension must only be used with allwinner boards with edge kernel"
 	fi
 
-	if [[ ${AtriOS_RELAUNCHED} == "yes" ]]; then
+	if [[ ${ATRIOS_RELAUNCHED} == "yes" ]]; then
 		display_alert "allwinner-kernel-bump" "Checking new kernel version" "info"
 		PREV_KERNEL_PATCH_DIR=${SRC}/patch/kernel/${KERNELPATCHDIR}
 		declare -g KERNELBRANCH="branch:master"
@@ -24,7 +24,7 @@ function extension_prepare_config__prepare_kernel_patches() {
 }
 
 function extension_finish_config__prepare_megous_patches() {
-	if [[ ${AtriOS_RELAUNCHED} == "yes" ]]; then
+	if [[ ${ATRIOS_RELAUNCHED} == "yes" ]]; then
 		declare bare_tree_done_marker_file=".git/atrios-bare-tree-done"
 		declare kernel_git_bare_tree
 		declare git_bundles_dir

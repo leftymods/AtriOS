@@ -166,8 +166,8 @@ function kernel_package_hook_helper() {
 			# When installing these packages during image build, /boot is not mounted, and will most definitely not be vfat.
 			# Use an environment variable to signal that it _will_ be a fat32, so symlinks are not created.
 			# This is passed by install_deb_chroot() explicitly via the runners.
-			if [[ "\${AtriOS_IMAGE_BUILD_BOOTFS_TYPE:-"unknown"}" == "fat" ]]; then
-				echo "AtriOS: AtriOS_IMAGE_BUILD_BOOTFS_TYPE: '\${AtriOS_IMAGE_BUILD_BOOTFS_TYPE:-"not set"}'"
+			if [[ "\${ATRIOS_IMAGE_BUILD_BOOTFS_TYPE:-"unknown"}" == "fat" ]]; then
+				echo "AtriOS: ATRIOS_IMAGE_BUILD_BOOTFS_TYPE: '\${ATRIOS_IMAGE_BUILD_BOOTFS_TYPE:-"not set"}'"
 				return 0
 			fi
 			if ! mountpoint -q /boot; then

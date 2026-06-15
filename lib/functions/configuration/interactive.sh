@@ -23,15 +23,15 @@ function interactive_config_prepare_terminal() {
 	declare current_year
 	current_year=$(date +%Y)
 	declare -g -r backtitle="AtriOS Linux build framework, https://www.AtriOS.com | (c) 2025-2026 leftymods "
-	declare -A -g AtriOS_INTERACTIVE_CONFIGS=() # An associative array of all interactive configurations
+	declare -A -g ATRIOS_INTERACTIVE_CONFIGS=() # An associative array of all interactive configurations
 }
 
-# Set config variable and AtriOS_INTERACTIVE_CONFIGS in a consistent way
+# Set config variable and ATRIOS_INTERACTIVE_CONFIGS in a consistent way
 # $1: variable name
 # $2: variable value
 function set_interactive_config_value() {
 	declare -g "${1}=${2}"
-	AtriOS_INTERACTIVE_CONFIGS["${1}"]="${2}"
+	ATRIOS_INTERACTIVE_CONFIGS["${1}"]="${2}"
 }
 
 function interactive_finish() {
