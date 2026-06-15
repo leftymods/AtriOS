@@ -206,6 +206,18 @@ function kernel_prepare_bare_repo_from_oras_gitball() {
 		# The ORAS bundles on ghcr.io/leftymods only contain mainline kernel trees.
 		if [[ -n "${KERNELSOURCE}" && "${KERNELSOURCE}" != "https://git.kernel.org/"* && "${KERNELSOURCE}" != "https://kernel.googlesource.com/"* ]]; then
 			display_alert "Custom kernel source detected" "skipping ORAS bundle, cloning directly" "info"
+			if [[ -d "${kernel_git_bare_tree}/.git" ]]; then
+				# bare repo exists; ensure main branch exists for worktree creation
+				if ! git -C "${kernel_git_bare_tree}" show-ref --verify --quiet refs/heads/main; then
+					declare fetch_ref="${KERNELBRANCH##*:}"
+					display_alert "Bare repo exists but lacks main branch" "fetching ${fetch_ref}" "info"
+					run_host_command_logged git -C "${kernel_git_bare_tree}" fetch --depth=1 origin "${fetch_ref}"
+					run_host_command_logged git -C "${kernel_git_bare_tree}" update-ref refs/heads/main FETCH_HEAD
+					run_host_command_logged touch "${kernel_git_bare_tree_done_marker}"
+				fi
+				display_alert "Custom kernel bare tree ready" "${kernel_git_bare_tree}" "info"
+				return 0
+			fi
 			run_host_command_logged mkdir -p "${kernel_git_bare_tree}"
 			run_host_command_logged git init "${kernel_git_bare_tree}"
 			run_host_command_logged git -C "${kernel_git_bare_tree}" remote add origin "${KERNELSOURCE}"
