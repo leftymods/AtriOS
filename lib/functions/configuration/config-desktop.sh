@@ -45,7 +45,7 @@ function interactive_desktop_main_configuration() {
 	# if [[ ! -f "${parser}" ]]; then
 	# 	exit_with_error "Desktop parser not found at ${parser}" \
 	# 		"atrios-config clone may be incomplete"
-	fi
+	# fi
 
 	# --- DE selection ---
 	if [[ -z $DESKTOP_ENVIRONMENT ]]; then
