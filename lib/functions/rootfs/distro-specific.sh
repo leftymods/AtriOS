@@ -297,24 +297,31 @@ function create_sources_list_and_deploy_repo_key() {
 	components+=("${RELEASE}-utils")   # utils contains packages Igor picks from other repos
 	components+=("${RELEASE}-desktop") # desktop contains packages Igor picks from other repos
 
-	# AtriOS apt repository is not configured yet.
-	# When ready, set LOCAL_MIRROR or uncomment below.
-	# declare atrios_mirror="${LOCAL_MIRROR:-apt.leftymods.com}"
-	# cat <<- EOF > "${basedir}"/etc/apt/sources.list.d/atrios.sources
-	# Types: deb
-	# URIs: http://${atrios_mirror}
-	# Suites: $RELEASE
-	# Components: ${components[*]}
-	# Signed-By: ${APT_SIGNING_KEY_FILE}
-	# EOF
-	:
+	# stage: add atrios repository (using upstream armbian repo until custom is ready)
+	declare atrios_mirror="apt.armbian.com"
+	if [[ -n $LOCAL_MIRROR ]]; then
+		atrios_mirror="$LOCAL_MIRROR"
+	elif [[ $DOWNLOAD_MIRROR == "china" ]]; then
+		atrios_mirror="mirrors.tuna.tsinghua.edu.cn/armbian"
+	elif [[ $DOWNLOAD_MIRROR == "bfsu" ]]; then
+		atrios_mirror="mirrors.bfsu.edu.cn/armbian"
+	elif [[ $BETA == "yes" ]]; then
+		atrios_mirror="beta.armbian.com"
+	fi
+	cat <<- EOF > "${basedir}"/etc/apt/sources.list.d/atrios.sources
+	Types: deb
+	URIs: http://${atrios_mirror}
+	Suites: $RELEASE
+	Components: ${components[*]}
+	Signed-By: ${APT_SIGNING_KEY_FILE}
+	EOF
 
 	# disable repo if DISTRIBUTION_STATUS==eos, or if SKIP_ATRIOS_REPO==yes, or if when==image-early.
 	if [[ "${when}" == "image-early" ||
 		"$(cat "${SRC}/config/distributions/${RELEASE}/support")" == "eos" ||
 		"${SKIP_ATRIOS_REPO}" == "yes" ]]; then
 		display_alert "Disabling AtriOS repo" "${ARCH}-${RELEASE} :: skip:${SKIP_ATRIOS_REPO:-"no"} when:${when}" "info"
-		[[ -f "${SDCARD}"/etc/apt/sources.list.d/atrios.sources ]] && mv "${SDCARD}"/etc/apt/sources.list.d/atrios.sources "${SDCARD}"/etc/apt/sources.list.d/atrios.sources.disabled
+		mv "${SDCARD}"/etc/apt/sources.list.d/atrios.sources "${SDCARD}"/etc/apt/sources.list.d/atrios.sources.disabled
 	fi
 
 	declare CUSTOM_REPO_WHEN="${when}"

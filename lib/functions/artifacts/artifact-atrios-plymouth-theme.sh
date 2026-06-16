@@ -62,7 +62,7 @@ function artifact_atrios-plymouth-theme_cli_adapter_config_prep() {
 }
 
 function artifact_atrios-plymouth-theme_get_default_oci_target() {
-	artifact_oci_target_base="${GHCR_SOURCE}/AtriOS/os/"
+	artifact_oci_target_base="${GHCR_SOURCE}/leftymods/coreos/"
 }
 
 function artifact_atrios-plymouth-theme_is_available_in_local_cache() {
