@@ -475,6 +475,12 @@ function install_distribution_agnostic() {
 	[[ -f "${SDCARD}"/lib/systemd/system/atrios-hardware-monitor.service ]] && chroot_sdcard systemctl --no-reload enable atrios-hardware-monitor.service
 	[[ -f "${SDCARD}"/lib/systemd/system/atrios-led-state.service ]] && chroot_sdcard systemctl --no-reload enable atrios-led-state.service
 
+	# Disable services that add 1+ minute boot delays on SBCs without RTC or EFI
+	[[ -f "${SDCARD}"/lib/systemd/system/fake-hwclock-load.service ]] && chroot_sdcard systemctl --no-reload disable fake-hwclock-load.service
+	chroot_sdcard systemctl --no-reload mask modprobe@efi_pstore.service 2>/dev/null || true
+	# ramlog blocks journald and adds ~30-60s to boot; disable for speed (logs go to eMMC or volatile journal)
+	[[ -f "${SDCARD}"/lib/systemd/system/atrios-ramlog.service ]] && chroot_sdcard systemctl --no-reload disable atrios-ramlog.service
+
 	# switch to beta repository at this stage if building nightly images
 	if [[ $IMAGE_TYPE == nightly && -f "${SDCARD}"/etc/apt/sources.list.d/atrios.sources ]]; then
 		sed -i 's/apt/beta/' "${SDCARD}"/etc/apt/sources.list.d/atrios.sources
