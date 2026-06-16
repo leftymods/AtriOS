@@ -79,16 +79,23 @@ function create_new_rootfs_cache_via_debootstrap() {
 	declare debootstrap_bin="" debootstrap_version="" debootstrap_wanted_dir="" debootstrap_default_script=""
 
 	display_alert "Preparing mmdebstrap" "for ${DISTRIBUTION}'s ${RELEASE}" "info"
-	declare debootstrap_name="mmdebstrap-debian-devel"
-	#FIXME: branch should be a variable eventually
-	GIT_FIXED_WORKDIR="${debootstrap_name}" \
-		fetch_from_repo "https://gitlab.mister-muffin.de/josch/mmdebstrap" "${debootstrap_name}" "${mmdebstrap_branch}"
-	debootstrap_wanted_dir="${SRC}/cache/sources/${debootstrap_name}"
-	debootstrap_version="$(sed 's/^## \[\([^]]*\)\].*/\1/; q' "${debootstrap_wanted_dir}/CHANGELOG.md")"
-	debootstrap_bin="${debootstrap_wanted_dir}/mmdebstrap"
 
-	run_host_command_logged chmod a+x "${debootstrap_bin}"
-	display_alert "mmdebstrap version" "'${debootstrap_version}' for ${debootstrap_bin}" "info"
+	# Use system mmdebstrap if available, otherwise fetch from git
+	if command -v mmdebstrap &> /dev/null; then
+		debootstrap_bin="$(command -v mmdebstrap)"
+		debootstrap_version="$(${debootstrap_bin} --version 2>/dev/null | head -1 || echo 'system')"
+		display_alert "Using system mmdebstrap" "${debootstrap_version} at ${debootstrap_bin}" "info"
+	else
+		declare debootstrap_name="mmdebstrap-debian-devel"
+		#FIXME: branch should be a variable eventually
+		GIT_FIXED_WORKDIR="${debootstrap_name}" \
+			fetch_from_repo "https://gitlab.mister-muffin.de/josch/mmdebstrap" "${debootstrap_name}" "${mmdebstrap_branch}"
+		debootstrap_wanted_dir="${SRC}/cache/sources/${debootstrap_name}"
+		debootstrap_version="$(sed 's/^## \[\([^]]*\)\].*/\1/; q' "${debootstrap_wanted_dir}/CHANGELOG.md")"
+		debootstrap_bin="${debootstrap_wanted_dir}/mmdebstrap"
+		run_host_command_logged chmod a+x "${debootstrap_bin}"
+		display_alert "mmdebstrap version" "'${debootstrap_version}' for ${debootstrap_bin}" "info"
+	fi
 
 	display_alert "Installing base system with ${#AGGREGATED_PACKAGES_DEBOOTSTRAP[@]} packages" "Stage 1/1" "info"
 	cd "${SDCARD}" || exit_with_error "cray-cray about SDCARD" "${SDCARD}" # this will prevent error sh: 0: getcwd() failed
