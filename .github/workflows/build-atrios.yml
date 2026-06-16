@@ -6,7 +6,7 @@ on:
       board:
         description: "Board to build"
         required: true
-        default: "odroidc4"
+        default: "atristation"
       branch:
         description: "Kernel branch"
         required: true

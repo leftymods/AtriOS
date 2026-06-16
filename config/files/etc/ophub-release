@@ -1,6 +1,6 @@
 # ophub-release - Amlogic Ophub tool configuration
 PLATFORM='amlogic'
-MODEL_ID='odroidc4'
+MODEL_ID='atristation'
 FDTFILE='meson-sm1-x96-max-plus.dtb'
 UBOOT_OVERLOAD=''
 MAINLINE_UBOOT='yes'

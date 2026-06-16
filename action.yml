@@ -45,7 +45,7 @@ inputs:
   atrios_board:
     description: "Select hardware platform"
     required: false
-    default: "uefi-x86"
+    default: "atristation"
 
   atrios_ui:
     description: "AtriOS user interface"
