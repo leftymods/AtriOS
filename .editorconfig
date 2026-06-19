@@ -23,7 +23,7 @@ trim_trailing_whitespace = false
 indent_style = space
 indent_size = 4
 
-# Custom Armbian formatting for bash sources and configuration
+# Custom AtriOS formatting for bash sources and configuration
 [*.{sh,inc,conf,eos,wip,tvb,csc}]
 indent_size = 4
 shell_variant = bash

@@ -4,7 +4,7 @@
 #
 # Copyright (c) 2013-2023 leftymods 
 #
-# This file is a part of the Armbian Build Framework
+# This file is a part of the AtriOS Build Framework
 # https://github.com/leftymods/CoreOS/
 
 

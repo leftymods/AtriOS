@@ -297,7 +297,7 @@ function create_sources_list_and_deploy_repo_key() {
 	components+=("${RELEASE}-utils")   # utils contains packages Igor picks from other repos
 	components+=("${RELEASE}-desktop") # desktop contains packages Igor picks from other repos
 
-	# stage: add atrios repository (using upstream armbian repo until custom is ready)
+	# stage: add atrios repository (using upstream atrios repo until custom is ready)
 	declare atrios_mirror="apt.armbian.com"
 	if [[ -n $LOCAL_MIRROR ]]; then
 		atrios_mirror="$LOCAL_MIRROR"

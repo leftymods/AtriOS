@@ -1,4 +1,4 @@
-### Specific to building Armbian ###
+### Specific to building AtriOS ###
 /.vagrant/
 ubuntu-*-cloudimg-console.log
 
