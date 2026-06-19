@@ -28,6 +28,9 @@ function fetch_sources_tools__libreelec_amlogic_fip() {
 # this family does not need it
 ATF_COMPILE="no"
 
+# Disable BTF to avoid running out of RAM during kernel build
+KERNEL_BTF="no"
+
 # Set CPUMIN et al if not already set in the board config.
 CPUMIN=${CPUMIN:-500000}
 CPUMAX=${CPUMAX:-1536000}
@@ -41,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:66d65158ec9733e2ccff764fa2d5b7aecf893ec6"
+		declare -g KERNELBRANCH="commit:06d82c3b3f3d81e4b5fc34228dc4bee6595ca8a3"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
