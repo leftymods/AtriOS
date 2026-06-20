@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:e13c03712ad419a3bf989c6186d505607efca683"
+		declare -g KERNELBRANCH="commit:4a5413a6c20f5ebf1fe4f4b3067ba5711f47f356"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
@@ -54,6 +54,11 @@ esac
 # See https://github.com/leftymods/CoreOS/pull/6227
 function custom_kernel_config__enable_rtl88x2cs_driver() {
 	opts_m+=("CONFIG_RTL8822CS")
+}
+
+# Enable TAS5825M audio amplifier for Station Max
+function custom_kernel_config__enable_tas5825m() {
+	opts_m+=("CONFIG_SND_SOC_TAS2781")
 }
 
 # this helper function includes postprocess for s400 and its variants.
