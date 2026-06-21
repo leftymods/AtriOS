@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:769f5e8533f80587c92400015c0d6b3313c50764"
+		declare -g KERNELBRANCH="commit:5c852dca3d1ff8d2c39ff563463665e51ce077bb"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
@@ -56,9 +56,12 @@ function custom_kernel_config__enable_rtl88x2cs_driver() {
 	opts_m+=("CONFIG_RTL8822CS")
 }
 
-# Enable TAS5825M audio amplifier for Station Max
+# Enable SY6045S audio amplifiers for Station Max
 function custom_kernel_config__enable_tas5825m() {
-	opts_m+=("CONFIG_SND_SOC_TAS2781")
+	opts_m+=("CONFIG_SND_SOC_SY6045S")
+	opts_m+=("CONFIG_SND_SOC_ES7210")
+	opts_y+=("CONFIG_IIO")
+	opts_m+=("CONFIG_KEYBOARD_ADC")
 }
 
 # this helper function includes postprocess for s400 and its variants.
