@@ -1,0 +1,3 @@
+# Allow users to control AtriStation LED ring
+SUBSYSTEM=="leds", KERNEL=="ring*", MODE="0666"
+SUBSYSTEM=="leds", KERNEL=="rgb*", MODE="0666"

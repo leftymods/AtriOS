@@ -1,0 +1,18 @@
+#!/bin/sh -e
+
+case "$1" in
+    configure)
+        udevadm control --reload-rules 2>/dev/null || true
+        udevadm trigger 2>/dev/null || true
+        systemctl --no-reload enable atri-led.service 2>/dev/null || true
+        systemctl --no-reload enable atri-led-boot.service 2>/dev/null || true
+        systemctl --no-reload enable atri-led-stop-boot.service 2>/dev/null || true
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

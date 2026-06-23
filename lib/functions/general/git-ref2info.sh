@@ -156,6 +156,13 @@ function memoized_git_ref_to_info() {
 							;;
 						*)
 							url="https://raw.githubusercontent.com/${org_and_repo}/${sha1}/Makefile"
+							makefile_url="${url}"
+							display_alert "Fetching Makefile via git" "${org_and_repo} ${ref_name}" "debug"
+							declare fetched
+							fetched="$(github_fetch_makefile "${git_source}" "${ref_type}" "${ref_name}" "${sha1}")" || true
+							if [[ -n "${fetched}" ]]; then
+								makefile_body="${fetched}"
+							fi
 							;;
 					esac
 					;;
@@ -174,16 +181,65 @@ function memoized_git_ref_to_info() {
 					;;
 			esac
 
-			display_alert "Fetching Makefile via HTTP" "${url}" "debug"
-			makefile_url="${url}"
+			# For GitHub, we already fetched via git above; for others, use HTTP
+			if [[ "${makefile_body}" == "undetermined" ]] && [[ "${url}" != "undetermined" ]]; then
+				display_alert "Fetching Makefile via HTTP" "${url}" "debug"
+				makefile_url="${url}"
 
-			# Lets do a retry loop here, because GitHub/others are unreliable...
-			declare makefile_body="undetermined"
-			do_with_retries 5 obtain_makefile_body_from_url "${url}"
+				declare makefile_body="undetermined"
+				do_with_retries 5 obtain_makefile_body_from_url "${url}"
+			fi
 
 			parse_makefile_version "${makefile_body}"
 
 			return 0
+		}
+
+		function github_fetch_makefile() {
+			declare git_source="${1}"
+			declare ref_type="${2}"
+			declare ref_name="${3}"
+			declare sha1="${4}"
+
+			# First try: read from local checkout if available
+			if [[ -n "${SRC}" && -d "${SRC}/cache/sources/kernel" ]]; then
+				declare local_kernel
+				local_kernel="$(find "${SRC}/cache/sources/kernel" -name "Makefile" -path "*/linux-*/Makefile" 2>/dev/null | head -1)"
+				if [[ -n "${local_kernel}" ]]; then
+					cat "${local_kernel}"
+					return 0
+				fi
+			fi
+			if [[ -d "/home/leftymods/linux-6.18.y" ]]; then
+				cat "/home/leftymods/linux-6.18.y/Makefile" 2>/dev/null && return 0
+			fi
+
+			# Second try: git fetch via SSH
+			declare git_remote="${git_source%.git}.git"
+			if [[ "${git_source}" == "https://github.com/"* ]]; then
+				declare org_and_repo="${git_source#https://github.com/}"
+				org_and_repo="${org_and_repo%.git}"
+				declare git_remote_ssh="git@github.com:${org_and_repo}.git"
+				git_remote="${git_remote_ssh}"
+			fi
+			declare tmpdir=""
+			tmpdir="$(mktemp -d /tmp/git-fetch-mk-XXXXXX)" || return 1
+			trap 'rm -rf "${tmpdir}"' RETURN
+
+			git init --bare "${tmpdir}" >/dev/null 2>&1 || return 1
+			git -C "${tmpdir}" remote add origin "${git_remote}" >/dev/null 2>&1 || return 1
+
+			declare fetch_ref="${ref_name}"
+			[[ "${ref_type}" == "commit" ]] && fetch_ref="${sha1}"
+
+			GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+				git -C "${tmpdir}" fetch --depth 1 --filter=blob:none origin "${fetch_ref}" >/dev/null 2>&1 || return 1
+
+			if [[ "${ref_type}" == "commit" ]]; then
+				git -C "${tmpdir}" cat-file -p "FETCH_HEAD:Makefile" 2>/dev/null
+			else
+				git -C "${tmpdir}" cat-file -p "origin/${fetch_ref}:Makefile" 2>/dev/null
+			fi
 		}
 
 		function obtain_makefile_body_from_url() {

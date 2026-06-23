@@ -27,6 +27,8 @@ function atrios_register_artifacts() {
 		["atrios-base-files"]="atrios-base-files"
 		["atrios-bsp-cli"]="atrios-bsp-cli"
 		["atrios-bsp-cli"]="atrios-bsp-cli"
+		["atri-led"]="atri-led"
+		["atri-led"]="atri-led"
 
 		# tar.zst
 		["rootfs"]="rootfs"

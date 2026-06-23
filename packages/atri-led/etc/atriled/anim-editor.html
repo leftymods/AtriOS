@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AtriStation LED Animation Editor</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+h1 { text-align: center; margin-bottom: 20px; color: #e94560; font-weight: 300; letter-spacing: 2px; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; padding: 15px; background: #16213e; border-radius: 12px; }
+.toolbar button { padding: 8px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; transition: .2s; }
+.toolbar button:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.btn-play { background: #0f3460; color: #fff; }
+.btn-stop { background: #e94560; color: #fff; }
+.btn-action { background: #533483; color: #fff; }
+.btn-export { background: #1a8a3a; color: #fff; }
+.btn-import { background: #b8860b; color: #fff; }
+.btn-add { background: #0f3460; color: #fff; }
+.toolbar label { color: #aaa; font-size: 13px; }
+.toolbar input[type="range"] { width: 100px; }
+.toolbar input[type="number"] { width: 60px; padding: 4px 8px; border-radius: 6px; border: 1px solid #333; background: #0f3460; color: #fff; }
+.editor { display: flex; gap: 20px; flex-wrap: wrap; }
+.ring-canvas-wrap { flex: 0 0 auto; background: #16213e; border-radius: 12px; padding: 20px; }
+#ringCanvas { display: block; cursor: pointer; }
+.controls { flex: 1; min-width: 300px; }
+.color-picker-section { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; padding: 15px; background: #16213e; border-radius: 12px; }
+.color-picker-section input[type="color"] { width: 50px; height: 50px; border: none; border-radius: 8px; cursor: pointer; background: none; }
+.color-picker-section .rgb-inputs { display: flex; gap: 8px; align-items: center; }
+.color-picker-section .rgb-inputs input { width: 55px; padding: 6px; border-radius: 6px; border: 1px solid #333; background: #0f3460; color: #fff; text-align: center; }
+.color-picker-section .rgb-inputs label { font-size: 12px; color: #aaa; }
+.timeline { background: #16213e; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+.timeline h3 { margin-bottom: 10px; color: #e94560; font-weight: 300; }
+.frame-list { display: flex; gap: 8px; overflow-x: auto; padding: 10px 0; min-height: 80px; }
+.frame-item { flex: 0 0 60px; height: 60px; border-radius: 8px; cursor: pointer; position: relative; border: 2px solid transparent; transition: .2s; }
+.frame-item.active { border-color: #e94560; transform: scale(1.05); }
+.frame-item .duration { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #888; white-space: nowrap; }
+.frame-item .del { position: absolute; top: -8px; right: -8px; width: 18px; height: 18px; border-radius: 50%; background: #e94560; color: #fff; border: none; font-size: 10px; cursor: pointer; display: none; }
+.frame-item:hover .del { display: block; }
+.info { font-size: 13px; color: #888; margin-top: 15px; text-align: center; }
+.preview-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 20px; opacity: .6; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>&#9670; AtriLED Animator</h1>
+<div class="toolbar">
+  <button class="btn-play" onclick="play()">&#9654; Play</button>
+  <button class="btn-stop" onclick="stopAnim()">&#9632; Stop</button>
+  <button class="btn-action" onclick="applyToAll()">Apply Color to All</button>
+  <button class="btn-add" onclick="addFrame()">+ Add Frame</button>
+  <button class="btn-add" onclick="duplicateFrame()">+ Dup Frame</button>
+  <label>Duration: <input type="number" id="frameDuration" value="300" min="20" max="5000"> ms</label>
+  <label>Speed: <input type="range" id="speedRange" min="1" max="10" value="5"></label>
+  <span style="flex:1"></span>
+  <button class="btn-import" onclick="importAnim()">&#128194; Import</button>
+  <button class="btn-export" onclick="exportAnim()">&#128190; Export</button>
+</div>
+<div class="editor">
+  <div class="ring-canvas-wrap">
+    <canvas id="ringCanvas" width="360" height="360"></canvas>
+  </div>
+  <div class="controls">
+    <div class="color-picker-section">
+      <input type="color" id="colorPicker" value="#ff6432" onchange="updateColorFromPicker()">
+      <div class="rgb-inputs">
+        <div><label>R</label><input type="number" id="valR" min="0" max="255" value="255" onchange="updateColorFromRGB()"></div>
+        <div><label>G</label><input type="number" id="valG" min="0" max="255" value="100" onchange="updateColorFromRGB()"></div>
+        <div><label>B</label><input type="number" id="valB" min="0" max="255" value="50" onchange="updateColorFromRGB()"></div>
+      </div>
+      <span style="margin-left:auto;font-size:12px;color:#888">Click a ring to set color</span>
+    </div>
+    <div class="timeline">
+      <h3>Frames (<span id="frameCount">1</span>)</h3>
+      <div class="frame-list" id="frameList"></div>
+    </div>
+  </div>
+</div>
+<div class="info" id="infoBar">Click rings to build your animation. Each frame color applies to all 24 LEDs.</div>
+</div>
+<script>
+const RINGS = 24;
+const CX = 180, CY = 180, R = 140, LED_R = 14;
+let frames = [{ r:255, g:100, b:50 }];
+let currentFrame = 0;
+let playing = false;
+let playTimer = null;
+
+const canvas = document.getElementById('ringCanvas');
+const ctx = canvas.getContext('2d');
+
+function getColor() {
+  return { r: +document.getElementById('valR').value, g: +document.getElementById('valG').value, b: +document.getElementById('valB').value };
+}
+
+function setColorUI(r, g, b) {
+  document.getElementById('valR').value = Math.round(r);
+  document.getElementById('valG').value = Math.round(g);
+  document.getElementById('valB').value = Math.round(b);
+  const hex = '#' + [r,g,b].map(v => Math.round(v).toString(16).padStart(2,'0')).join('');
+  document.getElementById('colorPicker').value = hex;
+}
+
+function updateColorFromPicker() {
+  const hex = document.getElementById('colorPicker').value;
+  const r = parseInt(hex.substr(1,2), 16);
+  const g = parseInt(hex.substr(3,2), 16);
+  const b = parseInt(hex.substr(5,2), 16);
+  setColorUI(r, g, b);
+}
+
+function updateColorFromRGB() {
+  const c = getColor();
+  const hex = '#' + [c.r,c.g,c.b].map(v => Math.round(v).toString(16).padStart(2,'0')).join('');
+  document.getElementById('colorPicker').value = hex;
+}
+
+function drawRing(index, r, g, b, highlight) {
+  const angle = (index / RINGS) * Math.PI * 2 - Math.PI / 2;
+  const x = CX + Math.cos(angle) * R;
+  const y = CY + Math.sin(angle) * R;
+  ctx.beginPath();
+  ctx.arc(x, y, LED_R, 0, Math.PI * 2);
+  ctx.fillStyle = `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+  ctx.fill();
+  ctx.strokeStyle = highlight ? '#e94560' : '#333';
+  ctx.lineWidth = highlight ? 3 : 1;
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.font = '8px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (index % 4 === 0) ctx.fillText(index, x, y);
+}
+
+function drawAll() {
+  ctx.clearRect(0, 0, 360, 360);
+  ctx.beginPath();
+  ctx.arc(CX, CY, R + 8, 0, Math.PI * 2);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  const c = frames[currentFrame] || { r:0, g:0, b:0 };
+  for (let i = 0; i < RINGS; i++) {
+    const frac = 1 - (i / RINGS);
+    const r = Math.round(c.r * frac);
+    const g = Math.round(c.g * frac);
+    const b = Math.round(c.b * frac);
+    drawRing(i, r, g, b, false);
+  }
+  ctx.fillStyle = '#e94560';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`Frame ${currentFrame + 1}/${frames.length}`, CX, 350);
+}
+
+function renderTimeline() {
+  const list = document.getElementById('frameList');
+  list.innerHTML = '';
+  frames.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'frame-item' + (i === currentFrame ? ' active' : '');
+    div.style.background = `rgb(${f.r},${f.g},${f.b})`;
+    div.onclick = () => { currentFrame = i; drawAll(); renderTimeline(); };
+    const dur = document.createElement('div');
+    dur.className = 'duration';
+    dur.textContent = (document.getElementById('frameDuration').value || '300') + 'ms';
+    div.appendChild(dur);
+    if (frames.length > 1) {
+      const del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = 'x';
+      del.onclick = (e) => { e.stopPropagation(); frames.splice(i,1); if(currentFrame>=frames.length)currentFrame=frames.length-1; drawAll(); renderTimeline(); };
+      div.appendChild(del);
+    }
+    list.appendChild(div);
+  });
+  document.getElementById('frameCount').textContent = frames.length;
+}
+
+function addFrame() {
+  const c = frames[currentFrame] || { r:0,g:0,b:0 };
+  frames.push({ r:c.r, g:c.g, b:c.b });
+  currentFrame = frames.length - 1;
+  drawAll(); renderTimeline();
+}
+
+function duplicateFrame() {
+  const c = frames[currentFrame] || { r:0,g:0,b:0 };
+  frames.splice(currentFrame + 1, 0, { r:c.r, g:c.g, b:c.b });
+  currentFrame++;
+  drawAll(); renderTimeline();
+}
+
+function applyToAll() {
+  const c = getColor();
+  frames.forEach(f => { f.r = Math.round(c.r); f.g = Math.round(c.g); f.b = Math.round(c.b); });
+  drawAll(); renderTimeline();
+}
+
+function play() {
+  if (playing) return;
+  if (frames.length < 2) return;
+  playing = true;
+  let fi = 0;
+  function step() {
+    if (!playing) return;
+    currentFrame = fi;
+    drawAll(); renderTimeline();
+    fi = (fi + 1) % frames.length;
+    const dur = +document.getElementById('frameDuration').value || 300;
+    const speed = +document.getElementById('speedRange').value || 5;
+    playTimer = setTimeout(step, dur / speed);
+  }
+  step();
+}
+
+function stopAnim() {
+  playing = false;
+  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+}
+
+canvas.onclick = function(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  for (let i = 0; i < RINGS; i++) {
+    const angle = (i / RINGS) * Math.PI * 2 - Math.PI / 2;
+    const lx = CX + Math.cos(angle) * R;
+    const ly = CY + Math.sin(angle) * R;
+    const dist = Math.sqrt((mx-lx)*(mx-lx) + (my-ly)*(my-ly));
+    if (dist < LED_R + 4) {
+      const c = getColor();
+      const frac = 1 - (i / RINGS);
+      frames[currentFrame].r = Math.round(c.r * frac);
+      frames[currentFrame].g = Math.round(c.g * frac);
+      frames[currentFrame].b = Math.round(c.b * frac);
+      drawAll(); renderTimeline();
+      break;
+    }
+  }
+};
+
+function exportAnim() {
+  const name = prompt('Animation name:', 'my_animation');
+  if (!name) return;
+  const dur = document.getElementById('frameDuration').value || '300';
+  let text = name + '\n' + frames.length + '\n' + dur + '\n';
+  frames.forEach(f => { text += `${Math.round(f.r)},${Math.round(f.g)},${Math.round(f.b)}\n`; });
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name + '.anim';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function importAnim() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.anim';
+  input.onchange = async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+    if (lines.length < 3) { alert('Invalid animation file'); return; }
+    let idx = 0;
+    const name = lines[idx++];
+    const frameCount = parseInt(lines[idx++]) || 1;
+    const dur = parseInt(lines[idx++]) || 300;
+    document.getElementById('frameDuration').value = dur;
+    frames = [];
+    for (let i = 0; i < frameCount && idx < lines.length; i++, idx++) {
+      const parts = lines[idx].split(',');
+      if (parts.length >= 3) {
+        frames.push({ r:+parts[0]||0, g:+parts[1]||0, b:+parts[2]||0 });
+      }
+    }
+    if (frames.length === 0) { frames.push({ r:255, g:100, b:50 }); }
+    currentFrame = 0;
+    stopAnim();
+    drawAll(); renderTimeline();
+    document.getElementById('infoBar').textContent = `Imported: ${name} (${frames.length} frames)`;
+  };
+  input.click();
+}
+
+drawAll(); renderTimeline();
+</script>
+</body>
+</html>

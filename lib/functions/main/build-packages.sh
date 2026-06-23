@@ -44,6 +44,9 @@ function determine_artifacts_to_build_for_image() {
 	# Userspace, BOARD+BRANCH specific (not RELEASE)
 	artifacts_to_build+=("atrios-bsp-cli")
 
+	# atri-led: LED ring control tools for AtriStation
+	artifacts_to_build+=("atri-led")
+
 	# Desktop packages are now installed by atrios-config (module_desktops)
 	# during rootfs creation in distro-agnostic.sh. No per-DE artifact to build.
 

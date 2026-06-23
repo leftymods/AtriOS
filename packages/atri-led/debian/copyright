@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: atri-led
+Source: https://github.com/leftymods/CoreOS
+
+Files: *
+Copyright: 2025-2026 leftymods
+License: GPL-2.0+

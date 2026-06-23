@@ -1,0 +1,14 @@
+#!/bin/sh -e
+
+case "$1" in
+    remove|purge)
+        systemctl disable atri-led.service 2>/dev/null || true
+        ;;
+    upgrade|deconfigure)
+        ;;
+    *)
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

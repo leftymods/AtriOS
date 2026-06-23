@@ -407,6 +407,9 @@ function install_distribution_agnostic() {
 	# install board support packages
 	install_artifact_deb_chroot "atrios-bsp-cli"
 
+	# install atri-led LED ring control tools
+	install_artifact_deb_chroot "atri-led"
+
 	# install atrios-zsh
 	if [[ "${PACKAGE_LIST_RM}" != *atrios-zsh* ]]; then
 		if [[ $BUILD_MINIMAL != yes ]]; then

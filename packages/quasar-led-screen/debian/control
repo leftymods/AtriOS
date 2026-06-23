@@ -1,0 +1,10 @@
+Package: quasar-led-screen
+Version: LOCAL
+Architecture: ARCH
+Maintainer: $MAINTAINER <$MAINTAINERMAIL>
+Section: universe/utils
+Priority: optional
+Description: Quasar 25x16 monochrome LED screen test tool
+ Test program for Quasar LED screen via SPI interface.
+ Provides quasar-led-test for testing the display.
+EOF

@@ -1,0 +1,11 @@
+[Unit]
+Description=AtriStation LED Boot Animation
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/atrild mood happy
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

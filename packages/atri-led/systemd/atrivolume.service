@@ -1,0 +1,12 @@
+[Unit]
+Description=AtriStation Potentiometer Volume Control
+After=multi-user.target sound.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/atrivolume PCM
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

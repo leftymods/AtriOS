@@ -1,0 +1,9 @@
+Package: atri-led
+Version: 1.0
+Architecture: arm64
+Maintainer: leftymods <leftymods@atrios.dev>
+Section: universe/utils
+Priority: optional
+Description: AtriStation LED ring control tools
+ Provides atrild and atrildctl for controlling WS2812B LED rings
+ via sysfs (leds-multicolor).

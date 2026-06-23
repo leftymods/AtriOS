@@ -44,24 +44,25 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:d895935ac34cc8a0f5404be6cf2e3a0d1b828e07"
+		declare -g KERNELBRANCH="commit:4390ad6b7238138c02ce4c26510535608f0e21f1"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
 esac
 
-# Use custom vendor driver for wireless rtl88x2cs
-# See https://github.com/leftymods/CoreOS/pull/6227
-function custom_kernel_config__enable_rtl88x2cs_driver() {
-	opts_m+=("CONFIG_RTL8822CS")
-}
-
 # Enable SY6045S audio amplifiers for Station Max
 function custom_kernel_config__enable_tas5825m() {
 	opts_m+=("CONFIG_SND_SOC_SY6045S")
 	opts_m+=("CONFIG_SND_SOC_ES7210")
+	opts_m+=("CONFIG_SND_SOC_ES8156")
 	opts_y+=("CONFIG_IIO")
 	opts_m+=("CONFIG_KEYBOARD_ADC")
+	opts_m+=("CONFIG_LEDS_IS31FL32XX")
+	opts_m+=("CONFIG_LEDS_CLASS_MULTICOLOR")
+	opts_m+=("CONFIG_INPUT_GPIO_ROTARY_ENCODER")
+	opts_m+=("CONFIG_RTC_DRV_PCF8563")
+	opts_m+=("CONFIG_LTR390")
+	opts_m+=("CONFIG_LTRF216A")
 }
 
 # this helper function includes postprocess for s400 and its variants.

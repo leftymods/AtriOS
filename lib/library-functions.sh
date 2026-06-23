@@ -24,6 +24,15 @@ source "${SRC}"/lib/functions/artifacts/artifact-atrios-bsp-cli.sh
 #set -o nounset   ## set -u : exit the script if you try to use an uninitialised variable - one day will be enabled
 set -o errtrace # trace ERR through - enabled
 set -o errexit  ## set -e : exit the script if any statement returns a non-true return value - enabled
+### lib/functions/artifacts/artifact-atri-led.sh
+# shellcheck source=lib/functions/artifacts/artifact-atri-led.sh
+source "${SRC}"/lib/functions/artifacts/artifact-atri-led.sh
+
+# no errors tolerated. invoked before each sourced file to make sure.
+#set -o pipefail  # trace ERR through pipes - will be enabled "soon"
+#set -o nounset   ## set -u : exit the script if you try to use an uninitialised variable - one day will be enabled
+set -o errtrace # trace ERR through - enabled
+set -o errexit  ## set -e : exit the script if any statement returns a non-true return value - enabled
 ### lib/functions/artifacts/artifact-atrios-plymouth-theme.sh
 # shellcheck source=lib/functions/artifacts/artifact-atrios-plymouth-theme.sh
 source "${SRC}"/lib/functions/artifacts/artifact-atrios-plymouth-theme.sh
@@ -387,6 +396,15 @@ set -o errexit  ## set -e : exit the script if any statement returns a non-true 
 ### lib/functions/compilation/kernel.sh
 # shellcheck source=lib/functions/compilation/kernel.sh
 source "${SRC}"/lib/functions/compilation/kernel.sh
+
+# no errors tolerated. invoked before each sourced file to make sure.
+#set -o pipefail  # trace ERR through pipes - will be enabled "soon"
+#set -o nounset   ## set -u : exit the script if you try to use an uninitialised variable - one day will be enabled
+set -o errtrace # trace ERR through - enabled
+set -o errexit  ## set -e : exit the script if any statement returns a non-true return value - enabled
+### lib/functions/compilation/packages/atri-led-deb.sh
+# shellcheck source=lib/functions/compilation/packages/atri-led-deb.sh
+source "${SRC}"/lib/functions/compilation/packages/atri-led-deb.sh
 
 # no errors tolerated. invoked before each sourced file to make sure.
 #set -o pipefail  # trace ERR through pipes - will be enabled "soon"
