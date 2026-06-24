@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:d7b249b97425a1bfc47486222d42dc2b2ec11c03"
+		declare -g KERNELBRANCH="commit:c2a0a8c9af47f43585bab7b683aabc2e95071f9b"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
@@ -53,6 +53,8 @@ esac
 # Enable SY6045S audio amplifiers for Station Max
 function custom_kernel_config__enable_tas5825m() {
 	opts_y+=("CONFIG_SND_SOC_SY6045S")
+	opts_y+=("CONFIG_BT_HCIUART_3WIRE")
+	opts_y+=("CONFIG_BT_HCIUART_RTL")
 	opts_m+=("CONFIG_SND_SOC_ES7210")
 	opts_m+=("CONFIG_SND_SOC_ES8156")
 	opts_m+=("CONFIG_SND_SOC_TLV320ADC3XXX")
@@ -67,6 +69,7 @@ function custom_kernel_config__enable_tas5825m() {
 	opts_m+=("CONFIG_LTRF216A")
 	opts_m+=("CONFIG_SERIO_AMS_DELTA")
 	opts_m+=("CONFIG_GPIO_SYSFS")
+	opts_m+=("CONFIG_ATRISTATION_ZIGBEE_CONTROL")
 }
 
 # this helper function includes postprocess for s400 and its variants.
