@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:49efe28f1031258caa81ca89f098fb7c4989785b"
+		declare -g KERNELBRANCH="commit:5bf5f758e45b619a65d4918dfd6bca9c64197272"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
