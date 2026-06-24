@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:5bf5f758e45b619a65d4918dfd6bca9c64197272"
+		declare -g KERNELBRANCH="commit:50a8628622094a28d0b2068d5228f3060adbe326"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
@@ -52,7 +52,7 @@ esac
 
 # Enable SY6045S audio amplifiers for Station Max
 function custom_kernel_config__enable_tas5825m() {
-	opts_m+=("CONFIG_SND_SOC_SY6045S")
+	opts_y+=("CONFIG_SND_SOC_SY6045S")
 	opts_m+=("CONFIG_SND_SOC_ES7210")
 	opts_m+=("CONFIG_SND_SOC_ES8156")
 	opts_y+=("CONFIG_IIO")
