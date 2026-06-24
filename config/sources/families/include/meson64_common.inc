@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:50a8628622094a28d0b2068d5228f3060adbe326"
+		declare -g KERNELBRANCH="commit:182ea0c4075e8f3e15306f17deaa7f1180aa2245"
 		declare -g DISABLE_KERNEL_PATCHES="yes"
 		;;
 
@@ -55,6 +55,8 @@ function custom_kernel_config__enable_tas5825m() {
 	opts_y+=("CONFIG_SND_SOC_SY6045S")
 	opts_m+=("CONFIG_SND_SOC_ES7210")
 	opts_m+=("CONFIG_SND_SOC_ES8156")
+	opts_m+=("CONFIG_SND_SOC_TLV320ADC3XXX")
+	opts_m+=("CONFIG_SND_ALOOP")
 	opts_y+=("CONFIG_IIO")
 	opts_m+=("CONFIG_KEYBOARD_ADC")
 	opts_m+=("CONFIG_LEDS_IS31FL32XX")
@@ -63,6 +65,8 @@ function custom_kernel_config__enable_tas5825m() {
 	opts_m+=("CONFIG_RTC_DRV_PCF8563")
 	opts_m+=("CONFIG_LTR390")
 	opts_m+=("CONFIG_LTRF216A")
+	opts_m+=("CONFIG_SERIO_AMS_DELTA")
+	opts_m+=("CONFIG_GPIO_SYSFS")
 }
 
 # this helper function includes postprocess for s400 and its variants.
