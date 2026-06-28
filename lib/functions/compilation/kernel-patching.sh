@@ -78,6 +78,15 @@ function kernel_main_patching() {
 	# Python patching will git reset to the kernel SHA1 git revision, and remove all untracked files.
 	LOG_SECTION="kernel_main_patching_python" do_with_logging do_with_hooks kernel_main_patching_python
 
+	# Remove broken/unwanted board DTS files added by Armbian auto-patcher
+	# meson-g12b-a311d-cainiao-cniot-core.dts: references non-existent pwm_d_a_pins
+	declare cainiao_dts="${kernel_work_dir}/arch/arm64/boot/dts/amlogic/meson-g12b-a311d-cainiao-cniot-core.dts"
+	if [[ -f "$cainiao_dts" ]]; then
+		rm -f "$cainiao_dts"
+		sed -i '/meson-g12b-a311d-cainiao-cniot-core.dtb/d' "${kernel_work_dir}/arch/arm64/boot/dts/amlogic/Makefile"
+		display_alert "Removed broken board DTS" "meson-g12b-a311d-cainiao-cniot-core (pwm_d_a_pins missing)" "warn"
+	fi
+
 	# STOP HERE, for cli support for patching tools.
 	if [[ "${PATCH_ONLY}" == "yes" ]]; then
 		return 0
