@@ -44,11 +44,17 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:c2a0a8c9af47f43585bab7b683aabc2e95071f9b"
-		declare -g DISABLE_KERNEL_PATCHES="yes"
+		declare -g KERNELBRANCH="commit:63f1d5be3805469e5f343377eb659aaab93493b3"
+		declare -g DISABLE_KERNEL_PATCHES="no"
 		;;
 
 esac
+
+# Enable RTL8822CS debugfs for diagnostics
+function custom_kernel_config__enable_rtw88_debugfs() {
+	opts_m+=("CONFIG_RTW88_8822CS")
+	opts_y+=("CONFIG_RTW88_DEBUGFS")
+}
 
 # Enable SY6045S audio amplifiers for Station Max
 function custom_kernel_config__enable_tas5825m() {
