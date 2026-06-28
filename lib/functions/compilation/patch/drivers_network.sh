@@ -643,7 +643,7 @@ driver_rtl8723cs() {
 	# Applies only from linux 6.1 onwards, so older kernel archives does not require to be altered
 
 	# It was disabled from d1/bcm2711 as that kernel is not fully in sync with mainline and as its probably not needed there anyway
-	if [[ "$LINUXFAMILY" == bcm2711 || "$LINUXFAMILY" == d1 ]]; then
+	if [[ "$LINUXFAMILY" == bcm2711 || "$LINUXFAMILY" == d1 || "$LINUXFAMILY" == meson64 ]]; then
 		return 0
 	fi
 
