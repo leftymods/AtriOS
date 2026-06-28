@@ -657,7 +657,7 @@ driver_rtl8723cs() {
 			process_patch_file "${SRC}/patch/misc/bluetooth-rtl8723cs/Bluetooth-btrtl-add-support-for-the-RTL8723CS.patch" "applying"
 		fi
 
-		process_patch_file "${SRC}/patch/misc/bluetooth-rtl8723cs/Bluetooth-hci_h5-Add-support-for-binding-RTL8723CS-with-device-.patch" "applying"
+
 		process_patch_file "${SRC}/patch/misc/bluetooth-rtl8723cs/bluetooth-h5-Don-t-re-initialize-rtl8723cs-on-resume.patch" "applying"
 		process_patch_file "${SRC}/patch/misc/bluetooth-rtl8723cs/bluetooth-btrtl-add-rtl8703bs.patch" "applying"
 		process_patch_file "${SRC}/patch/misc/bluetooth-rtl8723cs/dt-bindings-net-bluetooth-Add-rtl8723bs-bluetooth.patch" "applying"
