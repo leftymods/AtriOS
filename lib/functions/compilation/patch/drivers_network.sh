@@ -523,13 +523,19 @@ driver_rtl88x2cs() {
 		sed -i "s/^CONFIG_RTW_DEBUG.*/CONFIG_RTW_DEBUG = n/" \
 			"$kerneldir/drivers/net/wireless/rtl88x2cs/Makefile"
 
-		# Add to section Makefile
-		echo "obj-\$(CONFIG_RTL8822CS) += rtl88x2cs/" >> "$kerneldir/drivers/net/wireless/Makefile"
-		sed -i '/source "drivers\/net\/wireless\/ti\/Kconfig"/a source "drivers\/net\/wireless\/rtl88x2cs\/Kconfig"' \
-			"$kerneldir/drivers/net/wireless/Kconfig"
+		# NOTE: Makefile and Kconfig entries are already in the kernel fork (leftymods/linux-6.18.y),
+		# so we skip adding them here to avoid duplicates.
 
 		# fix compilation for kernels >= 5.4
 		process_patch_file "${SRC}/patch/misc/wireless-rtl88x2cs-Fix-VFS-import.patch" "applying"
+
+		# Add ITON RW8822-50B1 SDIO ID (0xA822) directly — not via patch file, so it's always applied
+		sed -i '/{SDIO_DEVICE(0x024c, 0xC822)/a\\t{SDIO_DEVICE(0x024c, 0xA822), .class = SDIO_CLASS_WLAN, .driver_data = RTL8822C}, \/\* ITON RW8822-50B1 \*\/' \
+			"$kerneldir/drivers/net/wireless/rtl88x2cs/os_dep/linux/sdio_intf.c"
+
+		# Kernel 6.18 uses wireless_dev * for cfg80211 callbacks (changed from 7.1.0 check in vendor driver)
+		sed -i 's/KERNEL_VERSION(7,1,0)/KERNEL_VERSION(6,1,0)/g' \
+			"$kerneldir/drivers/net/wireless/rtl88x2cs/os_dep/linux/ioctl_cfg80211.c"
 	fi
 }
 
