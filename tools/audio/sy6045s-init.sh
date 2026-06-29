@@ -9,11 +9,11 @@
 # Settings sourced from Yandex Station firmware dump.
 # Based on SY6045S GUI export with EQ/DRC tuning.
 #
-# I2C bus: typically i2c-3 on Amlogic S905X2/S905X3
+# I2C bus: i2c-0 on AtriStation (DTS i2c2 → /dev/i2c-0)
 # Override: I2C_BUS=<n> ./sy6045s-init.sh
 #
 
-BUS="${I2C_BUS:-3}"
+BUS="${I2C_BUS:-0}"
 I2CSET="i2cset -f -y ${BUS}"
 
 # ---- Tweeters (0x54) settings ----
