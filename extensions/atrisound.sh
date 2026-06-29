@@ -3,8 +3,9 @@
 # Copyright (c) 2026 leftymods
 #
 # AtriSound - audio subsystem initialization for AtriStation.
-# Loads audio codec modules in correct order (matching Yandex vendor sequence)
-# and waits for sound card to be ready before allowing audio services to start.
+# Configures two SY6045S amplifiers (tweeters + woofer) via I2C DSP init,
+# loads codec modules in correct order, and waits for sound card readiness.
+# Settings derived from Yandex Station (S905X2) firmware dump.
 
 function post_family_tweaks_bsp__atrisound_add_config() {
 	display_alert "Extension: ${EXTENSION}: ${BOARD}" "installing atrisound config" "info"
@@ -126,7 +127,12 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		}
 	UCM_VC
 
-	# Create systemd oneshot service to wait for sound card
+	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
+	run_host_command_logged mkdir -pv "${destination}"/usr/libexec
+	cp "${SRC}/tools/audio/sy6045s-init.sh" "${destination}/usr/libexec/sy6045s-init.sh"
+	run_host_command_logged chmod +x "${destination}"/usr/libexec/sy6045s-init.sh
+
+	# Create systemd oneshot service for sound card init
 	cat <<- SOUND_SERVICE > "${destination}"/lib/systemd/system/atrisound.service
 		[Unit]
 		Description=AtriStation sound card initialization
@@ -137,7 +143,11 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		[Service]
 		Type=oneshot
 		RemainAfterExit=yes
-		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done; /usr/sbin/alsactl init 0 || true'
+		# Wait for sound card device to appear
+		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done'
+		# Initialize SY6045S DSP config via I2C (EQ, DRC, volume curves)
+		ExecStart=/usr/libexec/sy6045s-init.sh
+		# Restore ALSA mixer state
 		ExecStart=/usr/sbin/alsactl restore 0 || true
 
 		[Install]

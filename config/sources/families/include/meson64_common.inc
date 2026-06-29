@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:40a9e9f43d449b2211807f1ed30bd485aaff228e"
+		declare -g KERNELBRANCH="commit:fb8513715f905469b85c35d6c0c7c037552bb2bd"
 		declare -g DISABLE_KERNEL_PATCHES="no"
 		;;
 
@@ -57,7 +57,7 @@ function custom_kernel_config__enable_rtw88_debugfs() {
 }
 
 # Enable SY6045S audio amplifiers for Station Max
-function custom_kernel_config__enable_tas5825m() {
+function custom_kernel_config__enable_sy6045s() {
 	opts_y+=("CONFIG_SND_SOC_SY6045S")
 	opts_y+=("CONFIG_BT_HCIUART_3WIRE")
 	opts_y+=("CONFIG_BT_HCIUART_RTL")

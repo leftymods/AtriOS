@@ -1,0 +1,47 @@
+<mixer>
+  <ctl name="PDM HCIC shift gain (~ 6dB * value)" value="2" />
+
+  <ctl name="Loopback MixL IN2_L_IN3_L Switch" value="1" />
+  <ctl name="Loopback MixL_IN2_L_IN3_L_6dB_Atten Switch" value="0" />
+
+  <ctl name="Loopback MixR IN2_R_IN3_R Switch" value="1" />
+  <ctl name="Loopback MixR_IN2_R_IN3_R_6dB_Atten Switch" value="0" />
+
+  <ctl name="Loopback PGA Switch" value="1 1" />
+  <ctl name="Loopback PGA Volume" value="32 32" />
+
+  <!-- if you change it, dont forget to change scale in hardvol_ti.xml -->
+  <ctl name="Headphone HPA Volume" value="55" />
+  <ctl name="Headphone MXL DAL Switch" value="1" />
+  <ctl name="Headphone MXR DAR Switch" value="1" />
+
+  <path name="speaker_off">
+    <ctl name="Woofer Master Playback Switch" value="0" />
+    <ctl name="Tweeters Master Playback Switch" value="0" />
+  </path>
+
+  <path name="headphone_off">
+    <ctl name="Headphone HPA Mute Switch" value="1" />
+  </path>
+
+  <path name="spdif_off">
+  </path>
+
+  <path name="speaker">
+    <ctl name="Woofer Master Playback Switch" value="1" />
+    <ctl name="Tweeters Master Playback Switch" value="1" />
+  </path>
+
+  <path name="headphone">
+    <ctl name="Headphone HPA Mute Switch" value="0" />
+  </path>
+
+  <path name="spdif">
+  </path>
+
+  <path name="main_mic">
+  </path>
+
+  <path name="headset-mic">
+  </path>
+</mixer>

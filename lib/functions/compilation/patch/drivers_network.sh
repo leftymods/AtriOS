@@ -486,58 +486,71 @@ driver_rtl8852bs() {
 	fi
 }
 
-driver_rtl88x2cs() {
+driver_rtw88_lwfinger() {
 
-	# Wireless drivers for Realtek 88x2cs chipsets
-	# Only used for meson64 family boards, use mainline rtw88 driver for all other boards
-	# If doesn't build,ask @adeepn for a fix
+	# Wireless drivers for Realtek 88x2cs chipsets — lwfinger/rtw88 backport
+	# Replaces in-tree rtw88 source with lwfinger's maintained backport of wireless-next.
+	# Only used for meson64 family boards. Supports RTL8822CS SDIO (inc. ITON RW8822-50B1).
+	#
+	# lwfinger handles most kernel API compat natively (6.17+ radio_idx, 6.18+ wireless_dev, etc.),
+	# but some 6.17+ changes to struct sdio_driver require explicit post-copy fixes:
+	#   - .shutdown was moved from .drv sub-struct to a direct member of sdio_driver
+	#   - .shutdown callback signature changed from (struct device *) to (struct sdio_func *)
 
 	if linux-version compare "${version}" ge 5.9 && [[ "$LINUXFAMILY" == meson64 ]] ; then
 
-		# Attach to specific commit (track branch:tune_for_jethub)
-		local rtl88x2csver='commit:55971663534233fd8d80363ddcb2fec1c01c473c' # Commit date: May 05, 2026 (please update when updating commit ref)
+		# Attach to specific commit
+		local rtw88ver='commit:a56bcd26e770257612a0803249cbd4095fc6feca' # Commit date: May 21, 2026 (please update when updating commit ref)
 
-		display_alert "Adding" "Wireless drivers for Realtek 88x2cs chipsets ${rtl88x2csver}" "info"
+		display_alert "Adding" "Wireless drivers for Realtek 88x2cs chipsets (lwfinger/rtw88) ${rtw88ver}" "info"
 
-		fetch_from_repo "$GITHUB_SOURCE/jethome-iot/rtl88x2cs" "rtl88x2cs" "${rtl88x2csver}" "yes" # https://github.com/jethome-iot/rtl88x2cs
+		fetch_from_repo "$GITHUB_SOURCE/lwfinger/rtw88" "rtw88" "${rtw88ver}" "yes" # https://github.com/lwfinger/rtw88
 		cd "$kerneldir" || exit
-		rm -rf "$kerneldir/drivers/net/wireless/rtl88x2cs"
-		mkdir -p "$kerneldir/drivers/net/wireless/rtl88x2cs/"
-		cp -R "${SRC}/cache/sources/rtl88x2cs/${rtl88x2csver#*:}"/{core,hal,include,os_dep,platform,halmac.mk,ifcfg-wlan0,rtl8822c.mk,runwpa,wlan0dhcp} \
-			"$kerneldir/drivers/net/wireless/rtl88x2cs"
 
-		# Makefile
-		cp "${SRC}/cache/sources/rtl88x2cs/${rtl88x2csver#*:}/Makefile" \
-			"$kerneldir/drivers/net/wireless/rtl88x2cs/Makefile"
+		# Remove all existing .c/.h source files from kernel's in-tree rtw88 (keep Makefile/Kconfig)
+		find "$kerneldir/drivers/net/wireless/realtek/rtw88" -maxdepth 1 \( -name '*.c' -o -name '*.h' \) -type f -delete
 
-		# Kconfig
-		sed -i 's/---help---/help/g' "${SRC}/cache/sources/rtl88x2cs/${rtl88x2csver#*:}/Kconfig"
-		cp "${SRC}/cache/sources/rtl88x2cs/${rtl88x2csver#*:}/Kconfig" \
-			"$kerneldir/drivers/net/wireless/rtl88x2cs/Kconfig"
+		# Copy all .c and .h files from lwfinger, replacing the in-tree source
+		cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}"/{*.c,*.h} \
+			"$kerneldir/drivers/net/wireless/realtek/rtw88/"
 
-		# Adjust path
-		sed -i "s/include \$(src)\/rtl8822c.mk/include \$(TopDIR)\/drivers\/net\/wireless\/rtl88x2cs\/rtl8822c.mk/" \
-			"$kerneldir/drivers/net/wireless/rtl88x2cs/Makefile"
+		# Copy firmware files (rtw8822c_fw.bin etc.) into kernel firmware dir for installation
+		mkdir -p "$kerneldir/firmware/rtw88"
+		cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}"/firmware/*.bin \
+			"$kerneldir/firmware/rtw88/"
 
-		# Disable debug
-		sed -i "s/^CONFIG_RTW_DEBUG.*/CONFIG_RTW_DEBUG = n/" \
-			"$kerneldir/drivers/net/wireless/rtl88x2cs/Makefile"
+		# Add ITON RW8822-50B1 SDIO ID (0xA822) as a separate array element before the {} terminator
+		# This is needed for all kernel versions since it's a hardware ID addition
+		perl -i -0777 -pe \
+			's/\t\{\}\n};/\t{SDIO_DEVICE(0x024c, 0xA822), .driver_data = (kernel_ulong_t)\&rtw8822c_hw_spec}, \/\* ITON RW8822-50B1 \*\/\n\t{}\n};/' \
+			"$kerneldir/drivers/net/wireless/realtek/rtw88/rtw8822cs.c"
 
-		# NOTE: Makefile and Kconfig entries are already in the kernel fork (leftymods/linux-6.18.y),
-		# so we skip adding them here to avoid duplicates.
+		# ---- kernel 6.17+ compat fixes (struct sdio_driver API change) ----
+		if linux-version compare "${version}" ge 6.17 ; then
 
-		# fix compilation for kernels >= 5.4
-		process_patch_file "${SRC}/patch/misc/wireless-rtl88x2cs-Fix-VFS-import.patch" "applying"
+			# Fix sdio.h: rtw_sdio_shutdown declaration — struct device* -> struct sdio_func*
+			sed -i 's/void rtw_sdio_shutdown(struct device \*dev);/void rtw_sdio_shutdown(struct sdio_func *sdio_func);/' \
+				"$kerneldir/drivers/net/wireless/realtek/rtw88/sdio.h"
 
-		# Add ITON RW8822-50B1 SDIO ID (0xA822) directly — not via patch file, so it's always applied
-		sed -i '/{SDIO_DEVICE(0x024c, 0xC822)/a\\t{SDIO_DEVICE(0x024c, 0xA822), .class = SDIO_CLASS_WLAN, .driver_data = RTL8822C}, \/\* ITON RW8822-50B1 \*\/' \
-			"$kerneldir/drivers/net/wireless/rtl88x2cs/os_dep/linux/sdio_intf.c"
+			# Fix sdio.c: rtw_sdio_shutdown implementation — change signature, remove dev_to_sdio_func()
+			sed -i 's/^void rtw_sdio_shutdown(struct device \*dev)/void rtw_sdio_shutdown(struct sdio_func *sdio_func)/' \
+				"$kerneldir/drivers/net/wireless/realtek/rtw88/sdio.c"
+			sed -i '/struct sdio_func \*sdio_func = dev_to_sdio_func(dev);/d' \
+				"$kerneldir/drivers/net/wireless/realtek/rtw88/sdio.c"
 
-		# Kernel 6.18 uses wireless_dev * for cfg80211 callbacks (changed from 7.1.0 check in vendor driver)
-		# Fix already applied in kernel fork (leftymods/linux-6.18.y), but harness cp overwrites
-		# vendor source which still has (7, 1, 0). This sed re-applies the fix after cp.
-		sed -i 's/KERNEL_VERSION(7, 1, 0)/KERNEL_VERSION(6, 18, 0)/g' \
-			"$kerneldir/drivers/net/wireless/rtl88x2cs/os_dep/linux/ioctl_cfg80211.c"
+			# Fix all SDIO chip drivers: move .shutdown from inside .drv {} to direct member
+			# Four files (rtw8822cs, rtw8822bs, rtw8821cs, rtw8723ds) use the standard format:
+			#   .drv = {\n\t\t.pm = &rtw_sdio_pm_ops,\n\t\t.shutdown = func,\n\t}\n};
+			# rtw8723cs.c differs: no trailing comma on .shutdown, \n\t}}; closure
+			for chip_file in rtw8822cs.c rtw8822bs.c rtw8821cs.c rtw8723ds.c; do
+				perl -i -0777 -pe \
+					's/\.drv = \{\n\t\t\.pm = &rtw_sdio_pm_ops,\n\t\t\.shutdown = (.*),\n\t\}/.drv = {\n\t\t.pm = \&rtw_sdio_pm_ops,\n\t},\n\t.shutdown = \1,/g' \
+					"$kerneldir/drivers/net/wireless/realtek/rtw88/$chip_file"
+			done
+			perl -i -0777 -pe \
+				's/\.drv = \{\n\t\t\.pm = &rtw_sdio_pm_ops,\n\t\t\.shutdown = (.*)\n\t\}};/.drv = {\n\t\t.pm = \&rtw_sdio_pm_ops,\n\t},\n\t.shutdown = \1,\n};/g' \
+				"$kerneldir/drivers/net/wireless/realtek/rtw88/rtw8723cs.c"
+		fi
 	fi
 }
 

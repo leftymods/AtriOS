@@ -87,13 +87,6 @@ function kernel_main_patching() {
 		display_alert "Removed broken board DTS" "meson-g12b-a311d-cainiao-cniot-core (pwm_d_a_pins missing)" "warn"
 	fi
 
-	# rtl88x2cs: belt-and-suspenders — re-apply KERNEL_VERSION fix in case cached driver patch missed it
-	declare rtl88x2cs_ioctl="${kernel_work_dir}/drivers/net/wireless/rtl88x2cs/os_dep/linux/ioctl_cfg80211.c"
-	if [[ -f "$rtl88x2cs_ioctl" ]] && rg -q "KERNEL_VERSION(7, 1, 0)" "$rtl88x2cs_ioctl" 2>/dev/null; then
-		sed -i 's/KERNEL_VERSION(7, 1, 0)/KERNEL_VERSION(6, 18, 0)/g' "$rtl88x2cs_ioctl"
-		display_alert "Applied uncached rtl88x2cs KERNEL_VERSION fix" "ioctl_cfg80211.c" "info"
-	fi
-
 	# STOP HERE, for cli support for patching tools.
 	if [[ "${PATCH_ONLY}" == "yes" ]]; then
 		return 0

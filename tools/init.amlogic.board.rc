@@ -1,0 +1,182 @@
+import /vendor/etc/init/hw/init.amlogic.usb.rc
+import /vendor/etc/init/hw/init.amlogic.tb_detect.rc
+
+on early-init
+    loglevel 3
+
+    mount configfs configfs /sys/kernel/config
+    #mount usbfs none /proc/bus/usb
+
+on init
+
+on fs
+    insmod /vendor/lib/modules/mali.ko
+
+on post-fs-data
+    insmod /vendor/lib/dovi.ko
+    insmod /vendor/lib/modules/atbm8881_fe.ko
+    insmod /vendor/lib/modules/aml_hardware_dmx.ko
+    insmod /vendor/lib/modules/rotary-volume.ko
+    chmod 777 /data/anr
+
+on boot
+    setprop ro.radio.noril true
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor interactive
+    write /sys/class/freq_limit/limit 0
+#HDMI IN
+    chmod 666 /sys/class/sii9233a/port
+    chmod 666 /sys/class/sii9233a/enable
+    chmod 666 /sys/module/tvin_vdin/parameters/max_buf_num
+
+    # chmod 0666 /dev/ge2d
+    chmod 666 /dev/cec
+    chmod 0666 /dev/opteearmtz00
+    chmod 0666 /dev/tee0
+
+#NET LED
+    chmod 666 sys/class/leds/net_green/brightness
+    chmod 666 sys/class/leds/net_red/brightness
+
+#IR blaster
+    chmod 666 /sys/devices/virtual/meson-irblaster/irblaster1/carrier_freq
+    chmod 666 /sys/devices/virtual/meson-irblaster/irblaster1/duty_cycle
+    chmod 666 /sys/devices/virtual/meson-irblaster/irblaster1/send
+
+#Zigbee-control enable
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev35f
+    insmod /vendor/lib/modules/zigbee-control.ko
+    symlink /dev/lp_uart /dev/zigbee_uart
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev375f
+    insmod /vendor/lib/modules/zigbee-control.ko
+    symlink /dev/ttyS4 /dev/zigbee_uart
+    symlink /dev/ttyS4 /dev/lp_uart
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev376f
+    insmod /vendor/lib/modules/zigbee-control.ko
+    symlink /dev/ttyS4 /dev/zigbee_uart
+    symlink /dev/ttyS4 /dev/lp_uart
+
+#WIFI/BT enable
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_dvt
+    # 482 - wifi enable
+    # 493 - bt enable
+    write /sys/class/gpio/export 482
+    write /sys/class/gpio/export 493
+    write /sys/class/gpio/gpio482/direction high
+    write /sys/class/gpio/gpio493/direction high
+
+    insmod /vendor/lib/modules/btintel.ko
+    insmod /vendor/lib/modules/btusb.ko
+
+    insmod /vendor/lib/backported_iwlwifi/compat.ko
+    insmod /vendor/lib/backported_iwlwifi/cfg80211.ko
+    insmod /vendor/lib/backported_iwlwifi/mac80211.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlwifi.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlmvm.ko
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_pvt
+    # 482 - wifi enable
+    # 493 - bt enable
+    write /sys/class/gpio/export 482
+    write /sys/class/gpio/export 493
+    write /sys/class/gpio/gpio482/direction high
+    write /sys/class/gpio/gpio493/direction high
+
+    insmod /vendor/lib/modules/btintel.ko
+    insmod /vendor/lib/modules/btusb.ko
+
+    insmod /vendor/lib/backported_iwlwifi/compat.ko
+    insmod /vendor/lib/backported_iwlwifi/cfg80211.ko
+    insmod /vendor/lib/backported_iwlwifi/mac80211.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlwifi.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlmvm.ko
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev3
+    # 482 - wifi enable
+    # 493 - bt enable
+    write /sys/class/gpio/export 482
+    write /sys/class/gpio/export 493
+    write /sys/class/gpio/gpio482/direction high
+    write /sys/class/gpio/gpio493/direction high
+
+    insmod /vendor/lib/modules/btintel.ko
+    insmod /vendor/lib/modules/btusb.ko
+
+    insmod /vendor/lib/backported_iwlwifi/compat.ko
+    insmod /vendor/lib/backported_iwlwifi/cfg80211.ko
+    insmod /vendor/lib/backported_iwlwifi/mac80211.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlwifi.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlmvm.ko
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev3f
+    # 482 - wifi enable
+    # 493 - bt enable
+    write /sys/class/gpio/export 482
+    write /sys/class/gpio/export 493
+    write /sys/class/gpio/gpio482/direction high
+    write /sys/class/gpio/gpio493/direction high
+
+    insmod /vendor/lib/modules/btintel.ko
+    insmod /vendor/lib/modules/btusb.ko
+
+    insmod /vendor/lib/backported_iwlwifi/compat.ko
+    insmod /vendor/lib/backported_iwlwifi/cfg80211.ko
+    insmod /vendor/lib/backported_iwlwifi/mac80211.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlwifi.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlmvm.ko
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev35f
+    # 482 - wifi enable
+    # 493 - bt enable
+    write /sys/class/gpio/export 482
+    write /sys/class/gpio/export 493
+    write /sys/class/gpio/gpio482/direction high
+    write /sys/class/gpio/gpio493/direction high
+
+    insmod /vendor/lib/modules/btintel.ko
+    insmod /vendor/lib/modules/btusb.ko
+
+    insmod /vendor/lib/backported_iwlwifi/compat.ko
+    insmod /vendor/lib/backported_iwlwifi/cfg80211.ko
+    insmod /vendor/lib/backported_iwlwifi/mac80211.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlwifi.ko
+    insmod /vendor/lib/backported_iwlwifi/iwlmvm.ko
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev375f
+    exec - root wifi -- /vendor/bin/wifi_power 1
+    exec - root wifi -- /vendor/bin/multiwifi.sh
+
+on boot && property:ro.boot.hardware.amlogic_dt_id=g12a_s905x2_rev376f
+    exec - root wifi -- /vendor/bin/wifi_power 1
+    exec - root wifi -- /vendor/bin/multiwifi.sh
+
+# Pause SCP task, stop led ring animation, release I2C bus
+# Load all kernel modules which works with I2C bus
+# Start Audioserver
+on property:vendor.load_i2c_modules=1
+    write /sys/class/scp_ctrl/pause_scp 1
+    insmod /vendor/lib/modules/snd-soc-tas5825m.ko
+    insmod /vendor/lib/modules/snd-soc-sy6045s.ko
+    insmod /vendor/lib/modules/snd-soc-pcm1774.ko
+    insmod /vendor/lib/modules/snd-soc-pcm1774-i2c.ko
+    insmod /vendor/lib/modules/snd-soc-es8156.ko
+    insmod /vendor/lib/modules/quasar_led_screen.ko
+    insmod /vendor/lib/modules/gowin_led_device.ko
+    insmod /vendor/lib/modules/ltr308als01.ko
+    insmod /vendor/lib/modules/snd-soc-tlv320adc3101.ko
+    insmod /vendor/lib/modules/snd-soc-es7210.ko
+    insmod /vendor/lib/modules/leds-is31fl32xx.ko
+    insmod /vendor/lib/modules/quasar_led_ring.ko
+    insmod /vendor/lib/modules/quasar_pcba_ids.ko
+    exec - root -- /vendor/bin/check_sound_ready.sh 0
+    insmod /vendor/lib/modules/snd-aloop.ko
+    exec - root -- /vendor/bin/check_sound_ready.sh 1
+    setprop vts.native_server.on 0
+    setprop vendor.i2c_modules_ready 1
+
+service rc_local /vendor/bin/rc_local.sh
+    class main
+    user root
+    group root
+    oneshot
