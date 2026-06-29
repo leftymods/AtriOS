@@ -534,7 +534,11 @@ driver_rtl88x2cs() {
 			"$kerneldir/drivers/net/wireless/rtl88x2cs/os_dep/linux/sdio_intf.c"
 
 		# Kernel 6.18 uses wireless_dev * for cfg80211 callbacks (changed from 7.1.0 check in vendor driver)
-		sed -i 's/KERNEL_VERSION(7,1,0)/KERNEL_VERSION(6,1,0)/g' \
+		# NOTE: vendor sources use "KERNEL_VERSION(7, 1, 0)" with spaces after commas
+		# Kernel 6.18 changed cfg80211 ops/callbacks from net_device * to wireless_dev *
+		# (upstream commit 033fe322f585). Vendor driver expects this at 7.1.0 but
+		# the change is already in 6.18.
+		sed -i 's/KERNEL_VERSION(7, 1, 0)/KERNEL_VERSION(6, 18, 0)/g' \
 			"$kerneldir/drivers/net/wireless/rtl88x2cs/os_dep/linux/ioctl_cfg80211.c"
 	fi
 }
