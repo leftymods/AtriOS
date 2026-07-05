@@ -6,14 +6,20 @@
 #include <getopt.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/un.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
+#include <fcntl.h>
 
 static const char *anim_dir = "/etc/atriled/animations";
 static const char *pid_file = "/run/atriled.pid";
+static const char *sock_path = "/run/atriled.sock";
 static volatile int running = 1;
+static char current_anim[128] = "";
+static int current_loop = 1;
 
 static void handle_signal(int sig)
 {
@@ -25,6 +31,9 @@ static int load_and_play(struct atri_led *led, const char *name, int loop)
 {
 	struct animation anim;
 	memset(&anim, 0, sizeof(anim));
+
+	strncpy(current_anim, name, sizeof(current_anim) - 1);
+	current_loop = loop;
 
 	char path[512];
 	snprintf(path, sizeof(path), "%s/%s.anim", anim_dir, name);
@@ -44,6 +53,10 @@ static int load_and_play(struct atri_led *led, const char *name, int loop)
 
 	while (running) {
 		for (int f = 0; f < anim.frame_count && running; f++) {
+			if (anim.frames[f].duration_ms < 0) {
+				running = 0;
+				break;
+			}
 			for (int r = 0; r < led->ring_count; r++) {
 				led->brightness[r][RGB_R] = anim.frames[f].rgb[r][RGB_R];
 				led->brightness[r][RGB_G] = anim.frames[f].rgb[r][RGB_G];
@@ -56,6 +69,7 @@ static int load_and_play(struct atri_led *led, const char *name, int loop)
 			}
 		}
 		if (!loop) break;
+		if (!running) break;
 	}
 
 	free(anim.frames);
@@ -67,7 +81,6 @@ static int daemonize(void)
 	pid_t pid = fork();
 	if (pid < 0) return -1;
 	if (pid > 0) {
-		printf("atriled started (pid %d)\n", pid);
 		_exit(0);
 	}
 	if (setsid() < 0) return -1;
@@ -77,12 +90,64 @@ static int daemonize(void)
 	if (pid > 0) _exit(0);
 	chdir("/");
 	umask(0);
-	fclose(stdin);
-	fclose(stdout);
-	fclose(stderr);
 	FILE *pf = fopen(pid_file, "w");
 	if (pf) { fprintf(pf, "%d\n", getpid()); fclose(pf); }
 	return 0;
+}
+
+static int create_socket(void)
+{
+	unlink(sock_path);
+	int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (fd < 0) return -1;
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
+	if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+		close(fd);
+		return -1;
+	}
+	chmod(sock_path, 0666);
+	return fd;
+}
+
+static void handle_command(struct atri_led *led, const char *cmd)
+{
+	if (strncmp(cmd, "play ", 5) == 0) {
+		char name[128];
+		strncpy(name, cmd + 5, sizeof(name) - 1);
+		name[sizeof(name) - 1] = '\0';
+		char *nl = strchr(name, '\n');
+		if (nl) *nl = '\0';
+		char *sp = strchr(name, ' ');
+		int loop = 0;
+		if (sp) { *sp = '\0'; loop = atoi(sp + 1); }
+		running = 0;
+		usleep(100000);
+		running = 1;
+		load_and_play(led, name, loop);
+	}
+}
+
+static void socket_loop(struct atri_led *led)
+{
+	int sock = create_socket();
+	if (sock < 0) return;
+
+	char buf[256];
+	struct sockaddr_un client;
+	socklen_t len = sizeof(client);
+	while (1) {
+		int n = recvfrom(sock, buf, sizeof(buf) - 1, 0,
+			(struct sockaddr*)&client, &len);
+		if (n > 0) {
+			buf[n] = '\0';
+			handle_command(led, buf);
+		}
+	}
+	close(sock);
+	unlink(sock_path);
 }
 
 static void list_animations(void)
@@ -169,14 +234,21 @@ int main(int argc, char *argv[])
 	const char *cmd = argv[1];
 
 	if (strcmp(cmd, "daemon") == 0) {
-		const char *anim_name = argc > 2 ? argv[2] : "happy";
+		const char *anim_name = argc > 2 ? argv[2] : "notification_passive";
 		if (daemonize() < 0) {
 			fprintf(stderr, "Failed to daemonize\n");
 			return 1;
 		}
 		atri_led_init(&led);
-		load_and_play(&led, anim_name, 1);
-		atri_led_off(&led);
+		/* Start animation in a separate process, then listen for commands */
+		pid_t apid = fork();
+		if (apid == 0) {
+			load_and_play(&led, anim_name, 1);
+			atri_led_off(&led);
+			_exit(0);
+		}
+		socket_loop(&led);
+		kill(apid, SIGTERM);
 		unlink(pid_file);
 
 	} else if (strcmp(cmd, "play") == 0) {
