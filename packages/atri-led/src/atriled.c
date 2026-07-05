@@ -31,7 +31,11 @@ static int load_and_play(struct atri_led *led, const char *name, int loop)
 
 	int ret = atri_led_load_animation(path, &anim);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to load animation: %s\n", path);
+		snprintf(path, sizeof(path), "%s/%s.led", anim_dir, name);
+		ret = atri_led_load_animation(path, &anim);
+	}
+	if (ret < 0) {
+		fprintf(stderr, "Failed to load animation: %s\n", name);
 		return -1;
 	}
 
@@ -91,17 +95,19 @@ static void list_animations(void)
 	struct dirent *de;
 	int n = 0;
 	while ((de = readdir(d)) != NULL) {
-		if (strstr(de->d_name, ".anim")) {
+		if (strstr(de->d_name, ".anim") || strstr(de->d_name, ".led")) {
 			char name[128];
 			memcpy(name, de->d_name, sizeof(name) - 1);
 			name[sizeof(name) - 1] = '\0';
-			*strstr(name, ".anim") = '\0';
+			char *dot = strstr(name, ".anim");
+			if (!dot) dot = strstr(name, ".led");
+			if (dot) *dot = '\0';
 			printf("  %s\n", name);
 			n++;
 		}
 	}
 	closedir(d);
-	if (n == 0) printf("(no .anim files found in %s)\n", anim_dir);
+	if (n == 0) printf("(no .anim or .led files found in %s)\n", anim_dir);
 }
 
 static int show_status(void)

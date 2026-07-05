@@ -43,11 +43,14 @@ install: $(LIB) $(CTL_BIN) $(MAIN_BIN)
 	mkdir -p $(DESTDIR)/usr/bin
 	mkdir -p $(DESTDIR)/usr/include
 	mkdir -p $(DESTDIR)/lib/systemd/system
+	mkdir -p $(DESTDIR)/etc/atriled/animations
 	cp $(LIB) $(DESTDIR)/usr/lib/
 	cp $(CTL_BIN) $(DESTDIR)/usr/bin/
 	cp $(MAIN_BIN) $(DESTDIR)/usr/bin/
 	cp include/atri_led.h $(DESTDIR)/usr/include/
 	cp include/atri_led_anim.h $(DESTDIR)/usr/include/
+	cp etc/atriled/animations/*.led $(DESTDIR)/etc/atriled/animations/
+	cp etc/atriled/animations/*.anim $(DESTDIR)/etc/atriled/animations/ 2>/dev/null || true
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
 else

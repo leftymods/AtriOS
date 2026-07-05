@@ -58,12 +58,108 @@ static int parse_per_ring_line(const char *line, struct animation_frame *frame, 
 	return 0;
 }
 
+static int parse_hex_color(const char *s, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+	unsigned int ri, gi, bi;
+	if (s[0] == '\0') return -1;
+	if (sscanf(s, "%02x%02x%02x", &ri, &gi, &bi) == 3) {
+		*r = (uint8_t)ri; *g = (uint8_t)gi; *b = (uint8_t)bi;
+		return 0;
+	}
+	return -1;
+}
+
+static int parse_led_line(const char *line, struct animation_frame *frame, int *loop_flag)
+{
+	char buf[4096];
+	memcpy(buf, line, sizeof(buf) - 1);
+	buf[sizeof(buf) - 1] = '\0';
+	char *trimmed = buf;
+	while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
+
+	if (*trimmed == '\0' || *trimmed == '#') return -2;
+
+	if (strcmp(trimmed, "loop") == 0) {
+		*loop_flag = 1;
+		return -2;
+	}
+	if (strcmp(trimmed, "gammacorrection") == 0) return -2;
+	if (strncmp(trimmed, "smooth", 6) == 0) return -2;
+
+	int n = 0;
+	char *token = strtok(trimmed, " \t");
+	while (token && n < ATRI_LED_MAX_RINGS) {
+		if (parse_hex_color(token,
+			&frame->rgb[n][RGB_R],
+			&frame->rgb[n][RGB_G],
+			&frame->rgb[n][RGB_B]) == 0) {
+			n++;
+		} else if (n > 0) {
+			unsigned int d;
+			if (sscanf(token, "%u", &d) == 1) {
+				frame->duration_ms = (int)d;
+			}
+			break;
+		}
+		token = strtok(NULL, " \t");
+	}
+
+	return (n > 0) ? 0 : -1;
+}
+
 int atri_led_load_animation(const char *path, struct animation *anim)
 {
 	FILE *f = fopen(path, "r");
 	if (!f) return -1;
 
 	memset(anim, 0, sizeof(*anim));
+
+	int is_led = (strstr(path, ".led") != NULL);
+
+	if (is_led) {
+		const char *basename = strrchr(path, '/');
+		if (basename) basename++; else basename = path;
+		strncpy(anim->name, basename, sizeof(anim->name) - 1);
+		char *dot = strchr(anim->name, '.');
+		if (dot) *dot = '\0';
+
+		int loop_flag = 0;
+		int capacity = 256;
+		anim->frames = calloc(capacity, sizeof(struct animation_frame));
+		if (!anim->frames) { fclose(f); return -1; }
+
+		char line[4096];
+		int fi = 0;
+		while (fgets(line, sizeof(line), f)) {
+			struct animation_frame tmp = { .duration_ms = 100 };
+			int ret = parse_led_line(line, &tmp, &loop_flag);
+			if (ret == 0) {
+				if (fi >= capacity) {
+					capacity *= 2;
+					struct animation_frame *nf = realloc(anim->frames,
+						capacity * sizeof(struct animation_frame));
+					if (!nf) break;
+					anim->frames = nf;
+				}
+				anim->frames[fi] = tmp;
+				fi++;
+			}
+		}
+		anim->frame_count = fi;
+		fclose(f);
+
+		if (loop_flag && anim->frame_count > 0) {
+			struct animation_frame *nf = realloc(anim->frames,
+				(anim->frame_count + 1) * sizeof(struct animation_frame));
+			if (nf) {
+				anim->frames = nf;
+				anim->frames[anim->frame_count] = anim->frames[0];
+				anim->frames[anim->frame_count].duration_ms = -1;
+				anim->frame_count++;
+			}
+		}
+		return 0;
+	}
 
 	if (fscanf(f, " %63s ", anim->name) != 1) {
 		fclose(f);
