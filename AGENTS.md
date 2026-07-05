@@ -9,7 +9,7 @@
 
 ## Kernel commit pinning
 
-- Kernel pinned via `KERNELBRANCH="commit:<sha>"` in `config/sources/families/include/meson64_common.inc:49`
+- Kernel pinned via `KERNELBRANCH="commit:<sha>"` in `config/sources/families/include/meson64_common.inc:47`
 - To update: `git ls-remote https://github.com/leftymods/linux-6.18.y.git main` → update SHA in that file
 - Also update the fetch in `lib/functions/compilation/kernel-git-oras.sh:207-228` if the ref format changes
 - Custom kernel sources (not `kernel.org` or `googlesource.com`) are cloned directly, bypassing ORAS bundles
@@ -41,7 +41,7 @@ Pinned tool versions in `lib/*.sh` are tracked by Renovate's regex manager via t
 ## Board support
 
 - **One board**: `AtriStation` (Amlogic S905X3, meson-sm1 family) — `config/boards/atristation.conf`
-- Board config enables: RTL8822CS WiFi/BT, TAS5825M audio amp, rotary encoder, AtriOS sound stack
+- Board config enables: RTL8822CS WiFi/BT, SY6045S audio amps (tweeters + woofer), rotary encoder, AtriOS sound stack
 
 ## Patches policy
 
