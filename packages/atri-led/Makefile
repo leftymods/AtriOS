@@ -9,6 +9,7 @@ LIB = libatri_led.a
 CTL_BIN = atrledctl
 MAIN_BIN = atrled
 VOL_BIN = atrivolume
+SCR_BIN = atriled-screen
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
@@ -38,7 +39,10 @@ $(MAIN_BIN): src/atriled.c $(LIB) include/atri_led.h include/atri_led_anim.h
 $(VOL_BIN): src/atrivolume.c $(LIB) include/atri_led.h
 	$(CC) $(CFLAGS) $< -L. -latri_led $(ASOUND_LIBS) $(LDFLAGS) -o $@
 
-install: $(LIB) $(CTL_BIN) $(MAIN_BIN)
+$(SCR_BIN): src/atriled_screen.c
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+
+install: $(LIB) $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN)
 	mkdir -p $(DESTDIR)/usr/lib
 	mkdir -p $(DESTDIR)/usr/bin
 	mkdir -p $(DESTDIR)/usr/include
@@ -51,6 +55,7 @@ install: $(LIB) $(CTL_BIN) $(MAIN_BIN)
 	cp include/atri_led_anim.h $(DESTDIR)/usr/include/
 	cp etc/atriled/animations/*.led $(DESTDIR)/etc/atriled/animations/
 	cp etc/atriled/animations/*.anim $(DESTDIR)/etc/atriled/animations/ 2>/dev/null || true
+	cp $(SCR_BIN) $(DESTDIR)/usr/bin/
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
 else
@@ -59,6 +64,6 @@ else
 endif
 
 clean:
-	rm -f *.o $(LIB) $(CTL_BIN) $(MAIN_BIN) $(VOL_BIN)
+	rm -f *.o $(LIB) $(CTL_BIN) $(MAIN_BIN) $(VOL_BIN) $(SCR_BIN)
 
 .PHONY: all install clean

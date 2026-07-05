@@ -209,7 +209,8 @@ static void print_usage(const char *prog)
 	printf("  list                       List available animations\n");
 	printf("  status                     Check if daemon is running\n");
 	printf("  stop                       Stop the daemon\n");
-	printf("  off                        Turn off all LEDs\n\n");
+	printf("  off                        Turn off all LEDs\n");
+	printf("  test                       Play all animations sequentially\n\n");
 	printf("Animations are loaded from: %s\n", anim_dir);
 	printf("Use 'list' to show available animations.\n");
 }
@@ -282,6 +283,27 @@ int main(int argc, char *argv[])
 	} else if (strcmp(cmd, "off") == 0) {
 		atri_led_off(&led);
 		printf("LEDs turned off\n");
+
+	} else if (strcmp(cmd, "test") == 0) {
+		DIR *d = opendir(anim_dir);
+		if (!d) { fprintf(stderr, "No animations directory\n"); return 1; }
+		struct dirent *de;
+		int count = 0;
+		while ((de = readdir(d)) != NULL) {
+			if (strstr(de->d_name, ".led") || strstr(de->d_name, ".anim")) {
+				char name[128];
+				memcpy(name, de->d_name, sizeof(name) - 1);
+				name[sizeof(name) - 1] = '\0';
+				char *dot = strstr(name, ".anim");
+				if (!dot) dot = strstr(name, ".led");
+				if (dot) *dot = '\0';
+				printf("[%d] Playing: %s\n", ++count, name);
+				load_and_play(&led, name, 0);
+				usleep(500000);
+			}
+		}
+		closedir(d);
+		printf("Test complete: %d animations played\n", count);
 
 	} else {
 		fprintf(stderr, "Unknown command: %s\n", cmd);
