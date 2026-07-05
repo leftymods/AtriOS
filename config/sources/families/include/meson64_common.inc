@@ -52,7 +52,7 @@ esac
 
 # Enable RTL8822CS debugfs for diagnostics
 function custom_kernel_config__enable_rtw88_debugfs() {
-	opts_m+=("CONFIG_RTW88_8822CS")
+	opts_y+=("CONFIG_RTW88_8822CS")
 	opts_y+=("CONFIG_RTW88_DEBUGFS")
 }
 
