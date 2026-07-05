@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <sys/ioctl.h>
 #include <linux/spi/spidev.h>
 #include <errno.h>
