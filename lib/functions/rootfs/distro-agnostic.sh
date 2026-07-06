@@ -409,8 +409,7 @@ function install_distribution_agnostic() {
 
 	# install atri-led LED ring control tools
 	install_artifact_deb_chroot "atri-led"
-	# install quasar-led-screen SPI LED screen test tool
-	install_artifact_deb_chroot "quasar-led-screen"
+
 
 	# install atrios-zsh
 	if [[ "${PACKAGE_LIST_RM}" != *atrios-zsh* ]]; then

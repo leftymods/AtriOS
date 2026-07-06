@@ -46,8 +46,7 @@ function determine_artifacts_to_build_for_image() {
 
 	# atri-led: LED ring control tools for AtriStation
 	artifacts_to_build+=("atri-led")
-	# quasar-led-screen: SPI LED screen test tool for AtriStation
-	artifacts_to_build+=("quasar-led-screen")
+
 
 	# Desktop packages are now installed by atrios-config (module_desktops)
 	# during rootfs creation in distro-agnostic.sh. No per-DE artifact to build.

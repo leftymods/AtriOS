@@ -32,11 +32,11 @@ compile_atri-led() {
 		Maintainer: $MAINTAINER <$MAINTAINERMAIL>
 		Section: universe/utils
 		Priority: optional
-		Description: AtriStation LED ring control tools
-		 Provides atrild and atrildctl for controlling WS2812B LED rings
-		 via sysfs (leds-group-multicolor).
-		 Includes systemd service for boot animation and udev rules
-		 for world-readable LED sysfs nodes.
+		Description: AtriStation LED ring and SPI screen tools
+		 Provides atrled, atrledctl for LED ring control via I2C,
+		 and quasar_led_test/text/demo/info for 25x16 SPI LED screen.
+		 Includes systemd service for boot animation and screen
+		 test/demo utilities.
 	END
 
 	# Compile C source for target architecture
