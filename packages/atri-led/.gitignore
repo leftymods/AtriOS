@@ -1,0 +1,7 @@
+*.o
+*.a
+atrled
+atrledctl
+atriled-screen
+atrivolume
+quasar_led_ctl

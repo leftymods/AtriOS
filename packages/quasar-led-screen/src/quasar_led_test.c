@@ -1,141 +1,155 @@
+#include "quasar_screen.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/spi/spidev.h>
-#include <poll.h>
 #include <time.h>
 
-#define WIDTH 25
-#define HEIGHT 16
-#define PIXELS (WIDTH * HEIGHT)
-
-static int spi_fd = -1;
-static uint8_t frame[WIDTH * HEIGHT / 8];
-static int gpio_reset = -1;
-
-int led_spi_init(const char *dev)
+static void pattern_all_on(quasar_screen_t *scr)
 {
-	spi_fd = open(dev, O_RDWR);
-	if (spi_fd < 0) {
-		perror(dev);
-		return -1;
-	}
-
-	uint32_t mode = SPI_MODE_0;
-	uint32_t bits = 8;
-	uint32_t speed = 4000000;
-
-	ioctl(spi_fd, SPI_IOC_WR_MODE32, &mode);
-	ioctl(spi_fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
-	ioctl(spi_fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
-
-	memset(frame, 0, sizeof(frame));
-	return 0;
-}
-
-void led_reset(void)
-{
-	if (gpio_reset >= 0) {
-		char path[64];
-		snprintf(path, sizeof(path), "/sys/class/gpio/gpio%d/value", gpio_reset);
-		int fd = open(path, O_WRONLY);
-		if (fd >= 0) {
-			write(fd, "0", 1);
-			usleep(10000);
-			write(fd, "1", 1);
-			close(fd);
-			usleep(100000);
-		}
-	}
-}
-
-void led_pixel(int x, int y, int on)
-{
-	if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return;
-	int addr = y * WIDTH + x;
-	int byte = addr / 8;
-	int bit = addr % 8;
-	if (on)
-		frame[byte] |= (1 << bit);
-	else
-		frame[byte] &= ~(1 << bit);
-}
-
-void led_update(void)
-{
-	uint8_t tx[WIDTH + 1];
-	for (int y = 0; y < HEIGHT; y++) {
-		tx[0] = y + 1;
-		memcpy(tx + 1, frame + y * WIDTH / 8, WIDTH / 8);
-		struct spi_ioc_transfer t = {
-			.tx_buf = (uintptr_t)tx,
-			.len = WIDTH / 8 + 1,
-			.speed_hz = 4000000,
-		};
-		ioctl(spi_fd, SPI_IOC_MESSAGE(1), &t);
-	}
-}
-
-void led_test_patterns(void)
-{
-	printf("Testing Quasar 25x16 monochrome LED screen via SPI\n");
-
-	printf("Pattern: all on\n");
-	memset(frame, 0xff, sizeof(frame));
-	led_update();
+	printf("all on\n");
+	memset(scr->fb, 0xff, sizeof(scr->fb));
+	screen_flush(scr);
 	sleep(1);
+}
 
-	printf("Pattern: all off\n");
-	memset(frame, 0, sizeof(frame));
-	led_update();
+static void pattern_all_off(quasar_screen_t *scr)
+{
+	printf("all off\n");
+	screen_clear(scr);
+	screen_flush(scr);
 	usleep(500000);
+}
 
-	printf("Pattern: horizontal scan\n");
-	for (int y = 0; y < HEIGHT; y++) {
-		memset(frame, 0, sizeof(frame));
-		for (int x = 0; x < WIDTH; x++) led_pixel(x, y, 1);
-		led_update();
-		usleep(100000);
+static void pattern_hscan(quasar_screen_t *scr)
+{
+	printf("horizontal scan\n");
+	for (int y = 0; y < SCREEN_HEIGHT; y++) {
+		screen_clear(scr);
+		screen_rect(scr, 0, y, SCREEN_WIDTH, 1, 1);
+		screen_flush(scr);
+		usleep(80000);
 	}
+}
 
-	printf("Pattern: vertical scan\n");
-	for (int x = 0; x < WIDTH; x++) {
-		memset(frame, 0, sizeof(frame));
-		for (int y = 0; y < HEIGHT; y++) led_pixel(x, y, 1);
-		led_update();
-		usleep(100000);
+static void pattern_vscan(quasar_screen_t *scr)
+{
+	printf("vertical scan\n");
+	for (int x = 0; x < SCREEN_WIDTH; x++) {
+		screen_clear(scr);
+		screen_rect(scr, x, 0, 1, SCREEN_HEIGHT, 1);
+		screen_flush(scr);
+		usleep(80000);
 	}
+}
 
-	printf("Pattern: checkerboard\n");
-	memset(frame, 0, sizeof(frame));
-	for (int y = 0; y < HEIGHT; y++) {
-		for (int x = 0; x < WIDTH; x++) {
-			if ((x + y) % 2) led_pixel(x, y, 1);
-		}
-	}
-	led_update();
+static void pattern_checkerboard(quasar_screen_t *scr)
+{
+	printf("checkerboard\n");
+	for (int y = 0; y < SCREEN_HEIGHT; y++)
+		for (int x = 0; x < SCREEN_WIDTH; x++)
+			screen_pixel(scr, x, y, (x + y) % 2);
+	screen_flush(scr);
 	sleep(1);
+}
+
+static void pattern_borders(quasar_screen_t *scr)
+{
+	printf("borders\n");
+	screen_clear(scr);
+	screen_rect(scr, 0, 0, SCREEN_WIDTH, 1, 1);
+	screen_rect(scr, 0, SCREEN_HEIGHT - 1, SCREEN_WIDTH, 1, 1);
+	screen_rect(scr, 0, 0, 1, SCREEN_HEIGHT, 1);
+	screen_rect(scr, SCREEN_WIDTH - 1, 0, 1, SCREEN_HEIGHT, 1);
+	screen_flush(scr);
+	sleep(1);
+}
+
+static void pattern_diagonal(quasar_screen_t *scr)
+{
+	printf("diagonal lines\n");
+	screen_clear(scr);
+	screen_line(scr, 0, 0, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1, 1);
+	screen_line(scr, SCREEN_WIDTH - 1, 0, 0, SCREEN_HEIGHT - 1, 1);
+	screen_line(scr, 0, SCREEN_HEIGHT / 2, SCREEN_WIDTH - 1, SCREEN_HEIGHT / 2, 1);
+	screen_line(scr, SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 1, 1);
+	screen_flush(scr);
+	sleep(1);
+}
+
+static void pattern_countdown(quasar_screen_t *scr)
+{
+	printf("countdown\n");
+	for (int i = 9; i >= 0; i--) {
+		screen_clear(scr);
+		char buf[2] = {(char)('0' + i), 0};
+		screen_text(scr, SCREEN_WIDTH / 2 - 3, SCREEN_HEIGHT / 2 - 4, buf, 1);
+		screen_flush(scr);
+		usleep(300000);
+	}
+}
+
+static void pattern_text(quasar_screen_t *scr)
+{
+	printf("text display\n");
+	screen_clear(scr);
+	screen_text(scr, 0, 0, "HELLO", 1);
+	screen_text(scr, 0, 8, "QUASAR", 1);
+	screen_flush(scr);
+	sleep(2);
+}
+
+static void pattern_pong(quasar_screen_t *scr)
+{
+	printf("pong demo\n");
+	int bx = 1, by = 1, bdx = 1, bdy = 1;
+	int px = SCREEN_WIDTH / 2 - 3, py = SCREEN_HEIGHT - 2;
+	for (int frame = 0; frame < 100; frame++) {
+		screen_clear(scr);
+		screen_rect(scr, px, py, 7, 1, 1);
+		screen_pixel(scr, bx, by, 1);
+		screen_flush(scr);
+		bx += bdx; by += bdy;
+		if (bx <= 0 || bx >= SCREEN_WIDTH - 1) bdx = -bdx;
+		if (by <= 0) bdy = -bdy;
+		if (by >= SCREEN_HEIGHT - 1) break;
+		if (by == py - 1 && bx >= px && bx < px + 7) bdy = -bdy;
+		usleep(80000);
+	}
 }
 
 int main(int argc, char *argv[])
 {
-	const char *dev = "/dev/spidev0.0";
+	const char *dev = "/dev/spidev1.0";
+	int gpio = 74;
 	if (argc > 1) dev = argv[1];
+	if (argc > 2) gpio = atoi(argv[2]);
 
-	if (led_spi_init(dev) < 0) {
-		fprintf(stderr, "Failed to open SPI device: %s\n", dev);
+	quasar_screen_t scr;
+	if (screen_open(&scr, dev) < 0) {
+		fprintf(stderr, "Failed to open %s\n", dev);
 		return 1;
 	}
+	scr.gpio_reset = gpio;
+	screen_reset(&scr);
 
-	led_reset();
+	printf("Quasar 25x16 SPI LED screen test\n");
+	printf("Device: %s  GPIO reset: %d\n\n", dev, gpio);
 
-	printf("Running test patterns...\n");
-	led_test_patterns();
+	pattern_all_on(&scr);
+	pattern_all_off(&scr);
+	pattern_borders(&scr);
+	pattern_hscan(&scr);
+	pattern_vscan(&scr);
+	pattern_diagonal(&scr);
+	pattern_checkerboard(&scr);
+	pattern_text(&scr);
+	pattern_countdown(&scr);
+	pattern_pong(&scr);
 
-	close(spi_fd);
+	screen_clear(&scr);
+	screen_flush(&scr);
+	screen_close(&scr);
+	printf("\nTest complete\n");
 	return 0;
 }

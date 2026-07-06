@@ -26,17 +26,21 @@ compile_quasar-led-screen() {
 		Maintainer: $MAINTAINER <$MAINTAINERMAIL>
 		Section: universe/utils
 		Priority: optional
-		Description: Quasar 25x16 monochrome LED screen test tool
-		 Test program for Quasar LED screen via SPI interface.
+		Description: Quasar 25x16 monochrome LED screen tools
+		 Test, text, demo, and info programs for Quasar LED screen
+		 via SPI interface. Includes shared screen library.
 		END
 
 	display_alert "Compiling quasar-led-screen" "CC=${KERNEL_COMPILER}gcc" "info"
 	declare -g orig_dir="${SRC}/packages/quasar-led-screen"
 
+	run_host_command_logged rm -f "${orig_dir}"/*.o "${orig_dir}"/libquasar_screen.a
 	run_host_command_logged rm -f "${orig_dir}"/quasar_led_test
 	run_host_command_logged make -C "${orig_dir}" CC="${KERNEL_COMPILER}gcc" clean all
 
-	run_host_command_logged cp "${orig_dir}/quasar_led_test" "${destination}/usr/bin/"
+	for bin in quasar_led_test quasar_led_text quasar_led_demo quasar_led_info; do
+		run_host_command_logged cp "${orig_dir}/${bin}" "${destination}/usr/bin/"
+	done
 
 	find "${destination}" -print0 2> /dev/null | xargs -0r chown --no-dereference 0:0
 	find "${destination}" ! -type l -print0 2> /dev/null | xargs -0r chmod 'go=rX,u+rw,a-s'

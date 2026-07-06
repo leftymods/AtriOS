@@ -10,11 +10,13 @@ CTL_BIN = atrledctl
 MAIN_BIN = atrled
 VOL_BIN = atrivolume
 SCR_BIN = atriled-screen
+QUASAR_CTL_BIN = quasar_led_ctl
+QUASAR_CTL_SRC = ../quasar-led-screen/src/quasar_led_ctl.c
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LIB) $(CTL_BIN) $(MAIN_BIN)
+all: $(LIB) $(CTL_BIN) $(MAIN_BIN) $(QUASAR_CTL_BIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -42,6 +44,9 @@ $(VOL_BIN): src/atrivolume.c $(LIB) include/atri_led.h
 $(SCR_BIN): src/atriled_screen.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
+$(QUASAR_CTL_BIN): $(QUASAR_CTL_SRC) $(LIB) include/atri_led.h include/atri_led_anim.h
+	$(CC) $(CFLAGS) -I./include $< -L. -latri_led $(LDFLAGS) -o $@
+
 install: all $(SCR_BIN)
 	mkdir -p $(DESTDIR)/usr/lib
 	mkdir -p $(DESTDIR)/usr/bin
@@ -51,6 +56,7 @@ install: all $(SCR_BIN)
 	cp $(LIB) $(DESTDIR)/usr/lib/
 	cp $(CTL_BIN) $(DESTDIR)/usr/bin/
 	cp $(MAIN_BIN) $(DESTDIR)/usr/bin/
+	cp $(QUASAR_CTL_BIN) $(DESTDIR)/usr/bin/
 	cp include/atri_led.h $(DESTDIR)/usr/include/
 	cp include/atri_led_anim.h $(DESTDIR)/usr/include/
 	cp etc/atriled/animations/*.led $(DESTDIR)/etc/atriled/animations/
@@ -65,6 +71,6 @@ else
 endif
 
 clean:
-	rm -f *.o $(LIB) $(CTL_BIN) $(MAIN_BIN) $(VOL_BIN) $(SCR_BIN)
+	rm -f *.o $(LIB) $(CTL_BIN) $(MAIN_BIN) $(VOL_BIN) $(SCR_BIN) $(QUASAR_CTL_BIN)
 
 .PHONY: all install clean
