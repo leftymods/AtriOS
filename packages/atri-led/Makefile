@@ -42,7 +42,7 @@ $(VOL_BIN): src/atrivolume.c $(LIB) include/atri_led.h
 $(SCR_BIN): src/atriled_screen.c
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
-install: $(LIB) $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN)
+install: all $(SCR_BIN)
 	mkdir -p $(DESTDIR)/usr/lib
 	mkdir -p $(DESTDIR)/usr/bin
 	mkdir -p $(DESTDIR)/usr/include
@@ -56,11 +56,12 @@ install: $(LIB) $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN)
 	cp etc/atriled/animations/*.led $(DESTDIR)/etc/atriled/animations/
 	cp etc/atriled/animations/*.anim $(DESTDIR)/etc/atriled/animations/ 2>/dev/null || true
 	cp $(SCR_BIN) $(DESTDIR)/usr/bin/
+	cp systemd/*.service $(DESTDIR)/lib/systemd/system/
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
+	rm -f $(DESTDIR)/lib/systemd/system/atrivolume.service
 else
 	cp $(VOL_BIN) $(DESTDIR)/usr/bin/
-	cp systemd/atrivolume.service $(DESTDIR)/lib/systemd/system/
 endif
 
 clean:

@@ -54,8 +54,6 @@ compile_atri-led() {
 	# Copy configuration files from source package
 	run_host_command_logged cp -rv "${orig_dir}"/etc/atriled/animations/*.anim "${destination}"/etc/atriled/animations/
 	run_host_command_logged cp -rv "${orig_dir}"/etc/udev/rules.d/99-atri-led.rules "${destination}"/etc/udev/rules.d/
-	run_host_command_logged cp -rv "${orig_dir}"/lib/systemd/system/atri-led.service "${destination}"/lib/systemd/system/
-
 	# Copy firmware files if they exist
 	for fw in "${orig_dir}"/lib/firmware/*.bin; do
 		[[ -s "${fw}" ]] && run_host_command_logged cp -v "${fw}" "${destination}"/lib/firmware/

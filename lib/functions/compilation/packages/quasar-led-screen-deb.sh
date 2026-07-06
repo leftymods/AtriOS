@@ -33,8 +33,8 @@ compile_quasar-led-screen() {
 	display_alert "Compiling quasar-led-screen" "CC=${KERNEL_COMPILER}gcc" "info"
 	declare -g orig_dir="${SRC}/packages/quasar-led-screen"
 
-	run_host_command_logged make -C "${orig_dir}" clean 2>/dev/null || true
-	run_host_command_logged make -C "${orig_dir}" CC="${KERNEL_COMPILER}gcc" ${orig_dir}/quasar_led_test
+	run_host_command_logged rm -f "${orig_dir}"/quasar_led_test
+	run_host_command_logged make -C "${orig_dir}" CC="${KERNEL_COMPILER}gcc" clean all
 
 	run_host_command_logged cp "${orig_dir}/quasar_led_test" "${destination}/usr/bin/"
 
