@@ -55,7 +55,7 @@ compile_atri-led() {
 	run_host_command_logged cp -rv "${orig_dir}"/etc/atriled/animations/*.anim "${destination}"/etc/atriled/animations/
 	run_host_command_logged cp -rv "${orig_dir}"/etc/udev/rules.d/99-atri-led.rules "${destination}"/etc/udev/rules.d/
 	# Copy firmware files if they exist
-	for fw in "${orig_dir}"/lib/firmware/*.bin; do
+	for fw in "${orig_dir}"/lib/firmware/*.bin "${orig_dir}"/lib/firmware/*.manifest; do
 		[[ -s "${fw}" ]] && run_host_command_logged cp -v "${fw}" "${destination}"/lib/firmware/
 	done
 
