@@ -1,0 +1,15 @@
+[Unit]
+Description=AtriOS main LED/ring daemon
+After=systemd-modules-load.service systemd-udev-settle.service
+Wants=systemd-modules-load.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/atri-main
+Restart=on-failure
+RestartSec=2
+StandardError=journal
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target

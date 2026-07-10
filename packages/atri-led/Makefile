@@ -105,6 +105,9 @@ endif
 	cp include/quasar_screen.h $(DESTDIR)/usr/include/
 	cp etc/atriled/animations/*.led $(DESTDIR)/etc/atriled/animations/
 	cp etc/atriled/animations/*.anim $(DESTDIR)/etc/atriled/animations/ 2>/dev/null || true
+	mkdir -p $(DESTDIR)/lib/firmware
+	cp lib/firmware/*.bin $(DESTDIR)/lib/firmware/
+	cp lib/firmware/*.manifest $(DESTDIR)/lib/firmware/
 	cp systemd/*.service $(DESTDIR)/lib/systemd/system/
 ifneq ($(ASOUND_AVAIL),yes)
 	rm -f $(DESTDIR)/lib/systemd/system/atrivolume.service

@@ -1,0 +1,15 @@
+Source: atri-main
+Section: utils
+Priority: optional
+Maintainer: AtriOS contributors <none@example.com>
+Build-Depends: debhelper (>= 13), libc6-dev
+Standards-Version: 4.6.0
+
+Package: atri-main
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Offline userspace daemon for AtriStation LED matrix and ring
+ atri-main replaces the cloud-dependent maind from Yandex Station 2 firmware.
+ It drives the local SPI framebuffer, the 24 RGB ring LEDs, reacts to input
+ events, and plays offline animations. No network, cloud, Alice or WebRTC
+ code is included.

@@ -1,0 +1,8 @@
+atri-main (0.1.0) unstable; urgency=medium
+
+  * Initial offline daemon for AtriStation LED matrix and ring.
+  * Framebuffer auto-detection, backlight and ring LED control.
+  * Input reactions: volume, mic mute, voice command button.
+  * Stock boot/volume/thinking/error/mute/bluetooth/alarm/timer animations.
+
+ -- AtriOS contributors <none@example.com>  Thu, 09 Jul 2026 19:00:00 +0000
