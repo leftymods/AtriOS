@@ -8,7 +8,7 @@
 static void pattern_all_on(quasar_screen_t *scr)
 {
 	printf("all on\n");
-	memset(scr->fb, 0xff, sizeof(scr->fb));
+	screen_rect(scr, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 1);
 	screen_flush(scr);
 	sleep(1);
 }
@@ -120,21 +120,17 @@ static void pattern_pong(quasar_screen_t *scr)
 
 int main(int argc, char *argv[])
 {
-	const char *dev = "/dev/spidev1.0";
-	int gpio = 74;
-	if (argc > 1) dev = argv[1];
-	if (argc > 2) gpio = atoi(argv[2]);
+	(void)argc;
+	(void)argv;
 
 	quasar_screen_t scr;
-	if (screen_open(&scr, dev) < 0) {
-		fprintf(stderr, "Failed to open %s\n", dev);
+	if (screen_open(&scr, NULL) < 0) {
+		fprintf(stderr, "Failed to open atri_led_panel framebuffer\n");
 		return 1;
 	}
-	scr.gpio_reset = gpio;
 	screen_reset(&scr);
 
-	printf("Quasar 25x16 SPI LED screen test\n");
-	printf("Device: %s  GPIO reset: %d\n\n", dev, gpio);
+	printf("Quasar 25x16 LED screen test (via atri_led_panel fb)\n\n");
 
 	pattern_all_on(&scr);
 	pattern_all_off(&scr);

@@ -7,15 +7,15 @@
 #define SCREEN_WIDTH  25
 #define SCREEN_HEIGHT 16
 #define SCREEN_PIXELS (SCREEN_WIDTH * SCREEN_HEIGHT)
-#define SCREEN_BYTES  ((SCREEN_PIXELS + 7) / 8)
+#define SCREEN_BYTES  (SCREEN_PIXELS)
 
 typedef struct {
-	int spi_fd;
-	int gpio_reset;
-	uint8_t fb[SCREEN_BYTES];
+	int fb_fd;
+	uint8_t *fb_mmap;
+	int fb_len;
 } quasar_screen_t;
 
-int  screen_open(quasar_screen_t *scr, const char *spi_dev);
+int  screen_open(quasar_screen_t *scr, const char *ignored);
 void screen_close(quasar_screen_t *scr);
 void screen_reset(quasar_screen_t *scr);
 void screen_clear(quasar_screen_t *scr);
