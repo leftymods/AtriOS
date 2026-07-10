@@ -1,27 +1,23 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include "screen.h"
+#include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 
-int screen_init(struct screen *s, const char *fb_path, const char *bl_path)
+#define ATRI_FB_ID "atri_led_panel_fb"
+
+static int screen_open_fd(struct screen *s, int fd, const char *bl_path)
 {
-    memset(s, 0, sizeof(*s));
-    xstrlcpy(s->backlight_path, bl_path, sizeof(s->backlight_path));
-
-    s->fd = open(fb_path, O_RDWR);
-    if (s->fd < 0) {
-        log_msg(LOG_ERR, "failed to open %s: %s", fb_path, strerror(errno));
-        return -1;
-    }
-
     struct fb_var_screeninfo vinfo;
     struct fb_fix_screeninfo finfo;
-    if (ioctl(s->fd, FBIOGET_VSCREENINFO, &vinfo) < 0 ||
-        ioctl(s->fd, FBIOGET_FSCREENINFO, &finfo) < 0) {
+
+    if (ioctl(fd, FBIOGET_VSCREENINFO, &vinfo) < 0 ||
+        ioctl(fd, FBIOGET_FSCREENINFO, &finfo) < 0) {
         log_msg(LOG_ERR, "fb ioctl failed: %s", strerror(errno));
-        close(s->fd);
         return -1;
     }
 
@@ -30,10 +26,9 @@ int screen_init(struct screen *s, const char *fb_path, const char *bl_path)
     s->bpp = vinfo.bits_per_pixel / 8;
     s->line_length = finfo.line_length;
 
-    s->fb = mmap(NULL, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, s->fd, 0);
+    s->fb = mmap(NULL, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (s->fb == MAP_FAILED) {
         log_msg(LOG_ERR, "fb mmap failed: %s", strerror(errno));
-        close(s->fd);
         return -1;
     }
 
@@ -41,8 +36,58 @@ int screen_init(struct screen *s, const char *fb_path, const char *bl_path)
     if (s->backlight_fd < 0)
         log_msg(LOG_WARNING, "backlight %s not available: %s", bl_path, strerror(errno));
 
-    log_msg(LOG_INFO, "screen %dx%d bpp=%d line=%d mapped", s->width, s->height, s->bpp, s->line_length);
+    log_msg(LOG_INFO, "screen '%s' %dx%d bpp=%d line=%d mapped",
+            finfo.id, s->width, s->height, s->bpp, s->line_length);
     return 0;
+}
+
+static int screen_try_open(struct screen *s, const char *path,
+                           const char *bl_path, const char *want_id)
+{
+    struct fb_fix_screeninfo finfo;
+    int fd;
+
+    fd = open(path, O_RDWR);
+    if (fd < 0)
+        return -1;
+
+    if (ioctl(fd, FBIOGET_FSCREENINFO, &finfo) < 0) {
+        close(fd);
+        return -1;
+    }
+
+    if (want_id && strcmp(finfo.id, want_id) != 0) {
+        close(fd);
+        return -1;
+    }
+
+    s->fd = fd;
+    return screen_open_fd(s, fd, bl_path);
+}
+
+int screen_init(struct screen *s, const char *fb_path, const char *bl_path)
+{
+    memset(s, 0, sizeof(*s));
+    xstrlcpy(s->backlight_path, bl_path, sizeof(s->backlight_path));
+
+    /* Try the configured path first. */
+    if (fb_path && fb_path[0]) {
+        if (screen_try_open(s, fb_path, bl_path, NULL) == 0)
+            return 0;
+        log_msg(LOG_WARNING, "%s not usable, scanning for '%s'",
+                fb_path, ATRI_FB_ID);
+    }
+
+    /* Scan /dev/fb* for the AtriStation LED panel fb. */
+    for (int i = 0; i < 8; i++) {
+        char path[32];
+        snprintf(path, sizeof(path), "/dev/fb%d", i);
+        if (screen_try_open(s, path, bl_path, ATRI_FB_ID) == 0)
+            return 0;
+    }
+
+    log_msg(LOG_ERR, "screen framebuffer '%s' not found", ATRI_FB_ID);
+    return -1;
 }
 
 void screen_close(struct screen *s)
