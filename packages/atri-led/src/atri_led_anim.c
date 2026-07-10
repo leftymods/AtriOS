@@ -640,6 +640,8 @@ static struct animation_frame chase_frames[24];
 static struct animation_frame colors_frames[4];
 static struct animation_frame rainbow_frames[72];
 
+static void init_extra_animations(void);
+
 void atri_led_init_animations(void)
 {
 	fill_solid(red_frames, 1, FRAME_MS, 255, 0, 0);
@@ -650,6 +652,7 @@ void atri_led_init_animations(void)
 	fill_chase(chase_frames, 24, 60, 255, 0, 0);
 	fill_colors(colors_frames, 4, 500);
 	fill_rainbow(rainbow_frames, 72, 60);
+	init_extra_animations();
 }
 
 struct animation *atri_led_find_builtin(const char *name)
@@ -662,6 +665,12 @@ struct animation *atri_led_find_builtin(const char *name)
 	if (strcmp(name, "chase") == 0) return &anim_chase;
 	if (strcmp(name, "colors") == 0) return &anim_colors;
 	if (strcmp(name, "rainbow") == 0) return &anim_rainbow;
+	if (strcmp(name, "happy") == 0) return &anim_happy;
+	if (strcmp(name, "focused") == 0) return &anim_focused;
+	if (strcmp(name, "calming") == 0) return &anim_calming;
+	if (strcmp(name, "love") == 0) return &anim_love;
+	if (strcmp(name, "night") == 0) return &anim_night;
+	if (strcmp(name, "excited") == 0) return &anim_excited;
 	return NULL;
 }
 
@@ -711,4 +720,63 @@ struct animation anim_rainbow = {
 	.name = "rainbow",
 	.frame_count = 72,
 	.frames = rainbow_frames,
+};
+
+static struct animation_frame happy_frames[60];
+static struct animation_frame focused_frames[60];
+static struct animation_frame calming_frames[40];
+static struct animation_frame love_frames[40];
+static struct animation_frame night_frames[60];
+static struct animation_frame excited_frames[60];
+
+static void init_extra_animations(void)
+{
+	atri_led_fill_wave(happy_frames, 60, 4000, 1, 255, 100, 50, 100, 255, 50);
+	atri_led_fill_breathe(focused_frames, 60, 4000, 80, 60, 180);
+	atri_led_fill_wave_slow(calming_frames, 40, 6000, 1, 50, 100, 255, 100, 50, 200);
+	atri_led_fill_heart(love_frames, 40, 3000, 255, 50, 100, 255, 50, 100);
+	atri_led_fill_sparkle(night_frames, 60, 5000, 20, 20, 80, 200, 220, 255);
+	atri_led_fill_fire(excited_frames, 60, 2500, 255, 100, 0, 255, 200, 0);
+}
+
+struct animation anim_happy = {
+	.name = "happy",
+	.frame_count = 60,
+	.num_init = init_extra_animations,
+	.frames = happy_frames,
+};
+
+struct animation anim_focused = {
+	.name = "focused",
+	.frame_count = 60,
+	.num_init = init_extra_animations,
+	.frames = focused_frames,
+};
+
+struct animation anim_calming = {
+	.name = "calming",
+	.frame_count = 40,
+	.num_init = init_extra_animations,
+	.frames = calming_frames,
+};
+
+struct animation anim_love = {
+	.name = "love",
+	.frame_count = 40,
+	.num_init = init_extra_animations,
+	.frames = love_frames,
+};
+
+struct animation anim_night = {
+	.name = "night",
+	.frame_count = 60,
+	.num_init = init_extra_animations,
+	.frames = night_frames,
+};
+
+struct animation anim_excited = {
+	.name = "excited",
+	.num_init = init_extra_animations,
+	.frames = excited_frames,
+	.frame_count = 60,
 };

@@ -23,13 +23,8 @@ static void render_line(quasar_screen_t *scr, const char *line, int scroll)
 
 int main(int argc, char *argv[])
 {
-	const char *dev = "/dev/spidev1.0";
-	int gpio = 74;
-
 	if (argc < 2) {
 		fprintf(stderr, "Usage: %s [options] <text...>\n", argv[0]);
-		fprintf(stderr, "  -d <dev>   SPI device (default: /dev/spidev1.0)\n");
-		fprintf(stderr, "  -g <gpio>  GPIO reset pin (default: 74)\n");
 		fprintf(stderr, "  -s         single frame, no scroll\n");
 		fprintf(stderr, "  -r <ms>    scroll speed (default: 100)\n");
 		return 1;
@@ -40,9 +35,7 @@ int main(int argc, char *argv[])
 	int speed_ms = 100;
 
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) dev = argv[++i];
-		else if (strcmp(argv[i], "-g") == 0 && i + 1 < argc) gpio = atoi(argv[++i]);
-		else if (strcmp(argv[i], "-s") == 0) single = 1;
+		if (strcmp(argv[i], "-s") == 0) single = 1;
 		else if (strcmp(argv[i], "-r") == 0 && i + 1 < argc) speed_ms = atoi(argv[++i]);
 		else text = argv[i];
 	}
@@ -53,8 +46,7 @@ int main(int argc, char *argv[])
 	}
 
 	quasar_screen_t scr;
-	if (screen_open(&scr, dev) < 0) return 1;
-	scr.gpio_reset = gpio;
+	if (screen_open(&scr, NULL) < 0) return 1;
 	screen_reset(&scr);
 
 	if (single) {

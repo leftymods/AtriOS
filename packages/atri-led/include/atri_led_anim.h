@@ -13,6 +13,7 @@ struct animation {
 	char name[64];
 	int frame_count;
 	struct animation_frame *frames;
+	void (*num_init)(void);
 };
 
 int atri_led_load_animation(const char *path, struct animation *anim);
@@ -64,5 +65,12 @@ extern struct animation anim_off;
 extern struct animation anim_chase;
 extern struct animation anim_colors;
 extern struct animation anim_rainbow;
+
+extern struct animation anim_happy;
+extern struct animation anim_focused;
+extern struct animation anim_calming;
+extern struct animation anim_love;
+extern struct animation anim_night;
+extern struct animation anim_excited;
 
 #endif

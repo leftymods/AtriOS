@@ -1,0 +1,11 @@
+Package: atri-main
+Version: 0.1
+Section: utils
+Priority: optional
+Architecture: arm64
+Maintainer: leftymods <ggalab33@gmail.com>
+Depends: systemd
+Description: Offline userspace daemon for AtriStation
+ atri-main drives the LED matrix framebuffer, RGB ring LEDs,
+ input events and offline animations. It replaces the cloud
+ dependent maind from the Yandex Station 2 firmware.

@@ -29,7 +29,7 @@ ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS)
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -79,8 +79,8 @@ $(QDEMO_BIN): src/quasar_led_demo.c $(SCR_LIB)
 $(QINFO_BIN): src/quasar_led_info.c $(SCR_LIB)
 	$(CC) $(CFLAGS) $< -L. -lquasar_screen $(LDFLAGS) -o $@
 
-$(QCTL_BIN): src/quasar_led_ctl.c $(LED_LIB) include/atri_led.h include/atri_led_anim.h
-	$(CC) $(CFLAGS) -I./include $< -L. -latri_led $(LDFLAGS) -o $@
+$(QCTL_BIN): src/quasar_led_ctl.c $(SCR_LIB) include/quasar_screen.h
+	$(CC) $(CFLAGS) -I./include $< -L. -lquasar_screen $(LDFLAGS) -o $@
 
 install: all
 	mkdir -p $(DESTDIR)/usr/lib

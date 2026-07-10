@@ -154,23 +154,17 @@ static void demo_tunnel(quasar_screen_t *scr)
 
 int main(int argc, char *argv[])
 {
-	const char *dev = "/dev/spidev1.0";
-	int gpio = 74;
 	const char *demo = NULL;
 
 	if (argc < 2) {
 		printf("Usage: %s [options] [demo]\n", argv[0]);
-		printf("  -d <dev>   SPI device (default: /dev/spidev1.0)\n");
-		printf("  -g <gpio>  GPIO reset (default: 74)\n");
 		printf("  -l         list demos\n");
 		printf("\nDemos: bounce snake fire matrix stars tunnel all\n");
 		return 1;
 	}
 
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) dev = argv[++i];
-		else if (strcmp(argv[i], "-g") == 0 && i + 1 < argc) gpio = atoi(argv[++i]);
-		else if (strcmp(argv[i], "-l") == 0) {
+		if (strcmp(argv[i], "-l") == 0) {
 			printf("bounce   - bouncing ball with trail\n");
 			printf("snake    - snake game simulation\n");
 			printf("fire     - fire effect\n");
@@ -186,8 +180,7 @@ int main(int argc, char *argv[])
 	if (!demo) { fprintf(stderr, "Specify a demo or -l to list\n"); return 1; }
 
 	quasar_screen_t scr;
-	if (screen_open(&scr, dev) < 0) return 1;
-	scr.gpio_reset = gpio;
+	if (screen_open(&scr, NULL) < 0) return 1;
 	screen_reset(&scr);
 
 	signal(SIGINT, sigint_handler);

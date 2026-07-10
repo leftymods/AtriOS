@@ -7,6 +7,7 @@
 struct screen {
     int fd;
     uint8_t *fb;
+    int mmap_len;
     int width;
     int height;
     int bpp;

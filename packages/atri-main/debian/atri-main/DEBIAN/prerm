@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+systemctl stop atri-main.service || true
+systemctl disable atri-main.service || true
