@@ -29,6 +29,16 @@ enum main_state {
     STATE_TIMER,
     STATE_BLUETOOTH,
     STATE_ERROR,
+    STATE_TEST,
+};
+
+enum test_pattern {
+    TEST_NONE,
+    TEST_SNAKE,
+    TEST_BOUNCE,
+    TEST_FILL,
+    TEST_RAINBOW,
+    TEST_CHASE,
 };
 
 void log_init(bool use_syslog);

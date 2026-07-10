@@ -116,6 +116,186 @@ static void render_mute(struct screen *s, struct ring *r)
     if (r) ring_set_all(r, 200, 0, 0);
 }
 
+/* ------------------------------------------------------------------ */
+/* Test patterns                                                       */
+/* ------------------------------------------------------------------ */
+
+static void set_pixel(uint8_t *frame, int x, int y, uint8_t r, uint8_t g, uint8_t b)
+{
+    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
+        return;
+    int off = (y * SCREEN_WIDTH + x) * SCREEN_BPP;
+    frame[off + 0] = r;
+    frame[off + 1] = g;
+    frame[off + 2] = b;
+}
+
+static void draw_snake(uint8_t *frame, int step)
+{
+    int len = 12;
+    int head = step % (SCREEN_WIDTH * SCREEN_HEIGHT);
+
+    for (int i = 0; i < len; i++) {
+        int idx = (head - i + SCREEN_WIDTH * SCREEN_HEIGHT) % (SCREEN_WIDTH * SCREEN_HEIGHT);
+        int px = idx % SCREEN_WIDTH;
+        int py = idx / SCREEN_WIDTH;
+        int intensity = 255 - (i * 220 / len);
+        set_pixel(frame, px, py, 0, intensity, 0);
+    }
+}
+
+static void draw_bounce(uint8_t *frame, int step)
+{
+    int x = step % (2 * (SCREEN_WIDTH - 1));
+    if (x >= SCREEN_WIDTH)
+        x = 2 * (SCREEN_WIDTH - 1) - x;
+    int y = (step * 2) % (2 * (SCREEN_HEIGHT - 1));
+    if (y >= SCREEN_HEIGHT)
+        y = 2 * (SCREEN_HEIGHT - 1) - y;
+
+    set_pixel(frame, x, y, 255, 0, 0);
+    set_pixel(frame, x - 1, y, 120, 0, 0);
+    set_pixel(frame, x + 1, y, 120, 0, 0);
+    set_pixel(frame, x, y - 1, 120, 0, 0);
+    set_pixel(frame, x, y + 1, 120, 0, 0);
+}
+
+static void draw_fill(uint8_t *frame, int step)
+{
+    int total = SCREEN_WIDTH * SCREEN_HEIGHT;
+    int filled = (step * 5) % (total + 10);
+
+    for (int i = 0; i < total && i < filled; i++) {
+        int x = i % SCREEN_WIDTH;
+        int y = i / SCREEN_WIDTH;
+        uint8_t c = (uint8_t)(i * 255 / total);
+        set_pixel(frame, x, y, c, c, c);
+    }
+}
+
+static void draw_rainbow(uint8_t *frame, int step)
+{
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            int h = (x + y + step * 2) % 768;
+            uint8_t r, g, b;
+            if (h < 256) {
+                r = 255 - h; g = h; b = 0;
+            } else if (h < 512) {
+                r = 0; g = 511 - h; b = h - 256;
+            } else {
+                r = h - 512; g = 0; b = 767 - h;
+            }
+            set_pixel(frame, x, y, r, g, b);
+        }
+    }
+}
+
+static void draw_chase(uint8_t *frame, int step)
+{
+    int bar = step % SCREEN_WIDTH;
+
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            int dist = abs(x - bar);
+            uint8_t c = dist < 3 ? (255 - dist * 80) : 0;
+            set_pixel(frame, x, y, c, c / 2, 0);
+        }
+    }
+}
+
+static void render_test_ring(struct ring *r, enum test_pattern p, int step)
+{
+    if (!r)
+        return;
+
+    for (int i = 0; i < RING_LEDS; i++) {
+        switch (p) {
+        case TEST_SNAKE: {
+            int head = step % RING_LEDS;
+            int dist = (head - i + RING_LEDS) % RING_LEDS;
+            int c = (dist < 6) ? (255 - dist * 40) : 0;
+            ring_set_pixel(r, i, 0, c, 0);
+            break;
+        }
+        case TEST_BOUNCE: {
+            int head = (step / 2) % (2 * RING_LEDS);
+            if (head >= RING_LEDS)
+                head = 2 * RING_LEDS - head;
+            int dist = abs(head - i);
+            int c = (dist < 3) ? (255 - dist * 80) : 0;
+            ring_set_pixel(r, i, c, 0, 0);
+            break;
+        }
+        case TEST_FILL: {
+            int lit = (step * 2) % (RING_LEDS + 4);
+            uint8_t c = (i < lit) ? 200 : 0;
+            ring_set_pixel(r, i, c, c, 0);
+            break;
+        }
+        case TEST_RAINBOW: {
+            int h = (i * 768 / RING_LEDS + step * 20) % 768;
+            uint8_t rr, gg, bb;
+            if (h < 256) {
+                rr = 255 - h; gg = h; bb = 0;
+            } else if (h < 512) {
+                rr = 0; gg = 511 - h; bb = h - 256;
+            } else {
+                rr = h - 512; gg = 0; bb = 767 - h;
+            }
+            ring_set_pixel(r, i, rr, gg, bb);
+            break;
+        }
+        case TEST_CHASE: {
+            int head = step % RING_LEDS;
+            int dist = (head - i + RING_LEDS) % RING_LEDS;
+            int c = (dist < 4) ? (255 - dist * 60) : 0;
+            ring_set_pixel(r, i, c, c / 2, 0);
+            break;
+        }
+        default:
+            ring_set_pixel(r, i, 0, 0, 0);
+        }
+    }
+}
+
+static void render_test(struct animator *a, struct screen *s, struct ring *r, uint64_t now_ms)
+{
+    uint8_t frame[SCREEN_FRAME_SIZE];
+
+    memset(frame, 0, sizeof(frame));
+
+    if (now_ms - a->test_last_update_ms >= 80) {
+        a->test_step++;
+        a->test_last_update_ms = now_ms;
+    }
+
+    switch (a->test_pattern) {
+    case TEST_SNAKE:
+        draw_snake(frame, a->test_step);
+        break;
+    case TEST_BOUNCE:
+        draw_bounce(frame, a->test_step);
+        break;
+    case TEST_FILL:
+        draw_fill(frame, a->test_step);
+        break;
+    case TEST_RAINBOW:
+        draw_rainbow(frame, a->test_step);
+        break;
+    case TEST_CHASE:
+        draw_chase(frame, a->test_step);
+        break;
+    default:
+        break;
+    }
+
+    if (s)
+        screen_render(s, frame);
+    if (r)
+        render_test_ring(r, a->test_pattern, a->test_step);
+}
+
 int animator_init(struct animator *a, struct config *cfg)
 {
     memset(a, 0, sizeof(*a));
@@ -124,6 +304,9 @@ int animator_init(struct animator *a, struct config *cfg)
     a->state_entered_ms = get_ms();
     a->volume_level = 50;
     a->brightness = cfg->default_brightness;
+    a->test_pattern = TEST_NONE;
+    a->test_step = 0;
+    a->test_last_update_ms = 0;
 
     char path[512];
     snprintf(path, sizeof(path), "%s/screen_raw/boot", cfg->animations_dir);
@@ -171,6 +354,13 @@ void animator_set_volume(struct animator *a, int level)
     a->volume_level = level;
 }
 
+void animator_set_test_pattern(struct animator *a, enum test_pattern p)
+{
+    a->test_pattern = p;
+    a->test_step = 0;
+    a->test_last_update_ms = get_ms();
+}
+
 void animator_tick(struct animator *a, struct screen *s, struct ring *r, uint64_t now_ms)
 {
     screen_set_brightness(s, a->brightness);
@@ -208,6 +398,9 @@ void animator_tick(struct animator *a, struct screen *s, struct ring *r, uint64_
         break;
     case STATE_ERROR:
         render_animation(&a->error, s, r, now_ms);
+        break;
+    case STATE_TEST:
+        render_test(a, s, r, now_ms);
         break;
     }
 }

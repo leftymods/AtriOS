@@ -34,6 +34,10 @@ struct animator {
 
     int volume_level;
     int brightness;
+
+    enum test_pattern test_pattern;
+    int test_step;
+    uint64_t test_last_update_ms;
 };
 
 int animator_init(struct animator *a, struct config *cfg);
@@ -41,5 +45,6 @@ void animator_close(struct animator *a);
 void animator_tick(struct animator *a, struct screen *s, struct ring *r, uint64_t now_ms);
 void animator_set_state(struct animator *a, enum main_state state);
 void animator_set_volume(struct animator *a, int level);
+void animator_set_test_pattern(struct animator *a, enum test_pattern p);
 
 #endif
