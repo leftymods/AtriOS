@@ -7,7 +7,8 @@
 #include <sys/mman.h>
 #include <linux/fb.h>
 
-#define ATRI_FB_ID "atri_led_panel_fb"
+/* fix.id is truncated to 15 chars because FB_FIX_SCREENINFO_ID is 16 bytes */
+#define ATRI_FB_ID "atri_led_panel_"
 
 static const uint8_t font5x7[96][5] = {
 	{0x00,0x00,0x00,0x00,0x00},

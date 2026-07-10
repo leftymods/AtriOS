@@ -8,7 +8,8 @@
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 
-#define ATRI_FB_ID "atri_led_panel_fb"
+/* fix.id is truncated to 15 chars because FB_FIX_SCREENINFO_ID is 16 bytes */
+#define ATRI_FB_ID "atri_led_panel_"
 
 static int screen_open_fd(struct screen *s, int fd, const char *bl_path)
 {
