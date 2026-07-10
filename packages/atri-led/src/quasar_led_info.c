@@ -79,14 +79,19 @@ static void get_info(struct screen_info *info)
 
 int main(int argc, char *argv[])
 {
+	const char *dev = "/dev/spidev1.0";
+	int gpio = 74;
 	int loop = 0;
 
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-l") == 0) loop = 1;
+		if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) dev = argv[++i];
+		else if (strcmp(argv[i], "-g") == 0 && i + 1 < argc) gpio = atoi(argv[++i]);
+		else if (strcmp(argv[i], "-l") == 0) loop = 1;
 	}
 
 	quasar_screen_t scr;
-	if (screen_open(&scr, NULL) < 0) return 1;
+	if (screen_open(&scr, dev) < 0) return 1;
+	scr.gpio_reset = gpio;
 	screen_reset(&scr);
 
 	do {

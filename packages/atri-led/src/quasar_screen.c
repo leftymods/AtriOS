@@ -4,10 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <linux/fb.h>
-
-#define ATRI_FB_ID "atri_led_panel_fb"
+#include <linux/spi/spidev.h>
 
 static const uint8_t font5x7[96][5] = {
 	{0x00,0x00,0x00,0x00,0x00},
@@ -107,75 +104,75 @@ static const uint8_t font5x7[96][5] = {
 	{0x02,0x01,0x02,0x04,0x02},
 };
 
-int screen_open(quasar_screen_t *scr, const char *ignored)
+int screen_open(quasar_screen_t *scr, const char *spi_dev)
 {
-	(void)ignored;
 	memset(scr, 0, sizeof(*scr));
-	scr->fb_fd = -1;
-	scr->fb_mmap = NULL;
+	scr->spi_fd = -1;
+	scr->gpio_reset = -1;
 
-	char fb_path[32];
-	struct fb_fix_screeninfo fix;
-	struct fb_var_screeninfo var;
-
-	for (int i = 0; i < 8; i++) {
-		snprintf(fb_path, sizeof(fb_path), "/dev/fb%d", i);
-		int fd = open(fb_path, O_RDWR);
-		if (fd < 0)
-			continue;
-
-		if (ioctl(fd, FBIOGET_FSCREENINFO, &fix) == 0 &&
-		    strcmp(fix.id, ATRI_FB_ID) == 0 &&
-		    ioctl(fd, FBIOGET_VSCREENINFO, &var) == 0) {
-			scr->fb_len = fix.smem_len > 0 ? fix.smem_len : SCREEN_BYTES;
-			void *map = mmap(NULL, scr->fb_len, PROT_READ | PROT_WRITE,
-					 MAP_SHARED, fd, 0);
-			if (map == MAP_FAILED) {
-				perror("mmap fb");
-				close(fd);
-				return -1;
-			}
-			scr->fb_fd = fd;
-			scr->fb_mmap = map;
-			return 0;
-		}
-		close(fd);
+	scr->spi_fd = open(spi_dev, O_RDWR);
+	if (scr->spi_fd < 0) {
+		perror(spi_dev);
+		return -1;
 	}
 
-	fprintf(stderr, "atri_led_panel fbdev not found\n");
+	uint32_t mode = SPI_MODE_0;
+	uint8_t bits = 8;
+	uint32_t speed = 4000000;
+
+	if (ioctl(scr->spi_fd, SPI_IOC_WR_MODE32, &mode) < 0) { perror("mode"); goto fail; }
+	if (ioctl(scr->spi_fd, SPI_IOC_WR_BITS_PER_WORD, &bits) < 0) { perror("bits"); goto fail; }
+	if (ioctl(scr->spi_fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed) < 0) { perror("speed"); goto fail; }
+
+	return 0;
+fail:
+	close(scr->spi_fd);
+	scr->spi_fd = -1;
 	return -1;
 }
 
 void screen_close(quasar_screen_t *scr)
 {
-	if (scr->fb_mmap) {
-		munmap(scr->fb_mmap, scr->fb_len);
-		scr->fb_mmap = NULL;
-	}
-	if (scr->fb_fd >= 0) {
-		close(scr->fb_fd);
-		scr->fb_fd = -1;
-	}
+	if (scr->spi_fd >= 0) close(scr->spi_fd);
+	scr->spi_fd = -1;
+}
+
+static void gpio_write(int gpio, int val)
+{
+	if (gpio < 0) return;
+	char path[64];
+	char buf[8];
+	snprintf(path, sizeof(path), "/sys/class/gpio/gpio%d/value", gpio);
+	int fd = open(path, O_WRONLY);
+	if (fd < 0) return;
+	snprintf(buf, sizeof(buf), "%d", val);
+	write(fd, buf, strlen(buf));
+	close(fd);
 }
 
 void screen_reset(quasar_screen_t *scr)
 {
-	(void)scr;
+	gpio_write(scr->gpio_reset, 0);
+	usleep(10000);
+	gpio_write(scr->gpio_reset, 1);
+	usleep(100000);
 }
 
 void screen_clear(quasar_screen_t *scr)
 {
-	if (scr->fb_mmap)
-		memset(scr->fb_mmap, 0, SCREEN_BYTES);
+	memset(scr->fb, 0, sizeof(scr->fb));
 }
 
 void screen_pixel(quasar_screen_t *scr, int x, int y, int on)
 {
-	if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
-		return;
-	if (!scr->fb_mmap)
-		return;
-	scr->fb_mmap[y * SCREEN_WIDTH + x] = on ? 0xff : 0x00;
+	if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) return;
+	int addr = y * SCREEN_WIDTH + x;
+	int byte = addr / 8;
+	int bit = addr % 8;
+	if (on)
+		scr->fb[byte] |= (1 << bit);
+	else
+		scr->fb[byte] &= ~(1 << bit);
 }
 
 void screen_rect(quasar_screen_t *scr, int x, int y, int w, int h, int on)
@@ -192,11 +189,9 @@ void screen_line(quasar_screen_t *scr, int x0, int y0, int x1, int y1, int on)
 	int dx = abs_int(x1 - x0), sx = x0 < x1 ? 1 : -1;
 	int dy = -abs_int(y1 - y0), sy = y0 < y1 ? 1 : -1;
 	int err = dx + dy, e2;
-
 	while (1) {
 		screen_pixel(scr, x0, y0, on);
-		if (x0 == x1 && y0 == y1)
-			break;
+		if (x0 == x1 && y0 == y1) break;
 		e2 = 2 * err;
 		if (e2 >= dy) { err += dy; x0 += sx; }
 		if (e2 <= dx) { err += dx; y0 += sy; }
@@ -224,15 +219,28 @@ void screen_text(quasar_screen_t *scr, int x, int y, const char *text, int on)
 
 void screen_flush(quasar_screen_t *scr)
 {
-	if (scr->fb_fd < 0)
-		return;
-	int blank = FB_BLANK_UNBLANK;
-	ioctl(scr->fb_fd, FBIOBLANK, blank);
+	if (scr->spi_fd < 0) return;
+	int row_bytes = (SCREEN_WIDTH + 7) / 8;
+	uint8_t tx[SCREEN_WIDTH + 1];
+	for (int y = 0; y < SCREEN_HEIGHT; y++) {
+		tx[0] = y + 1;
+		memcpy(tx + 1, scr->fb + y * row_bytes, row_bytes);
+		struct spi_ioc_transfer tr = {
+			.tx_buf = (uintptr_t)tx,
+			.len = (uint32_t)(row_bytes + 1),
+			.speed_hz = 4000000,
+		};
+		ioctl(scr->spi_fd, SPI_IOC_MESSAGE(1), &tr);
+	}
 }
 
 void screen_send_raw(quasar_screen_t *scr, const uint8_t *data, int len)
 {
-	(void)scr;
-	(void)data;
-	(void)len;
+	if (scr->spi_fd < 0) return;
+	struct spi_ioc_transfer tr = {
+		.tx_buf = (uintptr_t)data,
+		.len = (uint32_t)len,
+		.speed_hz = 4000000,
+	};
+	ioctl(scr->spi_fd, SPI_IOC_MESSAGE(1), &tr);
 }

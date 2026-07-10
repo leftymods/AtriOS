@@ -21,20 +21,10 @@ static int screen_open_fd(struct screen *s, int fd, const char *bl_path)
         return -1;
     }
 
-    if (vinfo.xres != SCREEN_WIDTH || vinfo.yres != SCREEN_HEIGHT) {
-        log_msg(LOG_ERR, "screen %s has wrong resolution %dx%d (expected %dx%d)",
-                finfo.id, vinfo.xres, vinfo.yres, SCREEN_WIDTH, SCREEN_HEIGHT);
-        return -1;
-    }
-
     s->width = vinfo.xres;
     s->height = vinfo.yres;
     s->bpp = vinfo.bits_per_pixel / 8;
     s->line_length = finfo.line_length;
-    s->mmap_len = finfo.smem_len;
-
-    if (vinfo.bits_per_pixel != 8)
-        log_msg(LOG_WARNING, "screen bpp=%d, expected 8", vinfo.bits_per_pixel);
 
     s->fb = mmap(NULL, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (s->fb == MAP_FAILED) {
@@ -103,7 +93,7 @@ int screen_init(struct screen *s, const char *fb_path, const char *bl_path)
 void screen_close(struct screen *s)
 {
     if (s->fb && s->fb != MAP_FAILED)
-        munmap(s->fb, s->mmap_len);
+        munmap(s->fb, s->line_length * s->height);
     if (s->fd >= 0)
         close(s->fd);
     if (s->backlight_fd >= 0)

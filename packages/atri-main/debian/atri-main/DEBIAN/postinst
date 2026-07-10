@@ -1,4 +1,0 @@
-#!/bin/bash
-set -e
-systemctl daemon-reload || true
-systemctl enable atri-main.service || true

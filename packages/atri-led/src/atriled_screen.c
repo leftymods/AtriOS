@@ -33,7 +33,7 @@ static int gpio_set(const char *path, int val)
 	int fd = open(path, O_WRONLY);
 	if (fd < 0) return -1;
 	snprintf(buf, sizeof(buf), "%d", val);
-	(void)write(fd, buf, strlen(buf));
+	write(fd, buf, strlen(buf));
 	close(fd);
 	return 0;
 }
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 		int len = ftell(f);
 		fseek(f, 0, SEEK_SET);
 		uint8_t *data = malloc(len);
-		(void)fread(data, 1, len, f);
+		fread(data, 1, len, f);
 		fclose(f);
 		if (spi_open() < 0) { free(data); return 1; }
 		screen_reset();
