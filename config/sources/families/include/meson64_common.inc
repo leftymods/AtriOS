@@ -44,11 +44,37 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:4fb385da8a97bead9d760d20f7d4c2e5c6ffab3e"
+		declare -g KERNELBRANCH="commit:f39c7eeee8f0e4d1af3d6129f2501f3db675d2f5"
 		declare -g DISABLE_KERNEL_PATCHES="no"
 		;;
 
 esac
+
+# Disable unused SoC families; saves compile time on Amlogic-only builds.
+function custom_kernel_config__disable_unused_arches() {
+	opts_n+=("ARCH_SUNXI")
+	opts_n+=("ARCH_ROCKCHIP")
+	# Unused Wi-Fi/BT vendors
+	opts_n+=("WLAN_VENDOR_ADMTEK" "WLAN_VENDOR_ATH" "WLAN_VENDOR_ATMEL"
+		 "WLAN_VENDOR_BROADCOM" "WLAN_VENDOR_INTEL" "WLAN_VENDOR_INTERSIL"
+		 "WLAN_VENDOR_MARVELL" "WLAN_VENDOR_QUANTENNA"
+		 "WLAN_VENDOR_RALINK" "WLAN_VENDOR_MEDIATEK"
+		 "WLAN_VENDOR_CISCO")
+	opts_n+=("BRCMFMAC" "BRCMDBG" "P54_COMMON" "MWIFIEX" "MT76_CORE"
+		 "MAC80211_HWSIM")
+	# Unused SATA/Storage
+	opts_n+=("SATA_MV" "SATA_SIL24" "AHCI_MTK" "AHCI_TEGRA"
+		 "AHCI_IMX" "AHCI_MVEBU" "MUSB"  "PATA_PXA")
+	# Unused Sound controllers
+	opts_n+=("SND_SOC_FSL" "SND_SOC_INTEL" "SND_SOC_AMD"
+		 "SND_SOC_ROCKCHIP" "SND_SOC_TEGRA" "SND_SOC_SOF_TOPLEVEL"
+		 "SND_BCM2835" "SND_PXA2XX" "SND_SOC_SOF"
+		 "SND_SUN4I" "SND_SUN8I" "SND_PCM_OSS" "SND_SEQUENCER_OSS")
+	# Unused pincontrol
+	opts_n+=("PINCTRL_INTEL" "PINCTRL_BAYTRAIL" "PINCTRL_CHERRYVIEW"
+		 "PINCTRL_BROXTON" "PINCTRL_SUNRISEPOINT" "PINCTRL_GEMINILAKE"
+		 "PINCTRL_ICELAKE" "PINCTRL_TIGERLAKE" "PINCTRL_ALDERLAKE" "PINCTRL_SUNXI")
+}
 
 # Enable RTL8822CS debugfs for diagnostics
 function custom_kernel_config__enable_rtw88_debugfs() {
@@ -75,7 +101,6 @@ function custom_kernel_config__enable_sy6045s() {
 	opts_m+=("CONFIG_LTRF216A")
 	opts_m+=("CONFIG_SERIO_AMS_DELTA")
 	opts_m+=("CONFIG_GPIO_SYSFS")
-	opts_m+=("CONFIG_ATRISTATION_ZIGBEE_CONTROL")
 }
 
 # this helper function includes postprocess for s400 and its variants.
@@ -299,4 +324,57 @@ family_tweaks_bsp() {
 			EOF
 			;;
 	esac
+}
+
+# Install Rust yandex_mono_matrix_led driver + embed FPGA bitstream.
+# Applied in kernel_make_config so it survives git reset.
+function kernel_make_config__install_yandex_mono_matrix_led() {
+	if linux-version compare "${KERNEL_MAJOR_MINOR}" lt "6.18"; then
+		return 0
+	fi
+
+	local drvdir="${kernel_work_dir}/drivers/leds/yandex_mono_matrix_led"
+	local src_rs="${SRC}/config/rust-driver/yandex_mono_matrix_led.rs"
+	local src_bin="${SRC}/config/rust-driver/yandex_led_screen_fpga.bin"
+
+	if [[ ! -f "${src_rs}" ]]; then
+		exit_with_error "Rust driver not found: ${src_rs}"
+	fi
+
+	display_alert "Installing Yandex Mono Matrix LED driver" "yandex_mono_matrix_led" "info"
+	run_host_command_logged mkdir -pv "${drvdir}"
+	run_host_command_logged cp -v "${src_rs}" "${drvdir}/"
+	run_host_command_logged cp -v "${src_bin}" "${drvdir}/"
+
+	local leds_make="${kernel_work_dir}/drivers/leds/Makefile"
+	local leds_kconfig="${kernel_work_dir}/drivers/leds/Kconfig"
+
+	if ! grep -q 'CONFIG_LEDS_YANDEX_MONO_MATRIX' "${leds_kconfig}"; then
+		display_alert "Adding Kconfig entry for yandex_mono_matrix_led" "" "info"
+		cat >> "${leds_kconfig}" <<- 'KCONFIG_EOF'
+
+		config LEDS_YANDEX_MONO_MATRIX
+			tristate "Yandex Station Max Mono Matrix LED Driver (Rust)"
+			depends on RUST && OF
+			help
+			  Rust driver for the 25x16 monochrome LED matrix panel on
+			  Yandex Station Max (Gowin FPGA, SPI + JTAG).
+			  Embeds the FPGA bitstream and flashes at probe.
+		KCONFIG_EOF
+	fi
+
+	if ! grep -q 'yandex_mono_matrix_led' "${leds_make}"; then
+		display_alert "Adding Makefile entry for yandex_mono_matrix_led" "" "info"
+		echo 'obj-$(CONFIG_LEDS_YANDEX_MONO_MATRIX) += yandex_mono_matrix_led/' >> "${leds_make}"
+	fi
+}
+
+# Enable the Rust LED driver in kernel config (only if rustc is available)
+function custom_kernel_config__enable_yandex_mono_matrix_led() {
+	if ! command -v rustc &>/dev/null; then
+		display_alert "rustc not found, skipping Rust LED driver" "CONFIG_LEDS_YANDEX_MONO_MATRIX" "info"
+		return 0
+	fi
+	opts_y+=("CONFIG_LEDS_YANDEX_MONO_MATRIX")
+	opts_y+=("CONFIG_RUST")
 }
