@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:fbd9bc6b42098bfe36dc66da72830cee200c0824"
+		declare -g KERNELBRANCH="commit:f339bac8c02d7b3e889d6bfa41b80838ee7e9081"
 		declare -g DISABLE_KERNEL_PATCHES="no"
 		;;
 
@@ -327,55 +327,3 @@ family_tweaks_bsp() {
 	esac
 }
 
-# Install Rust yandex_mono_matrix_led driver + embed FPGA bitstream.
-# Applied in kernel_make_config so it survives git reset.
-function kernel_make_config__install_yandex_mono_matrix_led() {
-	if linux-version compare "${KERNEL_MAJOR_MINOR}" lt "6.18"; then
-		return 0
-	fi
-
-	local drvdir="${kernel_work_dir}/drivers/leds/yandex_mono_matrix_led"
-	local src_rs="${SRC}/config/rust-driver/yandex_mono_matrix_led.rs"
-	local src_bin="${SRC}/config/rust-driver/yandex_led_screen_fpga.bin"
-
-	if [[ ! -f "${src_rs}" ]]; then
-		exit_with_error "Rust driver not found: ${src_rs}"
-	fi
-
-	display_alert "Installing Yandex Mono Matrix LED driver" "yandex_mono_matrix_led" "info"
-	run_host_command_logged mkdir -pv "${drvdir}"
-	run_host_command_logged cp -v "${src_rs}" "${drvdir}/"
-	run_host_command_logged cp -v "${src_bin}" "${drvdir}/"
-
-	local leds_make="${kernel_work_dir}/drivers/leds/Makefile"
-	local leds_kconfig="${kernel_work_dir}/drivers/leds/Kconfig"
-
-	if ! grep -q 'CONFIG_LEDS_YANDEX_MONO_MATRIX' "${leds_kconfig}"; then
-		display_alert "Adding Kconfig entry for yandex_mono_matrix_led" "" "info"
-		cat >> "${leds_kconfig}" <<- 'KCONFIG_EOF'
-
-		config LEDS_YANDEX_MONO_MATRIX
-			tristate "Yandex Station Max Mono Matrix LED Driver (Rust)"
-			depends on RUST && OF
-			help
-			  Rust driver for the 25x16 monochrome LED matrix panel on
-			  Yandex Station Max (Gowin FPGA, SPI + JTAG).
-			  Embeds the FPGA bitstream and flashes at probe.
-		KCONFIG_EOF
-	fi
-
-	if ! grep -q 'yandex_mono_matrix_led' "${leds_make}"; then
-		display_alert "Adding Makefile entry for yandex_mono_matrix_led" "" "info"
-		echo 'obj-$(CONFIG_LEDS_YANDEX_MONO_MATRIX) += yandex_mono_matrix_led/' >> "${leds_make}"
-	fi
-}
-
-# Enable the Rust LED driver in kernel config (only if rustc is available)
-function custom_kernel_config__enable_yandex_mono_matrix_led() {
-	if ! command -v rustc &>/dev/null; then
-		display_alert "rustc not found, skipping Rust LED driver" "CONFIG_LEDS_YANDEX_MONO_MATRIX" "info"
-		return 0
-	fi
-	opts_y+=("CONFIG_LEDS_YANDEX_MONO_MATRIX")
-	opts_y+=("CONFIG_RUST")
-}
