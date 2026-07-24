@@ -134,10 +134,12 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 
 	# Install SY6045S firmware settings for kernel driver (request_firmware)
 	run_host_command_logged mkdir -pv "${destination}"/lib/firmware
-	if [[ -f "${SRC}/../linux-unifreq/sound/soc/codecs/sy6045s-tweeters-settings.txt" ]]; then
-		cp "${SRC}/../linux-unifreq/sound/soc/codecs/sy6045s-tweeters-settings.txt" "${destination}/lib/firmware/"
-		cp "${SRC}/../linux-unifreq/sound/soc/codecs/sy6045s-woofer-settings.txt" "${destination}/lib/firmware/"
+	if [[ -f "${SRC}/tools/audio/sy6045s-tweeters-settings.txt" ]]; then
+		cp "${SRC}/tools/audio/sy6045s-tweeters-settings.txt" "${destination}/lib/firmware/"
+		cp "${SRC}/tools/audio/sy6045s-woofer-settings.txt" "${destination}/lib/firmware/"
 		display_alert "SY6045S" "firmware settings installed" "info"
+	else
+		display_alert "SY6045S" "firmware settings not found in tools/audio/" "wrn"
 	fi
 
 	# Create systemd oneshot service for sound card init
