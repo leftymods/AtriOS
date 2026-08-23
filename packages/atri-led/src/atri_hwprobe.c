@@ -305,6 +305,44 @@ static void sys_dir_list(const char *cls, const char *note)
 	closedir(d);
 }
 
+static void probe_tty(void)
+{
+	DIR *d = opendir("/sys/class/tty");
+
+	P("== serial ports (/sys/class/tty, bound drivers) ==");
+	if (!d) { P("  opendir: %s", strerror(errno)); return; }
+	struct dirent *de;
+	while ((de = readdir(d))) {
+		char pdev[600], plink[600], tgt[600];
+		ssize_t n;
+		char name[300];
+		snprintf(name, sizeof(name), "%s", de->d_name);
+		/* only real hardware ports */
+		if (strncmp(name, "ttyAML", 6) && strncmp(name, "ttyUSB", 6) &&
+		    strncmp(name, "ttyACM", 6) && strncmp(name, "ttyS", 4))
+			continue;
+		P("  /dev/%-10s", name);
+		snprintf(pdev, sizeof(pdev), "/sys/class/tty/%s/device",
+			 name);
+		n = readlink(pdev, plink, sizeof(plink) - 1);
+		if (n > 0) {
+			plink[n] = '\0';
+			char *sl = strrchr(plink, '/');
+			P("      device: %s", sl ? sl + 1 : plink);
+		}
+		snprintf(pdev, sizeof(pdev),
+			 "/sys/class/tty/%s/device/driver", name);
+		n = readlink(pdev, tgt, sizeof(tgt) - 1);
+		if (n > 0) {
+			tgt[n] = '\0';
+			char *sl = strrchr(tgt, '/');
+			P("      driver: %s", sl ? sl + 1 : tgt);
+		}
+	}
+	closedir(d);
+	P("  hints: ttyAML0=console ttyAML1=BT(uart_A) ttyAML2=Zigbee(uart_AO_B)");
+}
+
 int main(int argc, char **argv)
 {
 	for (int i = 1; i < argc; i++) {
@@ -325,6 +363,8 @@ int main(int argc, char **argv)
 	sys_dir_list("leds", "LED class");
 	SEP();
 	sys_dir_list("backlight", "backlight class");
+	SEP();
+	probe_tty();
 	SEP();
 	P("(identification hints are AtriStation-specific; 'unknown' just "
 	  "means not on our board map)");
