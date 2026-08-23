@@ -269,7 +269,7 @@ int main(int argc, char **argv)
 {
 	const char *selem_name = argc > 1 ? argv[1] : "PCM";
 	struct input_event ev;
-	char devname[128] = "?";
+	char devname[256] = "?";
 	long last_render_ms = 0;
 	long now;
 
