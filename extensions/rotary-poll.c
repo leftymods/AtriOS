@@ -23,7 +23,7 @@ static int find_gpio_number(const char *chip_label, int offset) {
     if (!d) return -1;
 
     struct dirent *de;
-    char path[256], label[64];
+    char path[320], label[64];
     int base = -1;
 
     while ((de = readdir(d)) != NULL) {
@@ -58,7 +58,7 @@ static int export_gpio(int gpio) {
     if (fd < 0) return -1;
     char buf[16];
     int n = snprintf(buf, sizeof(buf), "%d", gpio);
-    write(fd, buf, n);
+    if (write(fd, buf, n) < 0) { close(fd); return -1; }
     close(fd);
 
     usleep(10000);
@@ -66,7 +66,7 @@ static int export_gpio(int gpio) {
     snprintf(path, sizeof(path), "/sys/class/gpio/gpio%d/direction", gpio);
     fd = open(path, O_WRONLY);
     if (fd < 0) return -1;
-    write(fd, "in", 2);
+    if (write(fd, "in", 2) < 0) { close(fd); return -1; }
     close(fd);
 
     return gpio;
@@ -116,13 +116,15 @@ static void emit_rel(int uinput_fd, int value) {
     ev.type = EV_REL;
     ev.code = REL_DIAL;
     ev.value = value;
-    write(uinput_fd, &ev, sizeof(ev));
+    ssize_t w1 = write(uinput_fd, &ev, sizeof(ev));
+    (void)w1;
 
     memset(&ev, 0, sizeof(ev));
     ev.type = EV_SYN;
     ev.code = SYN_REPORT;
     ev.value = 0;
-    write(uinput_fd, &ev, sizeof(ev));
+    ssize_t w2 = write(uinput_fd, &ev, sizeof(ev));
+    (void)w2;
 }
 
 int main(int argc, char **argv) {
@@ -148,8 +150,23 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (export_gpio(gpio_a) < 0 || export_gpio(gpio_b) < 0) {
-        fprintf(stderr, "Failed to export GPIOs (%d, %d)\n", gpio_a, gpio_b);
+    int gpio_b_ok = (export_gpio(gpio_b) >= 0);
+    if (export_gpio(gpio_a) < 0) {
+        fprintf(stderr, "Failed to export GPIO A (%d): %s\n",
+                gpio_a, strerror(errno));
+        return 1;
+    }
+    if (!gpio_b_ok) {
+        /* Phase B is shared with the 20V amplifier rail enable
+         * (GPIOAO_10, regulator "20V_AMPL" claims it). Quadrature
+         * decoding needs both edges — without B there is no reliable
+         * direction, so refuse to emit garbage and exit loudly.
+         * See docs/atristation-hardware.md ("PVDD pin"). */
+        fprintf(stderr,
+            "rotary-poll: phase B GPIO %d is claimed by another driver "
+            "(20V_AMPL regulator).\n"
+            "rotary-poll: volume knob DISABLED until the PVDD pin "
+            "conflict is resolved.\n", gpio_b);
         return 1;
     }
 
@@ -212,9 +229,9 @@ int main(int argc, char **argv) {
     int fd = open("/sys/class/gpio/unexport", O_WRONLY);
     if (fd >= 0) {
         int n = snprintf(buf, sizeof(buf), "%d", gpio_a);
-        write(fd, buf, n);
+        if (write(fd, buf, n) < 0) { /* EPIPE after reader gone */ }
         n = snprintf(buf, sizeof(buf), "%d", gpio_b);
-        write(fd, buf, n);
+        if (write(fd, buf, n) < 0) { /* EPIPE after reader gone */ }
         close(fd);
     }
 
