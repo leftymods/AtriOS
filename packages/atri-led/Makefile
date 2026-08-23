@@ -24,12 +24,13 @@ QTXT_BIN = quasar_led_text
 QDEMO_BIN = quasar_led_demo
 QINFO_BIN = quasar_led_info
 SCREEN_BINS = $(QTST_BIN) $(QTXT_BIN) $(QDEMO_BIN) $(QINFO_BIN)
+SCRTEST_BIN = atri-screen-test
 ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -82,6 +83,9 @@ $(QINFO_BIN): src/quasar_led_info.c $(SCR_LIB)
 $(QCTL_BIN): src/quasar_led_ctl.c $(SCR_LIB) include/quasar_screen.h
 	$(CC) $(CFLAGS) -I./include $< -L. -lquasar_screen $(LDFLAGS) -o $@
 
+$(SCRTEST_BIN): src/atri_screen_test.c
+	$(CC) $(CFLAGS) $< -o $@
+
 install: all
 	mkdir -p $(DESTDIR)/usr/lib
 	mkdir -p $(DESTDIR)/usr/bin
@@ -95,6 +99,7 @@ install: all
 	cp $(SCR_BIN) $(DESTDIR)/usr/bin/
 	cp $(SCREEN_BINS) $(DESTDIR)/usr/bin/
 	cp $(QCTL_BIN) $(DESTDIR)/usr/bin/
+	cp $(SCRTEST_BIN) $(DESTDIR)/usr/bin/
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
 else
