@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
 # This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
@@ -8,6 +9,8 @@
 # This extension is incompatible with the qcow2 equivalent.
 
 function add_host_dependencies__vhd_host_deps() {
+	# framework contract var: consumed by image-output-qcow2 extension
+	# shellcheck disable=SC2034
 	declare -g SKIP_QCOW2=yes # Skip qcow2 from the image-output-qcow2 extension
 	declare -g EXTRA_BUILD_DEPS="${EXTRA_BUILD_DEPS} qemu-utils"
 }

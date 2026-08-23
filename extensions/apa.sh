@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # AtriOS Package Archive (APA) extension placeholder.
 # The original APA repo is not available yet.
 

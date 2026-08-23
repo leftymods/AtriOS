@@ -5,6 +5,10 @@ Requires=atri-led.service
 
 [Service]
 Type=oneshot
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+ProtectSystem=full
 ExecStart=/usr/bin/atrledctl loop boot_scan
 
 [Install]

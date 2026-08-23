@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # `cryptroot` / LUKS support is no longer included by default in prepare-host.sh.
 # Enable this extension to include the required dependencies for building.
 # This is automatically enabled if CRYPTROOT_ENABLE is set to yes in main-config.sh.
@@ -12,6 +13,8 @@ function extension_prepare_config__prepare_cryptroot() {
 	add_packages_to_image cryptsetup cryptsetup-initramfs
 
 	# Config for cryptroot, a boot partition is required.
+	# framework contract var: consumed by lib/ partitioning
+	# shellcheck disable=SC2034
 	declare -g BOOTPART_REQUIRED=yes
 	EXTRA_IMAGE_SUFFIXES+=("-crypt")
 
@@ -27,14 +30,18 @@ function prepare_root_device__250_encrypt_root_device() {
 	display_alert "Extension: ${EXTENSION}: Encrypting root partition with LUKS..." "cryptsetup luksFormat $CRYPTROOT_PARAMETERS $rootdevice" ""
 	if [[ $CRYPTROOT_AUTOUNLOCK == "yes" ]]; then
 		display_alert "Extension: ${EXTENSION}: configuring LUKS autounlock" ""
-		declare -g cryptroot_autounlock_key_file=$(mktemp)
+		declare -g cryptroot_autounlock_key_file
+		cryptroot_autounlock_key_file=$(mktemp)
 		openssl rand -base64 32 > "$cryptroot_autounlock_key_file"
+		# $CRYPTROOT_PARAMETERS is intentionally word-split into separate cryptsetup options
+		# shellcheck disable=SC2086
 		cryptsetup luksFormat $CRYPTROOT_PARAMETERS "$rootdevice" "$cryptroot_autounlock_key_file"
-		cryptsetup luksOpen --key-file "$cryptroot_autounlock_key_file" "$rootdevice" $CRYPTROOT_MAPPER
+		cryptsetup luksOpen --key-file "$cryptroot_autounlock_key_file" "$rootdevice" "$CRYPTROOT_MAPPER"
 	else # CRYPTROOT_PASSPHRASE case
 		display_alert "Extension: ${EXTENSION}: configuring LUKS password" ""
-		echo -n $CRYPTROOT_PASSPHRASE | cryptsetup luksFormat $CRYPTROOT_PARAMETERS $rootdevice -
-		echo -n $CRYPTROOT_PASSPHRASE | cryptsetup luksOpen $rootdevice $CRYPTROOT_MAPPER -
+		# shellcheck disable=SC2086
+		echo -n "$CRYPTROOT_PASSPHRASE" | cryptsetup luksFormat $CRYPTROOT_PARAMETERS "$rootdevice" -
+		echo -n "$CRYPTROOT_PASSPHRASE" | cryptsetup luksOpen "$rootdevice" "$CRYPTROOT_MAPPER" -
 	fi
 	add_cleanup_handler cleanup_cryptroot
 	display_alert "Extension: ${EXTENSION}: Root partition encryption complete." "" "ext"
@@ -60,7 +67,7 @@ function pre_install_kernel_debs__adjust_dropbear_configuration() {
 		# Set the port of the dropbear ssh daemon in the initramfs to a different one if configured
 		# this avoids the typical 'host key changed warning' - `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!`
 		[[ -f "${DROPBEAR_DIR}/${dropbear_config}" ]] &&
-			sed -i "s/^#DROPBEAR_OPTIONS=.*/DROPBEAR_OPTIONS=\"-I 100 -j -k -p "${CRYPTROOT_SSH_UNLOCK_PORT}" -s -c cryptroot-unlock\"/" \
+			sed -i "s/^#DROPBEAR_OPTIONS=.*/DROPBEAR_OPTIONS=\"-I 100 -j -k -p ${CRYPTROOT_SSH_UNLOCK_PORT} -s -c cryptroot-unlock\"/" \
 				"${DROPBEAR_DIR}/${dropbear_config}"
 
 		# setup dropbear authorized_keys, either provided by userpatches or generated
@@ -84,6 +91,8 @@ function pre_install_kernel_debs__adjust_dropbear_configuration() {
 
 function post_umount_final_image__export_private_key(){
 	if [[ $CRYPTROOT_SSH_UNLOCK == yes && -f "${DROPBEAR_DIR}"/id_ecdsa ]]; then
+		# ${version} is provided by the framework for the image being built
+		# shellcheck disable=SC2154
 		CRYPTROOT_SSH_UNLOCK_KEY_PATH="${DESTIMG}/${version}.key"
 		# copy dropbear ssh key to image output dir for convenience
 		cp "${DROPBEAR_DIR}"/id_ecdsa "${CRYPTROOT_SSH_UNLOCK_KEY_PATH}"

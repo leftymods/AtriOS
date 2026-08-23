@@ -5,6 +5,10 @@ Before=graphical-session.target
 
 [Service]
 Type=oneshot
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+ProtectSystem=full
 ExecStart=/usr/bin/atrledctl play notification_passive
 
 [Install]

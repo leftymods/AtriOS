@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
@@ -76,6 +77,8 @@ function grub_pre_install__force_run_kernel_hook_for_atrios_dtb() {
 	# This is done forcibly here during `grub_pre_install`, since the kernel hook is deployed in the bsp-cli package
 	# which is only deployed after the linux-image package is installed and thus is not run.
 	display_alert "Extension: ${EXTENSION}: Deploying DTB for GRUB for image build" "${BOARD}" "info"
+	# intentional literal: $(...) is expanded inside the chroot shell
+	# shellcheck disable=SC2016
 	chroot_custom "${MOUNT}" 'for k in $(linux-version list); do /etc/kernel/postinst.d/AtriOS-grub-with-dtb "$k"; done'
 }
 

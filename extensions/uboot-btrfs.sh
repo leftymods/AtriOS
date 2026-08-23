@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Enable BTRFS support in u-boot
 
 function post_config_uboot_target__enable_uboot_btrfs_support() {

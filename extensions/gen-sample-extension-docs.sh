@@ -18,12 +18,15 @@ function extension_metadata_ready__docs_sample_extension() {
 
 ### Common stuff
 function read_common_data() {
-	declare -g HOOK_POINT_CALLS_COUNT=$(wc -l < "${EXTENSION_MANAGER_TMP_DIR}/hook_point_calls.txt")
-	declare -g HOOK_POINT_CALLS_UNIQUE_COUNT=$(sort < "${EXTENSION_MANAGER_TMP_DIR}/hook_point_calls.txt" | uniq | wc -l)
+	declare -g HOOK_POINT_CALLS_COUNT
+	HOOK_POINT_CALLS_COUNT=$(wc -l < "${EXTENSION_MANAGER_TMP_DIR}/hook_point_calls.txt")
+	declare -g HOOK_POINT_CALLS_UNIQUE_COUNT
+	HOOK_POINT_CALLS_UNIQUE_COUNT=$(sort < "${EXTENSION_MANAGER_TMP_DIR}/hook_point_calls.txt" | uniq | wc -l)
 	declare -g HOOK_POINTS_WITH_MULTIPLE_CALLS=""
 
 	# Read the hook_points (main, official names) from the hook point ordering file.
-	declare -g ALL_HOOK_POINT_CALLS=$(xargs echo -n < "${EXTENSION_MANAGER_TMP_DIR}/hook_point_calls.txt")
+	declare -g ALL_HOOK_POINT_CALLS
+	ALL_HOOK_POINT_CALLS=$(xargs echo -n < "${EXTENSION_MANAGER_TMP_DIR}/hook_point_calls.txt")
 }
 
 function loop_over_hook_points_and_call() {
@@ -32,9 +35,12 @@ function loop_over_hook_points_and_call() {
 	declare one_hook_point
 	for one_hook_point in ${ALL_HOOK_POINT_CALLS}; do
 		declare HOOK_POINT_COUNTER=$((HOOK_POINT_COUNTER + 1))
-		declare MARKDOWN_HEAD="$(head -1 "${EXTENSION_MANAGER_TMP_DIR}/${one_hook_point}.orig.md")"
-		declare MARKDOWN_BODY="$(tail -n +2 "${EXTENSION_MANAGER_TMP_DIR}/${one_hook_point}.orig.md")"
-		declare COMPATIBILITY_NAMES="$(xargs echo -n < "${EXTENSION_MANAGER_TMP_DIR}/${one_hook_point}.compat")"
+		declare MARKDOWN_HEAD
+		MARKDOWN_HEAD="$(head -1 "${EXTENSION_MANAGER_TMP_DIR}/${one_hook_point}.orig.md")"
+		declare MARKDOWN_BODY
+		MARKDOWN_BODY="$(tail -n +2 "${EXTENSION_MANAGER_TMP_DIR}/${one_hook_point}.orig.md")"
+		declare COMPATIBILITY_NAMES
+		COMPATIBILITY_NAMES="$(xargs echo -n < "${EXTENSION_MANAGER_TMP_DIR}/${one_hook_point}.compat")"
 		${callback}
 	done
 }
@@ -111,9 +117,11 @@ HEADER
 generate_bash_sample_for_hook_point() {
 	# Include the markdown documentation as a comment.
 	# Right now clean it up naively (remove backticks, mostly) but we could pipe through stuff to get better plaintext. (pandoc is a 155mb binary FYI)
-	local COMMENT_HEAD="#### $(echo "${MARKDOWN_HEAD}" | tr '`' '"')"
+	local COMMENT_HEAD
+	COMMENT_HEAD="#### $(echo "${MARKDOWN_HEAD}" | tr '`' '"')"
 	# shellcheck disable=SC2001
-	local COMMENT_BODY="$(echo "${MARKDOWN_BODY}" | tr '`' '"' | sed -e 's/^/###  /')"
+	local COMMENT_BODY
+	COMMENT_BODY="$(echo "${MARKDOWN_BODY}" | tr '`' '"' | sed -e 's/^/###  /')"
 
 	cat << SAMPLE_BASH_CODE
 ${COMMENT_HEAD}

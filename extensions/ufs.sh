@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Create UFS aligned image (requires >= Debian 13 (Trixie) Host)
 # declare -g DOCKER_ATRIOS_BASE_IMAGE=debian:trixie # Use this env variable manually
 function extension_prepare_config__ufs {
@@ -20,5 +21,7 @@ function extension_prepare_config__ufs {
 		fi
 	fi
 	EXTRA_IMAGE_SUFFIXES+=("-ufs")
+	# framework contract var: consumed by image layout code in lib/
+	# shellcheck disable=SC2034
 	declare -g SECTOR_SIZE=4096
 }

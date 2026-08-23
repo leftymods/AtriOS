@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 #
 # SPDX-License-Identifier: GPL-2.0
 # This file is a part of the AtriOS Build Framework https://github.com/leftymods/CoreOS/
@@ -29,8 +30,8 @@ function post_umount_final_image__write_syterkit_to_image() {
 		run_host_command_logged wget -O "${tmp_syterkit_img_path}" "${download_url}"
 		run_host_command_logged mv -v "${tmp_syterkit_img_path}" "${syterkit_img_path}"
 		display_alert " Decompressing SyterKit image to" "${syterkit_img_path}/${SYTERKIT_BOARD_ID}" "info"
-		mkdir -p ${syterkit_cache_dir}/${SYTERKIT_BOARD_ID}
-		run_host_command_logged tar -zxvf ${syterkit_img_path} -C ${syterkit_cache_dir}/${SYTERKIT_BOARD_ID}
+		mkdir -p "${syterkit_cache_dir}/${SYTERKIT_BOARD_ID}"
+		run_host_command_logged tar -zxvf "${syterkit_img_path}" -C "${syterkit_cache_dir}/${SYTERKIT_BOARD_ID}"
 	else
 		display_alert "SyterKit image already downloaded, using it" "${syterkit_img_path}" "info"
 	fi

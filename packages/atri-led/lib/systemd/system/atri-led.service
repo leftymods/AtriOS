@@ -10,6 +10,7 @@ ExecStart=/usr/bin/atrled daemon -f
 NoNewPrivileges=yes
 ProtectHome=yes
 PrivateTmp=yes
+ProtectSystem=full
 Restart=always
 RestartSec=2
 

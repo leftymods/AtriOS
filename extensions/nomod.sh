@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function extension_prepare_config__prepare_localmodconfig() {
 	display_alert "${EXTENSION}: nomod enabled" "${LSMOD} -- kernels won't work" "warn"
 }

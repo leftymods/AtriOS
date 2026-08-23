@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function add_host_dependencies__cleanup_space_final_image_zerofree() {
 	declare -g EXTRA_BUILD_DEPS="${EXTRA_BUILD_DEPS} zerofree"
 }

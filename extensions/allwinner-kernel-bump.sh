@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
@@ -25,10 +26,15 @@ function extension_prepare_config__prepare_kernel_patches() {
 
 function extension_finish_config__prepare_megous_patches() {
 	if [[ ${ATRIOS_RELAUNCHED} == "yes" ]]; then
+		# set/read via bash dynamic scoping by kernel_prepare_bare_repo_* helpers in lib/
+		# shellcheck disable=SC2034
 		declare bare_tree_done_marker_file=".git/atrios-bare-tree-done"
+		# shellcheck disable=SC2034
 		declare kernel_git_bare_tree
 		declare git_bundles_dir
+		# shellcheck disable=SC2034
 		declare git_kernel_ball_fn
+		# shellcheck disable=SC2034
 		declare git_kernel_oras_ref
 		declare kernel_work_dir="${SRC}/cache/sources/${LINUXSOURCEDIR}"
 		patch_dir_base="${SRC}/patch/kernel/${KERNELPATCHDIR}"

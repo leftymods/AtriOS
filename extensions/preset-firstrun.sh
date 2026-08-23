@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2129 # many individual preset echoes append to the same firstrun config
 function post_family_tweaks__preset_configs() {
 	display_alert "$BOARD" "preset configs for rootfs" "info"
 	# Set PRESET_NET_CHANGE_DEFAULTS to 1 to apply any network related settings below

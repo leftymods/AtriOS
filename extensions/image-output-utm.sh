@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 enable_extension "image-output-qcow2"
 
 #### *allow extensions to prepare their own config, after user config is done*

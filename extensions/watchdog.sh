@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # for boards with watchdog support - add watchdog package and
 # enable hardware watchdog device (/dev/watchdog) support in config
 

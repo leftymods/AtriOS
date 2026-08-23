@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # `btrfs` support is no longer included by default in prepare-host.sh.
 # Enable this extension to include the required dependencies for building.
 # This is automatically enabled if ROOTFS_TYPE is set to btrfs in main-config.sh.

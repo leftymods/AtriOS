@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function extension_finish_config__install_kernel_headers_for_aic8800_dkms() {
 
 	if [[ "${KERNEL_HAS_WORKING_HEADERS}" != "yes" ]]; then
@@ -53,6 +54,8 @@ function post_install_kernel_debs__install_aic8800_dkms_package() {
 		use_clean_environment="yes" chroot_sdcard_apt_get_install "gcc-14"
 		use_clean_environment="yes" chroot_sdcard "update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100"
 	fi
+	# consumed by the error handler in lib/
+	# shellcheck disable=SC2034
 	declare -ag if_error_find_files_sdcard=("/var/lib/dkms/aic8800*/*/build/*.log")
 	use_clean_environment="yes" chroot_sdcard_apt_get_install "/tmp/${aic8800_dkms_file_name} /tmp/aic8800-firmware_${latest_version}_all.deb"
 	use_clean_environment="yes" chroot_sdcard "rm -f /tmp/aic8800*.deb"

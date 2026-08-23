@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function extension_finish_config__install_kernel_headers_for_yt6801_dkms() {
 
 	if [[ "${KERNEL_HAS_WORKING_HEADERS}" != "yes" ]]; then
@@ -21,7 +22,9 @@ function post_install_kernel_debs__install_yt6801_dkms_package() {
 	yt6801_dkms_file_name=yt6801-dkms_${latest_version}_all.deb
 	use_clean_environment="yes" chroot_sdcard "wget ${yt6801_dkms_url} -P /tmp"
 	display_alert "Install yt6801 packages, will build kernel module in chroot" "${EXTENSION}" "info"
+	# consumed by the error handler in lib/
+	# shellcheck disable=SC2034
 	declare -ag if_error_find_files_sdcard=("/var/lib/dkms/yt6801*/*/build/*.log")
-	use_clean_environment="yes" chroot_sdcard_apt_get_install /tmp/${yt6801_dkms_file_name}
+	use_clean_environment="yes" chroot_sdcard_apt_get_install "/tmp/${yt6801_dkms_file_name}"
 	use_clean_environment="yes" chroot_sdcard "rm -f /tmp/yt6801*.deb"
 }

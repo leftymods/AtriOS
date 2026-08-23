@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 enable_extension "image-output-ovf" # Enable the ovf+vmdk output image extension
 
 function extension_prepare_config__prepare_vmware_config() {

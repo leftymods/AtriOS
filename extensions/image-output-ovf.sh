@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 enable_extension "image-output-qcow2"
 
 #### *run before installing host dependencies*

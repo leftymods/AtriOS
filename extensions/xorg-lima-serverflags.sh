@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2154 # framework provides ${destination} to bsp hook functions
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2023 AtriOS

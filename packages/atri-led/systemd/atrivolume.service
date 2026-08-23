@@ -6,6 +6,7 @@ After=multi-user.target sound.target
 NoNewPrivileges=yes
 ProtectHome=yes
 PrivateTmp=yes
+ProtectSystem=full
 Type=simple
 ExecStart=/usr/bin/atrivolume PCM
 Restart=always

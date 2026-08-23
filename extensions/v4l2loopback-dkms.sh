@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function extension_finish_config__build_v4l2loopback_dkms_kernel_module() {
 	# Deny on minimal CLI images
 	if [[ "${BUILD_MINIMAL}" == "yes" ]]; then
@@ -19,7 +20,11 @@ function post_install_kernel_debs__build_v4l2loopback_dkms_kernel_module() {
 	fi
 	[[ "${INSTALL_HEADERS}" != "yes" ]] || [[ "${KERNEL_HAS_WORKING_HEADERS}" != "yes" ]] && return 0
 	display_alert "Install v4l2loopback-dkms packages, will build kernel module in chroot" "${EXTENSION}" "info"
+	# consumed by the error handler in lib/
+	# shellcheck disable=SC2034
 	declare -g if_error_detail_message="v4l2loopback-dkms build failed, extension 'v4l2loopback-dkms'"
+	# consumed by the error handler in lib/
+	# shellcheck disable=SC2034
 	declare -ag if_error_find_files_sdcard=("/var/lib/dkms/v4l2loopback*/*/build/*.log")
 	use_clean_environment="yes" chroot_sdcard_apt_get_install "v4l2loopback-dkms v4l2loopback-utils v4l-utils"
 }

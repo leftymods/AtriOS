@@ -154,6 +154,7 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		[Service]
 		Type=oneshot
 		RemainAfterExit=yes
+		NoNewPrivileges=yes
 		# Wait for sound card device to appear
 		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done'
 		# SY6045S DSP config is applied by the kernel driver at probe

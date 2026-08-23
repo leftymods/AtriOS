@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <errno.h>
@@ -24,7 +25,7 @@ static void print_usage(const char *prog)
 	printf("  stop                   Stop animation (hold frame)\n");
 	printf("  off                    Turn off all LEDs\n");
 	printf("  list                   List available animations\n");
-	printf("  status                 Check if daemon is running\n");
+	printf("  status                 Query playback state from daemon\n");
 	printf("  kill                   Stop the daemon\n\n");
 	printf("Animations: builtins + files from /etc/atriled/animations\n");
 }
@@ -66,20 +67,56 @@ static void list_animations(void)
 	if (n == 0) printf("(no animations found)\n");
 }
 
-static int show_status(void)
+/*
+ * Live status query: one datagram round-trip with the daemon. The client
+ * binds a private path in /tmp so the daemon can reply to the sender.
+ */
+static int query_status(void)
 {
-	FILE *pf = fopen(pid_file, "r");
-	if (!pf) { printf("atriled: not running\n"); return 1; }
-	int pid;
-	if (fscanf(pf, "%d", &pid) != 1) { fclose(pf); return 1; }
-	fclose(pf);
-	if (kill(pid, 0) == 0)
-		printf("atriled: running (pid %d)\n", pid);
-	else {
-		printf("atriled: not running\n");
-		unlink(pid_file);
+	char buf[256];
+	struct sockaddr_un cli;
+	struct sockaddr_un addr;
+	int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (fd < 0) { perror("socket"); return 1; }
+
+	memset(&cli, 0, sizeof(cli));
+	cli.sun_family = AF_UNIX;
+	snprintf(cli.sun_path, sizeof(cli.sun_path),
+		 "/tmp/atrledctl-%ld.sock", (long)getpid());
+	unlink(cli.sun_path);
+	if (bind(fd, (struct sockaddr *)&cli, sizeof(cli)) < 0) {
+		perror("bind");
+		close(fd);
 		return 1;
 	}
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
+
+	struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+	if (sendto(fd, "status", 6, 0,
+		   (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		fprintf(stderr, "atriled: cannot reach daemon (%s)\n",
+			sock_path);
+		unlink(cli.sun_path);
+		close(fd);
+		return 1;
+	}
+
+	ssize_t n = recvfrom(fd, buf, sizeof(buf) - 1, 0, NULL, NULL);
+	if (n < 0) {
+		fprintf(stderr, "atriled: status timeout\n");
+		unlink(cli.sun_path);
+		close(fd);
+		return 1;
+	}
+	buf[n] = '\0';
+	printf("%s\n", buf);
+	unlink(cli.sun_path);
+	close(fd);
 	return 0;
 }
 
@@ -145,7 +182,7 @@ int main(int argc, char *argv[])
 		list_animations();
 
 	} else if (strcmp(cmd, "status") == 0) {
-		return show_status();
+		return query_status();
 
 	} else if (strcmp(cmd, "kill") == 0) {
 		FILE *pf = fopen(pid_file, "r");

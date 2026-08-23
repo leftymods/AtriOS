@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function extension_finish_config__install_kernel_headers_for_aic8800_dkms() {
 
 	if [[ "${KERNEL_HAS_WORKING_HEADERS}" != "yes" ]]; then
@@ -37,6 +38,8 @@ function post_install_kernel_debs__install_aic8800_dkms_package() {
 
 	use_clean_environment="yes" chroot_sdcard "wget \"${aic8800_dkms_url}\" -P /tmp"
 	display_alert "Installing aic8800 package, will build kernel module in chroot" "${EXTENSION}" "info"
+	# consumed by the error handler in lib/
+	# shellcheck disable=SC2034
 	declare -ag if_error_find_files_sdcard=("/var/lib/dkms/aic8800*/*/build/*.log")
 	# eject is needed by the aic8800-dkms package/DKMS workflow to safely unmount
 	# or eject media devices when building/installing kernel modules inside chroot.

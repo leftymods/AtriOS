@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154 # framework provides ${destination}/${SRC} to hook functions
 
 #
 # AtriOS Optimizations for Low-Memory Boards

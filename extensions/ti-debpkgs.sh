@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function post_repo_customize_image__install_ti_packages() {
 
     # Read JSON array into Bash array safely
@@ -5,7 +6,7 @@ function post_repo_customize_image__install_ti_packages() {
 		curl -s https://api.github.com/repos/TexasInstruments/ti-debpkgs/contents/dists |
 		jq -r '.[].name'
 	)
-	display_alert "TI Repo has the following valid suites - ${valid_suites[@]}..."
+	display_alert "TI Repo has the following valid suites - ${valid_suites[*]}..."
 
 	if printf '%s\n' "${valid_suites[@]}" | grep -qx "${RELEASE}"; then
 		# Get the sources file
@@ -33,6 +34,6 @@ function post_repo_customize_image__install_ti_packages() {
 	else
 		# Error if suite is not valid but continue building image anyway
 		display_alert "Error: Detected OS suite '$RELEASE' is not valid based on TI package repository. Skipping!"
-		display_alert "Valid Options Would Have Been: ${valid_suites[@]}"
+		display_alert "Valid Options Would Have Been: ${valid_suites[*]}"
 	fi
 }

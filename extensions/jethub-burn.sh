@@ -78,7 +78,10 @@ function make_burn__run() {
   local start size line
   while IFS= read -r line; do
     partition_count=$((partition_count + 1))
+    # regex extraction with capture groups; ${var//} substitution can't express this
+    # shellcheck disable=SC2001
     start=$(echo "$line" | sed 's/.*start= *\([0-9]*\).*/\1/')
+    # shellcheck disable=SC2001
     size=$(echo "$line" | sed 's/.*size= *\([0-9]*\).*/\1/')
     # Validate parsed values before dd
     [[ "$start" =~ ^[0-9]+$ ]] || exit_with_error "Failed to parse partition ${partition_count} start offset from sfdisk"
@@ -115,6 +118,8 @@ function post_build_image__900_jethub_burn() {
   [[ -f "$original_image_file" ]] || exit_with_error "Original image not found: $original_image_file"
 
   local dts_name
+  # ${BOARD} is the framework-provided board name (all caps by convention)
+  # shellcheck disable=SC2153
   case "${BOARD}" in
     jethubj80)  dts_name="meson-gxl-s905w-jethome-jethub-j80.dts" ;;
     jethubj100) dts_name="meson-axg-jethome-jethub-j100.dts" ;;

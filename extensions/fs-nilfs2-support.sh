@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Enable this extension to include the required dependencies for building.
 # This is automatically enabled if ROOTFS_TYPE is set to nilfs2 in main-config.sh.
 

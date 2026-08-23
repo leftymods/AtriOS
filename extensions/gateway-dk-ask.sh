@@ -69,6 +69,8 @@ function post_family_config__ask_fetch_repo() {
 # Post-config setup: enable kernel headers (userspace builds need FMAN UAPI headers)
 # and derive multiarch triplet from KERNEL_COMPILER (set by arch config)
 function extension_finish_config__ask_setup() {
+	# framework contract var: consumed by lib/ headers handling
+	# shellcheck disable=SC2034
 	declare -g INSTALL_HEADERS="yes"
 	[[ -z "${KERNEL_COMPILER}" ]] && exit_with_error "ASK extension: KERNEL_COMPILER is not set, cannot derive host triplet"
 	declare -g ASK_HOST_TRIPLET="${KERNEL_COMPILER%-}"
@@ -87,6 +89,8 @@ function custom_kernel_config__ask_modules() {
 
 	display_alert "ASK extension" "copying ASK module sources into kernel tree" "info"
 
+	# ${kernel_work_dir} is provided by the framework kernel-build environment
+	# shellcheck disable=SC2154
 	local ask_drv="${kernel_work_dir}/drivers/net/ethernet/freescale/ask"
 	local bsp_dir="${SRC}/packages/bsp/gateway-dk"
 
@@ -112,7 +116,10 @@ function custom_kernel_config__ask_modules() {
 
 		# Add board-specific entries to ASK Kconfig and Makefile
 		patch -p1 -d "${ask_drv}" < "${bsp_dir}/ask-kconfig-board-modules.patch"
+		# intentional literal: $(CONFIG_...) must reach the kernel Makefile unexpanded
+		# shellcheck disable=SC2016
 		echo 'obj-$(CONFIG_ASK_SFP_LED)	+= sfp_led/' >> "${ask_drv}/Makefile"
+		# shellcheck disable=SC2016
 		echo 'obj-$(CONFIG_ASK_LEDS_LP5812)	+= leds_lp5812/' >> "${ask_drv}/Makefile"
 	fi
 
@@ -188,6 +195,8 @@ function pre_customize_image__001_build_ask_userspace() {
 	display_alert "ASK extension" "building userspace components" "info"
 
 	local kernel_ver
+	# ls -1v is intentional: version-sort of module dirs (kernel versions)
+	# shellcheck disable=SC2012
 	kernel_ver=$(ls -1v "${SDCARD}/lib/modules/" | tail -1)
 	[[ -z "${kernel_ver}" ]] && exit_with_error "No kernel version found in ${SDCARD}/lib/modules/"
 	local kdir="/usr/src/linux-headers-${kernel_ver}"
@@ -383,7 +392,7 @@ function pre_customize_image__001_build_ask_userspace() {
 			cp -a "${SDCARD}/usr/lib/${ASK_HOST_TRIPLET}/${lib}" "${pkgdir}/usr/lib/${ASK_HOST_TRIPLET}/"
 	done
 	for pattern in libcli libfci; do
-		for f in "${SDCARD}/usr/lib/${ASK_HOST_TRIPLET}/"${pattern}*; do
+		for f in "${SDCARD}/usr/lib/${ASK_HOST_TRIPLET}/${pattern}"*; do
 			[[ -f "$f" ]] && cp -a "$f" "${pkgdir}/usr/lib/${ASK_HOST_TRIPLET}/"
 		done
 	done
@@ -398,7 +407,8 @@ function pre_customize_image__001_build_ask_userspace() {
 	done
 
 	# Version: kernel version + build date — allows bugfix rebuilds without kernel change
-	local ask_version="${kernel_ver}+$(date +%Y%m%d)"
+	local ask_version
+	ask_version="${kernel_ver}+$(date +%Y%m%d)"
 
 	# Depends uses >= (not =): this is intentional. The kernel may receive minor version bumps
 	# without ASK changes. Using = would require rebuilding ASK for every kernel point release

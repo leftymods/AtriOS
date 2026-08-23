@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2154 # framework provides ${rootpart} to prepare_root_device hooks
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
@@ -25,8 +26,12 @@ function extension_prepare_config__lvm_image_suffix() {
 
 function extension_prepare_config__prepare_lvm() {
 	# Config for lvm, boot partition is required, many bootloaders do not support LVM.
+	# framework contract var: consumed by lib/ partitioning
+	# shellcheck disable=SC2034
 	declare -g BOOTPART_REQUIRED=yes
 	declare -g LVM_VG_NAME="${LVM_VG_NAME:-armbivg}"
+	# framework contract var: consumed by lib/ rootfs sizing
+	# shellcheck disable=SC2034
 	declare -g EXTRA_ROOTFS_MIB_SIZE=256
 	add_packages_to_image lvm2
 }

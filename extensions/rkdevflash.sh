@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
@@ -165,7 +166,7 @@ function build_rkdeveloptool() {
 	run_host_command_logged pipetty autoheader
 	run_host_command_logged pipetty automake --add-missing
 	run_host_command_logged pipetty ./configure
-	run_host_command_logged pipetty make -j$(nproc)
+	run_host_command_logged pipetty make "-j$(nproc)"
 	run_host_command_logged pipetty ls -la "${rkdeveloptool_bin_path}"
 
 	popd &> /dev/null || exit_with_error "Fail to cd back to AtriOS-build"

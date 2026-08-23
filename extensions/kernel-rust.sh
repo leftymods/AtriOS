@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Enable Rust support for Linux kernel compilation.
 #
 # Installs Rust toolchain via rustup into ${SRC}/cache/tools/rustup/ and
@@ -171,6 +172,8 @@ function artifact_kernel_version_parts__add_rust_version() {
 	local short
 	short="$(echo -n "${cache_key}" | sha256sum | cut -c1-4)"
 
+	# consumed by artifact-version aggregation in lib/
+	# shellcheck disable=SC2034
 	artifact_version_parts["_R"]="rust${short}"
 
 	# Add to order array if not already present

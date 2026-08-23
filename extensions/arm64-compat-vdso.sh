@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Enable 32-bit compat vDSO for arm64 kernels with GCC or clang.
 # Requirements:
 # - arm64 build target (ARCH=arm64, ARCHITECTURE=arm64).

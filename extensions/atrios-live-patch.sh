@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2154 # framework provides ${destination} to bsp hook functions
 function post_family_tweaks_bsp__atrios-live-patch() {
 
 	display_alert "Extension: ${EXTENSION}: Installing AtriOS Live Patch" "${EXTENSION}" "info"

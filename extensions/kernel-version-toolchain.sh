@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Add compiler (gcc/clang) identifier to kernel artifact version string.
 # This ensures cache invalidation when the toolchain changes.
 # Enable with: ENABLE_EXTENSIONS="kernel-version-toolchain"
@@ -30,6 +31,8 @@ function artifact_kernel_version_parts__add_toolchain() {
 	display_alert "Extension: ${EXTENSION}: Adding toolchain to kernel version" "${toolchain_id}" "debug"
 
 	# Add to version parts
+	# consumed by artifact-version aggregation in lib/
+	# shellcheck disable=SC2034
 	artifact_version_parts["_T"]="${toolchain_id}"
 	artifact_version_part_order+=("0085-_T")
 }

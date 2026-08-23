@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # The C++ compiler is no longer included by default in prepare-host.sh.
 # Enable this extension if you need a C++ compiler during the build.
 

@@ -10,10 +10,15 @@ function extension_prepare_config__prepare_grub-riscv64() {
 	declare -g UEFI_GRUB_TIMEOUT=${UEFI_GRUB_TIMEOUT:-0}                      # Small timeout by default
 	declare -g GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT:-""}" # Cmdline by default
 	# User config overrides.
+	# framework contract vars: consumed by lib/ image partitioning
+	# shellcheck disable=SC2034
 	declare -g BOOTCONFIG="none"                                                     # To try and convince lib/ to not build or install u-boot.
 	unset BOOTSOURCE                                                                 # To try and convince lib/ to not build or install u-boot.
+	# shellcheck disable=SC2034
 	declare -g IMAGE_PARTITION_TABLE="gpt"                                           # GPT partition table is essential for many UEFI-like implementations, eg Apple+Intel stuff.
+	# shellcheck disable=SC2034
 	declare -g UEFISIZE=256                                                          # in MiB - grub EFI is tiny - but some EFI BIOSes ignore small too small EFI partitions
+	# shellcheck disable=SC2034
 	declare -g BOOTSIZE=0                                                            # No separate /boot when using UEFI.
 	if [[ $BOOTPART_REQUIRED == "yes" ]]; then
 		# It is important to place this into /boot to have unified boot partition, especially when CRYPTROOT is used
@@ -64,6 +69,7 @@ pre_umount_final_image__install_grub() {
 	chroot_custom "$chroot_target" mkdir -pv '/dev/disk/by-uuid/"$(grub-probe --target=fs_uuid /)"' "||" true
 	# Include /boot that might point to a separate boot partition in case one exists (lvm, cryptroot)
 	# Even if boot partition doesn't exist - the command will be the same as mkdir for / above
+	# shellcheck disable=SC2016 # some wierd escaping going on there.
 	chroot_custom "$chroot_target" mkdir -pv '/dev/disk/by-uuid/"$(grub-probe --target=fs_uuid /boot)"' "||" true
 
 	display_alert "Extension: ${EXTENSION}: Creating GRUB config..." "${EXTENSION}: grub-mkconfig / update-grub"

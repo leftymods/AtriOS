@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function add_host_dependencies__qcow2_host_deps() {
 	[[ "${SKIP_QCOW2}" == "yes" ]] && return 0
 	declare -g EXTRA_BUILD_DEPS="${EXTRA_BUILD_DEPS} qemu-utils"

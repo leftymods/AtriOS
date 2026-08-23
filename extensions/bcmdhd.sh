@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function extension_finish_config__install_kernel_headers_for_bcmdhd_dkms() {
 
 	if [[ "${KERNEL_HAS_WORKING_HEADERS}" != "yes" ]]; then
@@ -41,7 +42,9 @@ function post_install_kernel_debs__install_bcmdhd_dkms_package() {
 			;;
 	esac
 	display_alert "Install bcmdhd packages, will build kernel module in chroot" "${EXTENSION}" "info"
+	# consumed by the error handler in lib/
+	# shellcheck disable=SC2034
 	declare -ag if_error_find_files_sdcard=("/var/lib/dkms/bcmdhd*/*/build/*.log")
-	use_clean_environment="yes" chroot_sdcard_apt_get_install /tmp/${bcmdhd_dkms_file_name}
+	use_clean_environment="yes" chroot_sdcard_apt_get_install "/tmp/${bcmdhd_dkms_file_name}"
 	use_clean_environment="yes" chroot_sdcard "rm -f /tmp/bcmdhd*.deb"
 }

@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2154 # framework provides ${version}/${abl_boot_partition_label}/${extraargs}
 function add_host_dependencies__abl_host_deps() {
 	declare -g EXTRA_BUILD_DEPS="${EXTRA_BUILD_DEPS} mkbootimg"
 }
@@ -16,7 +17,9 @@ function post_build_image__900_convert_to_abl_img() {
 
 	display_alert "Converting image $version to rootfs" "${EXTENSION}" "info"
 	declare -g ROOTFS_IMAGE_FILE="${DESTIMG}/${version}.rootfs.img"
+	# shellcheck disable=SC2034 # kept for parity with upstream abl flow
 	rootfs_start_sector=$(gdisk -l "${DESTIMG}/${version}.img" | grep rootfs | awk '{print $2}')
+	# shellcheck disable=SC2034 # kept for parity with upstream abl flow
 	rootfs_end_sector=$(gdisk -l "${DESTIMG}/${version}.img" | grep rootfs | awk '{print $3}')
 	old_rootfs_image_mount_dir=${DESTIMG}/rootfs-old
 	new_rootfs_image_mount_dir=${DESTIMG}/rootfs-new
@@ -34,6 +37,7 @@ function post_build_image__900_convert_to_abl_img() {
 	rm "${DESTIMG}/${version}.img"
 	display_alert "Replace root partition uuid from ${old_rootfs_image_uuid} to ${new_rootfs_image_uuid} in /etc/fstab" "${EXTENSION}" "info"
 	sed -i "s|${old_rootfs_image_uuid}|${new_rootfs_image_uuid}|g" "${new_rootfs_image_mount_dir}/etc/fstab"
+	# shellcheck disable=SC1091 # sourced from the mounted image at build time
 	source "${new_rootfs_image_mount_dir}/boot/atriosEnv.txt"
 	declare -g bootimg_cmdline="${BOOTIMG_CMDLINE_EXTRA} root=UUID=${new_rootfs_image_uuid} slot_suffix=${abl_boot_partition_label#boot} ${extraargs}"
 

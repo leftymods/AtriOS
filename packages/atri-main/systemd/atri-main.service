@@ -5,6 +5,10 @@ Wants=systemd-modules-load.service
 
 [Service]
 Type=simple
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+ProtectSystem=full
 ExecStart=/usr/bin/atri-main
 Restart=on-failure
 RestartSec=2

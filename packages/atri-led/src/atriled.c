@@ -361,7 +361,8 @@ static void override_update(struct led_state *st)
 
 /* ---- command handling ---- */
 
-static void handle_command(struct led_state *st, char *cmd)
+static void handle_command(int sock, struct led_state *st, char *cmd,
+	const struct sockaddr_un *src, socklen_t srclen)
 {
 	char *nl = strchr(cmd, '\n');
 	if (nl) *nl = '\0';
@@ -369,7 +370,23 @@ static void handle_command(struct led_state *st, char *cmd)
 	char *verb = strtok_r(cmd, " \t", &save);
 	if (!verb) return;
 
-	if (strcmp(verb, "play") == 0 || strcmp(verb, "loop") == 0) {
+	if (strcmp(verb, "status") == 0) {
+		char reply[192];
+		int playing = (st->playing || st->fade_pos >= 0 ||
+			       st->arc_active) ? 1 : 0;
+		const char *anim = st->current_name[0] ?
+			st->current_name : "idle";
+		snprintf(reply, sizeof(reply),
+			 "playing=%d anim=%s brightness=%u gamma=%d",
+			 playing, anim,
+			 (unsigned)(st->led.master * 100 / 255),
+			 st->led.gamma_en ? 1 : 0);
+		if (src && srclen)
+			sendto(sock, reply, strlen(reply), 0,
+			       (const struct sockaddr *)src, srclen);
+		return;
+
+	} else if (strcmp(verb, "play") == 0 || strcmp(verb, "loop") == 0) {
 		char *name = strtok_r(NULL, " \t", &save);
 		if (!name) return;
 		int loop = (strcmp(verb, "loop") == 0);
@@ -478,10 +495,13 @@ static int daemon_loop(struct led_state *st, const char *start_anim)
 		int ret = poll(&pfd, 1, (int)timeout);
 		if (ret > 0 && (pfd.revents & POLLIN)) {
 			char buf[256];
-			int n = recvfrom(sock, buf, sizeof(buf) - 1, 0, NULL, NULL);
+			struct sockaddr_un src;
+			socklen_t srclen = sizeof(src);
+			int n = recvfrom(sock, buf, sizeof(buf) - 1, 0,
+					 (struct sockaddr *)&src, &srclen);
 			if (n > 0) {
 				buf[n] = '\0';
-				handle_command(st, buf);
+				handle_command(sock, st, buf, &src, srclen);
 			}
 		}
 	}
@@ -626,7 +646,7 @@ static void print_usage(const char *prog)
 	printf("  play <name>              Play an animation (once, builtin or file)\n");
 	printf("  loop <name>              Loop an animation\n");
 	printf("  list                     List builtin + file animations\n");
-	printf("  status                   Check if daemon is running\n");
+	printf("  status                   Check daemon and playback state\n");
 	printf("  stop                     Stop the daemon\n");
 	printf("  off                      Turn off all LEDs\n");
 	printf("  color <r> <g> <b>        Set solid color and exit\n");

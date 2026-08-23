@@ -16,10 +16,15 @@ function extension_prepare_config__prepare_grub_standard() {
 
 	if [[ "${UEFI_GRUB}" != "skip" ]]; then
 		# User config overrides for GRUB.
+		# framework contract vars: consumed by lib/ image partitioning
+		# shellcheck disable=SC2034
 		declare -g BOOTCONFIG="none"                       # To try and convince lib/ to not build or install u-boot.
 		unset BOOTSOURCE                                   # To try and convince lib/ to not build or install u-boot.
+		# shellcheck disable=SC2034
 		declare -g IMAGE_PARTITION_TABLE="gpt"             # GPT partition table is essential for many UEFI-like implementations, eg Apple+Intel stuff.
+		# shellcheck disable=SC2034
 		declare -g UEFISIZE=260                            # in MiB - grub EFI is tiny - but some EFI BIOSes ignore small too small EFI partitions
+		# shellcheck disable=SC2034
 		declare -g BOOTSIZE=0                              # No separate /boot when using UEFI.
 		if [[ $BOOTPART_REQUIRED == "yes" ]]; then		   # It is important to place this into /boot to have unified boot partition, especially when CRYPTROOT is used
 			declare -g UEFI_MOUNT_POINT=/boot
@@ -36,6 +41,8 @@ function extension_prepare_config__prepare_grub_standard() {
 			if [[ "${UEFI_ENABLE_BIOS_AMD64}" == "yes" ]]; then
 				packages+=(grub-pc-bin grub-pc)
 				declare -g UEFI_GRUB_TARGET_BIOS="i386-pc"
+				# framework contract var: consumed by lib/ partitioning
+				# shellcheck disable=SC2034
 				declare -g BIOSSIZE=4 # 4 MiB BIOS partition
 			else
 				packages+=("grub-efi-${ARCH}")
@@ -62,10 +69,16 @@ function extension_prepare_config__prepare_grub_standard() {
 	fi
 
 	if [[ "${DISTRO_GENERIC_KERNEL}" == "yes" ]]; then
+		# framework contract vars: consumed by lib/ kernel/firmware handling
+		# shellcheck disable=SC2034
 		declare -g IMAGE_INSTALLED_KERNEL_VERSION="${DISTRO_KERNEL_VER}"
+		# shellcheck disable=SC2034
 		declare -g KERNELSOURCE='none'         # We need to be explicit we don't want a kernel built.
+		# shellcheck disable=SC2034
 		declare -g INSTALL_ATRIOS_FIRMWARE=no # Should skip build and install of atrios-firmware.
 	else
+		# framework contract var: consumed by lib/ kernel dir handling
+		# shellcheck disable=SC2034
 		declare -g KERNELDIR="linux-uefi-${LINUXFAMILY}" # Avoid sharing a source tree with others, until we know it's safe.
 		# Don't install anything. AtriOS handles everything.
 		DISTRO_KERNEL_PACKAGES=""
@@ -90,6 +103,8 @@ function post_family_tweaks_bsp__remove_uboot_grub() {
 	# shellcheck disable=SC2154 # $destination is the target dir of the bsp building function
 	pushd "${destination}" || exit_with_error "cray-cray about destination: ${destination}"
 	run_host_command_logged find "." -type f "|" grep -e "uboot" -e "u-boot" "|" xargs rm -v
+	# popd failure here is not fatal; keep upstream behavior
+	# shellcheck disable=SC2164
 	popd
 }
 
@@ -157,7 +172,7 @@ pre_umount_final_image__install_grub() {
 
 	if [[ "${UEFI_GRUB_TARGET_BIOS}" != "" ]]; then
 		display_alert "Extension: ${EXTENSION}: Installing GRUB BIOS..." "${UEFI_GRUB_TARGET_BIOS} device ${LOOP}" ""
-		chroot_custom "$chroot_target" grub-install --target=${UEFI_GRUB_TARGET_BIOS} "${LOOP}" || {
+		chroot_custom "$chroot_target" grub-install --target="${UEFI_GRUB_TARGET_BIOS}" "${LOOP}" || {
 			exit_with_error "${install_grub_cmdline} failed!"
 		}
 	fi
@@ -179,6 +194,7 @@ pre_umount_final_image__install_grub() {
 	chroot_custom "$chroot_target" mkdir -pv '/dev/disk/by-uuid/"$(grub-probe --target=fs_uuid /)"' "||" true
 	# Include /boot that might point to a separate boot partition in case one exists (lvm, cryptroot)
 	# Even if boot partition doesn't exist - the command will be the same as mkdir for / above
+	# shellcheck disable=SC2016 # some wierd escaping going on there.
 	chroot_custom "$chroot_target" mkdir -pv '/dev/disk/by-uuid/"$(grub-probe --target=fs_uuid /boot)"' "||" true
 
 	display_alert "Extension: ${EXTENSION}: Creating GRUB config..." "grub-mkconfig" ""
@@ -249,6 +265,8 @@ pre_umount_final_image__900_export_kernel_and_initramfs() {
 		# this writes to ${DESTIMG} directly, since debootstrap.sh will move them later.
 		# capture the $MOUNT/boot/vmlinuz and initrd and send it out ${DESTIMG}
 		run_host_command_logged ls -la "${MOUNT}"/boot/vmlinuz-* "${MOUNT}"/boot/initrd.img-* || true
+		# ${version} is set by the framework for the image being built
+		# shellcheck disable=SC2154
 		run_host_command_logged cp -pv "${MOUNT}"/boot/vmlinuz-* "${DESTIMG}/${version}.kernel"
 		run_host_command_logged cp -pv "${MOUNT}"/boot/initrd.img-* "${DESTIMG}/${version}.initrd"
 	fi
