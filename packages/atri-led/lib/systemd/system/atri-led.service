@@ -1,10 +1,15 @@
 [Unit]
-Description=AtriStation LED ring daemon
+Description=AtriStation LED ring effects daemon
 After=local-fs.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/atrled daemon -f notification_passive
+# No idle animation: atri-main owns ambient ring state and yields it
+# to this daemon via /run/atriled.override while an effect plays.
+ExecStart=/usr/bin/atrled daemon -f
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
 Restart=always
 RestartSec=2
 

@@ -18,6 +18,7 @@
 static const char *anim_dir = "/etc/atriled/animations";
 static const char *pid_file = "/run/atriled.pid";
 static const char *sock_path = "/run/atriled.sock";
+static const char *override_path = "/run/atriled.override";
 static volatile sig_atomic_t running = 1;
 
 /* render cadence and change threshold */
@@ -341,6 +342,23 @@ static long state_tick(struct led_state *st)
 	return RENDER_INTERVAL_MS;
 }
 
+/*
+ * Ownership arbitration with atri-main: while any effect is active
+ * (animation, crossfade, volume arc) we hold /run/atriled.override;
+ * atri-main polls for it and stops touching the ring until it clears.
+ */
+static void override_update(struct led_state *st)
+{
+	int busy = st->playing || st->fade_pos >= 0 || st->arc_active;
+
+	if (busy) {
+		int fd = open(override_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		if (fd >= 0) close(fd);
+	} else {
+		unlink(override_path);
+	}
+}
+
 /* ---- command handling ---- */
 
 static void handle_command(struct led_state *st, char *cmd)
@@ -453,6 +471,8 @@ static int daemon_loop(struct led_state *st, const char *start_anim)
 		long timeout = state_tick(st);
 		if (timeout < 0)
 			timeout = -1;	/* idle: wait for commands only */
+
+		override_update(st);
 
 		struct pollfd pfd = { .fd = sock, .events = POLLIN };
 		int ret = poll(&pfd, 1, (int)timeout);

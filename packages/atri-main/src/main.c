@@ -4,6 +4,7 @@
 #include "screen.h"
 #include "ring.h"
 #include "animator.h"
+#include <unistd.h>
 #include "input.h"
 #include <signal.h>
 #include <getopt.h>
@@ -92,7 +93,11 @@ int main(int argc, char **argv)
     while (running) {
         uint64_t now = get_ms();
         input_poll(input);
-        animator_tick(&anim, &scr, &rng, now);
+                /* atrled override: пока играет уведомление/арка громкости,
+         * atrled владеет кольцом (флаг /run/atriled.override) */
+        struct ring *ring_now =
+            access("/run/atriled.override", F_OK) == 0 ? NULL : &rng;
+        animator_tick(&anim, &scr, ring_now, now);
         usleep(20000);
     }
 
