@@ -17,7 +17,11 @@ static int ring_found[ATRI_LED_MAX_RINGS];
 
 /* gamma 2.2 LUT, built once — perceptually linear LED output */
 static uint8_t gamma_lut[256];
+static uint8_t gamma_inv[256];	/* command value for a given linear level */
 static int gamma_ready = 0;
+
+const uint8_t *atri_led_get_gamma_lut(void) { return gamma_lut; }
+const uint8_t *atri_led_get_gamma_inv(void) { return gamma_inv; }
 
 static void build_gamma_lut(void)
 {
@@ -29,6 +33,15 @@ static void build_gamma_lut(void)
 	}
 	gamma_lut[0] = 0;
 	gamma_lut[255] = 255;
+	/* inverse map: linear emitted level -> command value */
+	for (int lvl = 0; lvl <= 255; lvl++) {
+		int best = 0;
+		for (int v = 0; v < 256; v++) {
+			if (gamma_lut[v] <= lvl) best = v;
+			else break;
+		}
+		gamma_inv[lvl] = (uint8_t)best;
+	}
 	gamma_ready = 1;
 }
 

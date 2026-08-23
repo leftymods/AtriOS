@@ -88,6 +88,8 @@ struct led_state {
 	long long pend_t0;
 	struct animation_frame fade_from;
 	int fade_pos;		/* -1 = no fade in progress */
+	int fade_black;		/* fading out to off */
+
 
 	/* volume arc easing */
 	int arc_active;
@@ -112,6 +114,11 @@ static void state_free_file(struct led_state *st)
 static struct animation *state_current_anim(struct led_state *st)
 {
 	return st->use_file ? &st->file_anim : st->builtin;
+}
+
+static struct animation *pa_unused(struct led_state *st)
+{
+	return st->pend_use_file ? NULL : &st->pend_builtin;
 }
 
 /* activate already-resolved animation (no fade): builds its timeline */
@@ -266,35 +273,50 @@ static long state_tick(struct led_state *st)
 		return ARC_TICK_MS;
 	}
 
-	/* asynchronous crossfade towards pending animation */
+	/* asynchronous crossfade towards pending animation (or to black) */
 	if (st->fade_pos >= 0) {
-		struct animation *pa = st->pend_use_file ? &st->pend_file
-							 : &st->pend_builtin;
-		int s = st->fade_pos * 255 / FADE_STEPS;
-		int r, c;
+		int x = st->fade_pos * 255 / FADE_STEPS;
+		/* smoothstep ease-in-out: gentle start and settle */
+		int s = x * x * (3 * 255 - 2 * x) / (255 * 255);
+		int r, ci;
 
-		atri_led_timeline_sample(&st->pend_tl, pa,
-					 now_ms() - st->pend_t0, &f);
+		if (st->fade_black)
+			memset(&f, 0, sizeof(f));
+		else {
+			struct animation *pa = st->pend_use_file
+				? &st->pend_file : &st->pend_builtin;
+			atri_led_timeline_sample(&st->pend_tl, pa,
+						 now_ms() - st->pend_t0, &f);
+		}
+
 		for (r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++)
-			for (c = 0; c < 3; c++)
-				st->led.brightness[r][c] =
-					chan_lerp(st->fade_from.rgb[r][c],
-						  f.rgb[r][c], s);
+			for (ci = 0; ci < 3; ci++)
+				st->led.brightness[r][ci] =
+					chan_lerp(st->fade_from.rgb[r][ci],
+						  f.rgb[r][ci], s);
 		atri_led_apply(&st->led);
 		st->last_valid = 0;
 
 		if (++st->fade_pos > FADE_STEPS) {
-			struct animation file_copy = st->pend_file;
-			int use_file = st->pend_use_file;
-			char name[128];
-			int loop = st->pend_loop;
+			if (st->fade_black) {
+				st->fade_pos = -1;
+				st->fade_black = 0;
+				atri_led_off(&st->led);
+				return -1;
+			}
+			{
+				struct animation file_copy = st->pend_file;
+				int use_file = st->pend_use_file;
+				char name[128];
+				int loop = st->pend_loop;
 
-			memcpy(name, st->pend_name, sizeof(name));
-			memset(&st->pend_file, 0, sizeof(st->pend_file));
-			atri_led_timeline_free(&st->pend_tl);
-			st->fade_pos = -1;
-			state_activate(st, use_file ? NULL : pa,
-				       &file_copy, use_file, name, loop);
+				memcpy(name, st->pend_name, sizeof(name));
+				memset(&st->pend_file, 0, sizeof(st->pend_file));
+				atri_led_timeline_free(&st->pend_tl);
+				st->fade_pos = -1;
+				state_activate(st, use_file ? NULL : pa_unused(st),
+					       &file_copy, use_file, name, loop);
+			}
 		}
 		return FADE_TICK_MS;
 	}
@@ -382,8 +404,11 @@ static void handle_command(struct led_state *st, char *cmd)
 		state_stop(st);
 
 	} else if (strcmp(verb, "off") == 0) {
+		memcpy(&st->fade_from, &st->led.brightness,
+		       sizeof(st->fade_from));
 		state_stop(st);
-		atri_led_off(&st->led);
+		st->fade_black = 1;
+		st->fade_pos = 0;	/* ease-out over ~170 ms */
 	}
 }
 

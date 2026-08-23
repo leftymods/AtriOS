@@ -33,6 +33,9 @@ uint8_t atri_led_get_master(struct atri_led *led);
 
 /* hue 0-359, sat/val 0-255 */
 void atri_led_hsv_to_rgb(int h, int s, int v, uint8_t *r, uint8_t *g, uint8_t *b);
+/* gamma tables for perceptual blending in animation code */
+const uint8_t *atri_led_get_gamma_lut(void);
+const uint8_t *atri_led_get_gamma_inv(void);
 
 /* render an arc: pct 0-100 of the ring lit with color (r,g,b), rest dark.
  * start_ring is index 0 of the arc; direction 1 = cw, -1 = ccw. */

@@ -753,8 +753,13 @@ static struct animation_frame rainbow_frames[72];
 
 static void init_extra_animations(void);
 
+void atri_led_anim_set_blend_tables(const uint8_t *fwd, const uint8_t *inv);
+
 void atri_led_init_animations(void)
 {
+	atri_led_anim_set_blend_tables(atri_led_get_gamma_lut(),
+				       atri_led_get_gamma_inv());
+
 	fill_solid(red_frames, 1, FRAME_MS, 255, 0, 0);
 	fill_solid(green_frames, 1, FRAME_MS, 0, 255, 0);
 	fill_solid(blue_frames, 1, FRAME_MS, 0, 0, 255);
@@ -1016,19 +1021,42 @@ void atri_led_timeline_free(struct anim_timeline *tl)
 	memset(tl, 0, sizeof(*tl));
 }
 
+/*
+ * Perceptual blending: interpolate in emitted-light space (through the
+ * gamma LUT and its inverse), so fades have no dark mid-point dip.
+ * Falls back to plain lerp until atri_led_anim_set_blend_tables().
+ */
+static const uint8_t *blend_fwd;
+static const uint8_t *blend_inv;
+
+void atri_led_anim_set_blend_tables(const uint8_t *fwd, const uint8_t *inv)
+{
+	blend_fwd = fwd;
+	blend_inv = inv;
+}
+
+static inline uint8_t chan_blend(int f, int t, int frac)
+{
+	if (frac <= 0) return (uint8_t)f;	/* exact endpoints */
+	if (frac >= 255) return (uint8_t)t;
+	if (blend_fwd && blend_inv) {
+		int lin = (int)blend_fwd[f] +
+			(((int)blend_fwd[t] - (int)blend_fwd[f]) * frac) / 255;
+		return blend_inv[lin];
+	}
+	return (uint8_t)(f + (t - f) * frac / 255);
+}
+
 static void frame_lerp(const struct animation_frame *from,
 	const struct animation_frame *to, int frac /*0..255*/,
 	struct animation_frame *out, int ring_count)
 {
 	int r, c;
 
-	for (r = 0; r < ring_count && r < ATRI_LED_MAX_RINGS; r++) {
-		for (c = 0; c < 3; c++) {
-			int f = from->rgb[r][c];
-			int t = to->rgb[r][c];
-			out->rgb[r][c] = (uint8_t)(f + (t - f) * frac / 255);
-		}
-	}
+	for (r = 0; r < ring_count && r < ATRI_LED_MAX_RINGS; r++)
+		for (c = 0; c < 3; c++)
+			out->rgb[r][c] =
+				chan_blend(from->rgb[r][c], to->rgb[r][c], frac);
 	out->duration_ms = from->duration_ms;
 }
 
