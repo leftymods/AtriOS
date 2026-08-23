@@ -23,8 +23,10 @@
 #include <linux/i2c-dev.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
+#include <time.h>
 
 static int opt_i2c_read = 0;
+static int opt_watch_sec = 0;
 
 #define P(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #define SEP()       P("-----------------------------------------------------------")
@@ -343,19 +345,123 @@ static void probe_tty(void)
 	P("  hints: ttyAML0=console ttyAML1=BT(uart_A) ttyAML2=Zigbee(uart_AO_B)");
 }
 
+static struct gpiochip_info info_tmp;
+
+
+static long now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+#define WATCH_LOG(...) do { printf("[watch] "); printf(__VA_ARGS__); putchar(0x0a); } while (0)
+
+/* ---- live gpio watcher: reveal encoder/unknown pins by motion ---- */
+
+#include <linux/gpio.h>
+
+#define WATCH_MAXLINES 128
+
+struct snap { unsigned int lines; uint8_t val[WATCH_MAXLINES]; };
+
+static int chip_watch(const char *path, struct snap *s)
+{
+	int fd = open(path, O_RDONLY);
+	struct gpiohandle_request req;
+	int i, ret;
+
+	if (fd < 0) return -1;
+	memset(&req, 0, sizeof(req));
+	if (ioctl(fd, GPIO_GET_CHIPINFO_IOCTL, &info_tmp) < 0) {
+		close(fd); return -1;
+	}
+	s->lines = info_tmp.lines > WATCH_MAXLINES ? WATCH_MAXLINES
+						   : info_tmp.lines;
+	/* request all lines as inputs (nonexclusive fails on claimed:
+	 * those are skipped silently — we only watch free lines) */
+	for (i = 0; i < (int)s->lines; i++)
+		req.lineoffsets[i] = i;
+	req.lines = s->lines;
+	req.flags = GPIOHANDLE_REQUEST_INPUT;
+	ret = ioctl(fd, GPIO_GET_LINEHANDLE_IOCTL, &req);
+	if (ret < 0) { close(fd); return -2; }	/* some lines claimed */
+
+	struct gpiohandle_data data;
+	memset(&data, 0, sizeof(data));
+	if (ioctl(req.fd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, &data) < 0) {
+		close(req.fd); close(fd); return -3;
+	}
+	for (i = 0; i < (int)s->lines; i++)
+		s->val[i] = data.values[i] & 1;
+	close(req.fd);
+	close(fd);
+	return 0;
+}
+
+static void watch_gpio(int seconds)
+{
+	DIR *d = opendir("/dev");
+	struct dirent *de;
+	char chips[16][64];
+	int nchips = 0;
+
+	WATCH_LOG("watching free GPIO lines for %ds — rotate the knob now!", seconds);
+	if (!d) return;
+	while ((de = readdir(d)) && nchips < 16) {
+		if (strncmp(de->d_name, "gpiochip", 8)) continue;
+		if (strlen(de->d_name) >= 56) continue;
+		snprintf(chips[nchips++], sizeof(chips[0]), "/dev/%s", de->d_name);
+	}
+	closedir(d);
+
+	struct snap prev[16], cur[16];
+	int valid[16] = {0};
+	long end = now_ms() + seconds * 1000L;
+
+	/* initial snapshots best-effort */
+	for (int i = 0; i < nchips; i++) {
+		if (chip_watch(chips[i], &prev[i]) == 0)
+			valid[i] = 1;
+	}
+
+	while (now_ms() < end) {
+		usleep(120000);
+		for (int i = 0; i < nchips; i++) {
+			if (!valid[i]) continue;
+			if (chip_watch(chips[i], &cur[i]) != 0)
+				continue;
+			for (unsigned l = 0; l < cur[i].lines; l++) {
+				if (valid[i] && cur[i].val[l] != prev[i].val[l]) {
+					WATCH_LOG("  %s line %u: %u -> %u",
+					    chips[i], l,
+					    prev[i].val[l], cur[i].val[l]);
+				}
+			}
+			memcpy(&prev[i], &cur[i], sizeof(cur[i]));
+		}
+	}
+	WATCH_LOG("watch done");
+}
+
 int main(int argc, char **argv)
 {
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--i2c-read") == 0)
 			opt_i2c_read = 1;
+		else if (strcmp(argv[i], "--watch-gpio") == 0)
+			opt_watch_sec = argc > i+1 ? atoi(argv[++i]) : 15;
 		else if (strcmp(argv[i], "--help") == 0 ||
 			 strcmp(argv[i], "-h") == 0) {
-			P("usage: atri-hwprobe [--i2c-read]");
+			P("usage: atri-hwprobe [--i2c-read] [--watch-gpio <seconds>]");
 			return 0;
 		}
 	}
 
 	P("=== atri-hwprobe: what is connected? ===");
+	if (opt_watch_sec > 0) {
+		watch_gpio(opt_watch_sec);
+		return 0;
+	}
 	probe_gpio();  SEP();
 	probe_i2c(opt_i2c_read);  SEP();
 	probe_spi();   SEP();
