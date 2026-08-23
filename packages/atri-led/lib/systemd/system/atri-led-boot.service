@@ -1,11 +1,11 @@
 [Unit]
 Description=AtriStation LED Boot Animation
-After=local-fs.target
+After=atri-led.service
+Requires=atri-led.service
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/atrild play boot_scan
-RemainAfterExit=yes
+Type=oneshot
+ExecStart=/usr/bin/atrledctl loop boot_scan
 
 [Install]
 WantedBy=multi-user.target

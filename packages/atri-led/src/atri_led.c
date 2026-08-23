@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <glob.h>
 #include <errno.h>
+#include <math.h>
 
 #define LED_CLASS_PATH "/sys/class/leds"
 
@@ -13,6 +14,23 @@ static char *ring_multi_intensity[ATRI_LED_MAX_RINGS];
 static char *ring_brightness[ATRI_LED_MAX_RINGS];
 
 static int ring_found[ATRI_LED_MAX_RINGS];
+
+/* gamma 2.2 LUT, built once — perceptually linear LED output */
+static uint8_t gamma_lut[256];
+static int gamma_ready = 0;
+
+static void build_gamma_lut(void)
+{
+	if (gamma_ready) return;
+	for (int i = 0; i < 256; i++) {
+		double x = i / 255.0;
+		int v = (int)(pow(x, 2.2) * 255.0 + 0.5);
+		gamma_lut[i] = v > 255 ? 255 : v;
+	}
+	gamma_lut[0] = 0;
+	gamma_lut[255] = 255;
+	gamma_ready = 1;
+}
 
 static void load_ring_leds(void)
 {
@@ -23,24 +41,30 @@ static void load_ring_leds(void)
 
 		snprintf(pattern, sizeof(pattern), LED_CLASS_PATH "/ring%d/multi_intensity", r);
 		if (ring_multi_intensity[r]) { free(ring_multi_intensity[r]); ring_multi_intensity[r] = NULL; }
-		if (glob(pattern, 0, NULL, &gl) == 0 && gl.gl_pathc > 0) {
+		int gr = glob(pattern, 0, NULL, &gl);
+		if (gr == 0 && gl.gl_pathc > 0) {
 			ring_multi_intensity[r] = strdup(gl.gl_pathv[0]);
 			ring_found[r] = 1;
 		}
-		globfree(&gl);
+		if (gr == 0)
+			globfree(&gl);	/* only valid after successful glob */
 
 		snprintf(pattern, sizeof(pattern), LED_CLASS_PATH "/ring%d/brightness", r);
 		if (ring_brightness[r]) { free(ring_brightness[r]); ring_brightness[r] = NULL; }
-		if (glob(pattern, 0, NULL, &gl) == 0 && gl.gl_pathc > 0) {
+		gr = glob(pattern, 0, NULL, &gl);
+		if (gr == 0 && gl.gl_pathc > 0)
 			ring_brightness[r] = strdup(gl.gl_pathv[0]);
-		}
-		globfree(&gl);
+		if (gr == 0)
+			globfree(&gl);
 	}
 }
 
 int atri_led_init(struct atri_led *led)
 {
 	memset(led, 0, sizeof(*led));
+	build_gamma_lut();
+	led->master = 255;
+	led->gamma_en = 1;
 	load_ring_leds();
 	led->ring_count = 0;
 	for (int r = 0; r < ATRI_LED_MAX_RINGS; r++) {
@@ -85,6 +109,31 @@ void atri_led_set_ring_rgb(struct atri_led *led, int ring, uint8_t r, uint8_t g,
 	led->brightness[ring][RGB_B] = b;
 }
 
+void atri_led_set_master(struct atri_led *led, uint8_t master)
+{
+	led->master = master;
+}
+
+uint8_t atri_led_get_master(struct atri_led *led)
+{
+	return led->master;
+}
+
+void atri_led_set_gamma(struct atri_led *led, int enable)
+{
+	led->gamma_en = enable ? 1 : 0;
+	build_gamma_lut();
+}
+
+static inline uint8_t scale_chan(struct atri_led *led, uint8_t v)
+{
+	if (led->master != 255)
+		v = (uint8_t)((v * led->master) / 255);
+	if (led->gamma_en)
+		v = gamma_lut[v];
+	return v;
+}
+
 int atri_led_apply(struct atri_led *led)
 {
 	int err = 0;
@@ -95,9 +144,9 @@ int atri_led_apply(struct atri_led *led)
 		if (ring_multi_intensity[r]) {
 			char buf[32];
 			snprintf(buf, sizeof(buf), "%d %d %d",
-				led->brightness[r][RGB_R],
-				led->brightness[r][RGB_G],
-				led->brightness[r][RGB_B]);
+				scale_chan(led, led->brightness[r][RGB_R]),
+				scale_chan(led, led->brightness[r][RGB_G]),
+				scale_chan(led, led->brightness[r][RGB_B]));
 			if (write_sysfs(ring_multi_intensity[r], buf) < 0)
 				err = -1;
 		}
@@ -146,11 +195,9 @@ void atri_led_fade_to(struct atri_led *led, int ring, uint8_t r, uint8_t g, uint
 void atri_led_rainbow(struct atri_led *led)
 {
 	for (int r = 0; r < led->ring_count; r++) {
-		int hue = (r * 256 / led->ring_count) % 256;
+		int hue = r * 360 / led->ring_count;
 		uint8_t rv, gv, bv;
-		if (hue < 85) { rv = 255 - hue * 3; gv = hue * 3; bv = 0; }
-		else if (hue < 170) { rv = 0; gv = 255 - (hue - 85) * 3; bv = (hue - 85) * 3; }
-		else { rv = (hue - 170) * 3; gv = 0; bv = 255 - (hue - 170) * 3; }
+		atri_led_hsv_to_rgb(hue, 255, 255, &rv, &gv, &bv);
 		led->brightness[r][RGB_R] = rv;
 		led->brightness[r][RGB_G] = gv;
 		led->brightness[r][RGB_B] = bv;
@@ -184,4 +231,62 @@ int atri_led_anim_to_rgb(const char *name, uint8_t *r, uint8_t *g, uint8_t *b)
 	else if (strcmp(name, "love") == 0) { *r = 255; *g = 50; *b = 100; }
 	else return -1;
 	return 0;
+}
+
+void atri_led_hsv_to_rgb(int h, int s, int v, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+	int region, remainder, p, q, t;
+	h %= 360;
+	if (h < 0) h += 360;
+	if (s <= 0) {
+		*r = *g = *b = (uint8_t)v;
+		return;
+	}
+	if (s > 255) s = 255;
+	if (v > 255) v = 255;
+	region = h / 60;
+	remainder = (h % 60) * 255 / 60;
+	p = (v * (255 - s)) / 255;
+	q = (v * (255 - ((s * remainder) / 255))) / 255;
+	t = (v * (255 - ((s * (255 - remainder)) / 255))) / 255;
+	switch (region) {
+	case 0: *r = v; *g = t; *b = p; break;
+	case 1: *r = q; *g = v; *b = p; break;
+	case 2: *r = p; *g = v; *b = t; break;
+	case 3: *r = p; *g = q; *b = v; break;
+	case 4: *r = t; *g = p; *b = v; break;
+	default: *r = v; *g = p; *b = q; break;
+	}
+}
+
+void atri_led_render_arc(struct atri_led *led, int pct,
+	uint8_t r, uint8_t g, uint8_t b, int start_ring, int direction)
+{
+	if (pct < 0) pct = 0;
+	if (pct > 100) pct = 100;
+	int n = led->ring_count;
+	if (n <= 0) return;
+	if (direction == 0) direction = 1;
+
+	/* lit rings with a fractional tail LED for smooth edge */
+	int lit_tenths = pct * n * 10 / 100;
+	int full = lit_tenths / 10;
+	int tail = (lit_tenths % 10) * 255 / 10;
+
+	for (int i = 0; i < n; i++) {
+		int idx = ((start_ring + i * direction) % n + n) % n;
+		if (i < full) {
+			led->brightness[idx][RGB_R] = r;
+			led->brightness[idx][RGB_G] = g;
+			led->brightness[idx][RGB_B] = b;
+		} else if (i == full && tail > 0) {
+			led->brightness[idx][RGB_R] = (uint8_t)(r * tail / 255);
+			led->brightness[idx][RGB_G] = (uint8_t)(g * tail / 255);
+			led->brightness[idx][RGB_B] = (uint8_t)(b * tail / 255);
+		} else {
+			led->brightness[idx][RGB_R] = 0;
+			led->brightness[idx][RGB_G] = 0;
+			led->brightness[idx][RGB_B] = 0;
+		}
+	}
 }

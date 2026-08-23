@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <math.h>
 
 #define N_RINGS ATRI_LED_MAX_RINGS
 
@@ -172,7 +173,8 @@ int atri_led_load_animation(const char *path, struct animation *anim)
 	}
 
 	int duration_ms = 200;
-	fscanf(f, " %d ", &duration_ms);
+	if (fscanf(f, " %d ", &duration_ms) != 1)
+		duration_ms = 200;	/* missing duration: keep default */
 
 	anim->frame_count = frame_count > 0 ? frame_count : 1;
 	anim->frames = calloc(anim->frame_count, sizeof(struct animation_frame));
@@ -286,10 +288,13 @@ void atri_led_fill_wave(struct animation_frame *frames, int n, int ms,
 	int nwaves, uint8_t r1, uint8_t g1, uint8_t b1,
 	uint8_t r2, uint8_t g2, uint8_t b2)
 {
+	if (nwaves < 1) nwaves = 1;
 	for (int f = 0; f < n; f++) {
 		frames[f].duration_ms = ms;
 		for (int ring = 0; ring < N_RINGS; ring++) {
-			int phase = (ring * N_RINGS / nwaves * 2 + f * 4) % (N_RINGS * 2);
+			/* one parabolic period per (N_RINGS/nwaves) LEDs:
+			 * phase step = 2*nwaves per ring */
+			int phase = (ring * 2 * nwaves + f * 4) % (N_RINGS * 2);
 			int frac = parabol(phase, N_RINGS * 2);
 			int inv = 255 - frac;
 			frames[f].rgb[ring][RGB_R] = (r1 * inv + r2 * frac) / 255;
@@ -303,10 +308,11 @@ void atri_led_fill_wave_slow(struct animation_frame *frames, int n, int ms,
 	int nwaves, uint8_t r1, uint8_t g1, uint8_t b1,
 	uint8_t r2, uint8_t g2, uint8_t b2)
 {
+	if (nwaves < 1) nwaves = 1;
 	for (int f = 0; f < n; f++) {
 		frames[f].duration_ms = ms;
 		for (int ring = 0; ring < N_RINGS; ring++) {
-			int phase = (ring * N_RINGS / nwaves * 2 + f) % (N_RINGS * 2);
+			int phase = (ring * 2 * nwaves + f) % (N_RINGS * 2);
 			int frac = parabol(phase, N_RINGS * 2);
 			int inv = 255 - frac;
 			frames[f].rgb[ring][RGB_R] = (r1 * inv + r2 * frac) / 255;
@@ -480,15 +486,16 @@ void atri_led_fill_meteor(struct animation_frame *frames, int n, int ms,
 	uint8_t r, uint8_t g, uint8_t b,
 	uint8_t rt, uint8_t gt, uint8_t bt)
 {
+	/* short decaying tail behind the head (was inverted: 3/4-ring tail) */
+	const int tail_len = 6;
 	for (int f = 0; f < n; f++) {
 		frames[f].duration_ms = ms;
 		int head = f * N_RINGS / n;
 		for (int ring = 0; ring < N_RINGS; ring++) {
-			int dist = (ring - head + N_RINGS) % N_RINGS;
-			int tail = N_RINGS - dist;
-			if (tail < 0) tail = 0;
-			int bright = tail * 255 / 6;
-			if (bright > 255) bright = 255;
+			int dist = (head - ring + N_RINGS) % N_RINGS;
+			int bright = 0;
+			if (dist < tail_len)
+				bright = (tail_len - dist) * 255 / tail_len;
 			int blend = ring * 255 / N_RINGS;
 			int inv = 255 - blend;
 			frames[f].rgb[ring][RGB_R] = (r * inv + rt * blend) * bright / 255 / 255;
@@ -527,11 +534,13 @@ void atri_led_fill_storm(struct animation_frame *frames, int n, int ms,
 	uint8_t r, uint8_t g, uint8_t b,
 	uint8_t rp, uint8_t gp, uint8_t bp)
 {
+	int half = n / 2;
+	if (half < 1) half = 1;
 	for (int f = 0; f < n; f++) {
 		frames[f].duration_ms = ms;
-		int flash = (f % (n / 2)) < 3;
-		int fade = f % (n / 2);
-		int dim = flash ? 255 : (n / 2 - fade) * 4;
+		int fade = f % half;
+		int flash = fade < 3;
+		int dim = flash ? 255 : (half - fade) * 4;
 		if (dim < 0) dim = 0;
 
 		for (int ring = 0; ring < N_RINGS; ring++) {
@@ -629,6 +638,108 @@ static void fill_rainbow(struct animation_frame *frames, int n, int ms)
 	}
 }
 
+/* Larson scanner: dot with fading trail bouncing around the ring */
+void atri_led_fill_scan(struct animation_frame *frames, int n, int ms,
+	uint8_t r, uint8_t g, uint8_t b)
+{
+	if (n < 2) n = 2;
+	const int trail = 4;
+	/* path: 0..N-1..0 (bounce), length 2*N-2 */
+	int path = 2 * N_RINGS - 2;
+	for (int f = 0; f < n; f++) {
+		frames[f].duration_ms = ms;
+		int pos = f % path;
+		if (pos >= N_RINGS) pos = path - pos;
+		for (int ring = 0; ring < N_RINGS; ring++) {
+			int d = pos - ring;
+			if (d < 0) d = -d;
+			int bright = (d < trail) ? (trail - d) * 255 / trail : 0;
+			frames[f].rgb[ring][RGB_R] = r * bright / 255;
+			frames[f].rgb[ring][RGB_G] = g * bright / 255;
+			frames[f].rgb[ring][RGB_B] = b * bright / 255;
+		}
+	}
+}
+
+/* twinkle: each LED randomly fades in/out (deterministic LCG per ring) */
+void atri_led_fill_twinkle(struct animation_frame *frames, int n, int ms,
+	uint8_t r, uint8_t g, uint8_t b)
+{
+	for (int f = 0; f < n; f++) {
+		frames[f].duration_ms = ms;
+		for (int ring = 0; ring < N_RINGS; ring++) {
+			/* pseudo-random smooth phase per ring */
+			unsigned int seed = ring * 1103515245u + 12345u;
+			int period = 12 + (seed >> 16) % 9;      /* 12..20 frames */
+			int phase = (f + (seed >> 8) % period) % period;
+			/* triangular envelope with idle gaps */
+			int env = 0;
+			if (phase < period / 3) {
+				int t = phase * 3 * 255 / period;
+				env = t < 128 ? t * 2 : (255 - t) * 2;
+			}
+			frames[f].rgb[ring][RGB_R] = r * env / 255;
+			frames[f].rgb[ring][RGB_G] = g * env / 255;
+			frames[f].rgb[ring][RGB_B] = b * env / 255;
+		}
+	}
+}
+
+/* rainbow wave: hue rotates around the ring (spatial gradient + motion) */
+void atri_led_fill_rainbow_wave(struct animation_frame *frames, int n, int ms,
+	int hue_step, uint8_t bright)
+{
+	for (int f = 0; f < n; f++) {
+		frames[f].duration_ms = ms;
+		for (int ring = 0; ring < N_RINGS; ring++) {
+			int hue = (ring * 360 / N_RINGS + f * hue_step) % 360;
+			uint8_t rv, gv, bv;
+			atri_led_hsv_to_rgb(hue, 255, bright, &rv, &gv, &bv);
+			frames[f].rgb[ring][RGB_R] = rv;
+			frames[f].rgb[ring][RGB_G] = gv;
+			frames[f].rgb[ring][RGB_B] = bv;
+		}
+	}
+}
+
+/* sinusoidal breathe — smoother than the parabolic one */
+void atri_led_fill_breathe_sine(struct animation_frame *frames, int n, int ms,
+	uint8_t r, uint8_t g, uint8_t b)
+{
+	for (int f = 0; f < n; f++) {
+		frames[f].duration_ms = ms;
+		double phase = 2.0 * M_PI * f / n;
+		/* shifted sine 0..1, ease dwell at the bottom */
+		double s = (1.0 - cos(phase)) / 2.0;
+		int frac = (int)(s * s * 255.0 + 0.5);
+		for (int ring = 0; ring < N_RINGS; ring++) {
+			frames[f].rgb[ring][RGB_R] = r * frac / 255;
+			frames[f].rgb[ring][RGB_G] = g * frac / 255;
+			frames[f].rgb[ring][RGB_B] = b * frac / 255;
+		}
+	}
+}
+
+/* rotating two-color gradient around the ring */
+void atri_led_fill_gradient(struct animation_frame *frames, int n, int ms,
+	uint8_t r1, uint8_t g1, uint8_t b1,
+	uint8_t r2, uint8_t g2, uint8_t b2)
+{
+	for (int f = 0; f < n; f++) {
+		frames[f].duration_ms = ms;
+		for (int ring = 0; ring < N_RINGS; ring++) {
+			/* triangle wave position along the ring, rotated by frame */
+			int p = (ring + f * N_RINGS / n) % N_RINGS;
+			int t = p <= N_RINGS / 2 ? p * 255 / (N_RINGS / 2)
+				: (N_RINGS - p) * 255 / (N_RINGS / 2);
+			int inv = 255 - t;
+			frames[f].rgb[ring][RGB_R] = (r1 * inv + r2 * t) / 255;
+			frames[f].rgb[ring][RGB_G] = (g1 * inv + g2 * t) / 255;
+			frames[f].rgb[ring][RGB_B] = (b1 * inv + b2 * t) / 255;
+		}
+	}
+}
+
 #define FRAME_MS 50
 
 static struct animation_frame red_frames[1];
@@ -655,23 +766,73 @@ void atri_led_init_animations(void)
 	init_extra_animations();
 }
 
+/*
+ * Builtin animation registry — framework discovers animations from this
+ * table; adding a new one = frames array + struct + one entry here.
+ */
+extern struct animation anim_red;
+extern struct animation anim_green;
+extern struct animation anim_blue;
+extern struct animation anim_white;
+extern struct animation anim_off;
+extern struct animation anim_chase;
+extern struct animation anim_colors;
+extern struct animation anim_rainbow;
+extern struct animation anim_happy;
+extern struct animation anim_focused;
+extern struct animation anim_calming;
+extern struct animation anim_love;
+extern struct animation anim_night;
+extern struct animation anim_excited;
+extern struct animation anim_scan;
+extern struct animation anim_twinkle;
+extern struct animation anim_rainbow_wave;
+extern struct animation anim_breathe;
+extern struct animation anim_gradient;
+
+struct animation *atri_led_builtin_animations[] = {
+	&anim_red,
+	&anim_green,
+	&anim_blue,
+	&anim_white,
+	&anim_off,
+	&anim_chase,
+	&anim_colors,
+	&anim_rainbow,
+	&anim_happy,
+	&anim_focused,
+	&anim_calming,
+	&anim_love,
+	&anim_night,
+	&anim_excited,
+	&anim_scan,
+	&anim_twinkle,
+	&anim_rainbow_wave,
+	&anim_breathe,
+	&anim_gradient,
+	NULL,
+};
+
 struct animation *atri_led_find_builtin(const char *name)
 {
-	if (strcmp(name, "red") == 0) return &anim_red;
-	if (strcmp(name, "green") == 0) return &anim_green;
-	if (strcmp(name, "blue") == 0) return &anim_blue;
-	if (strcmp(name, "white") == 0) return &anim_white;
-	if (strcmp(name, "off") == 0) return &anim_off;
-	if (strcmp(name, "chase") == 0) return &anim_chase;
-	if (strcmp(name, "colors") == 0) return &anim_colors;
-	if (strcmp(name, "rainbow") == 0) return &anim_rainbow;
-	if (strcmp(name, "happy") == 0) return &anim_happy;
-	if (strcmp(name, "focused") == 0) return &anim_focused;
-	if (strcmp(name, "calming") == 0) return &anim_calming;
-	if (strcmp(name, "love") == 0) return &anim_love;
-	if (strcmp(name, "night") == 0) return &anim_night;
-	if (strcmp(name, "excited") == 0) return &anim_excited;
+	for (int i = 0; atri_led_builtin_animations[i]; i++) {
+		if (strcmp(name, atri_led_builtin_animations[i]->name) == 0)
+			return atri_led_builtin_animations[i];
+	}
 	return NULL;
+}
+
+int atri_led_builtin_count(void)
+{
+	int n = 0;
+	while (atri_led_builtin_animations[n]) n++;
+	return n;
+}
+
+struct animation *atri_led_builtin_get(int idx)
+{
+	if (idx < 0 || idx >= atri_led_builtin_count()) return NULL;
+	return atri_led_builtin_animations[idx];
 }
 
 struct animation anim_red = {
@@ -728,6 +889,11 @@ static struct animation_frame calming_frames[40];
 static struct animation_frame love_frames[40];
 static struct animation_frame night_frames[60];
 static struct animation_frame excited_frames[60];
+static struct animation_frame scan_frames[46];
+static struct animation_frame twinkle_frames[40];
+static struct animation_frame rainbow_wave_frames[72];
+static struct animation_frame breathe_frames[48];
+static struct animation_frame gradient_frames[48];
 
 static void init_extra_animations(void)
 {
@@ -737,6 +903,11 @@ static void init_extra_animations(void)
 	atri_led_fill_heart(love_frames, 40, 3000, 255, 50, 100, 255, 50, 100);
 	atri_led_fill_sparkle(night_frames, 60, 5000, 20, 20, 80, 200, 220, 255);
 	atri_led_fill_fire(excited_frames, 60, 2500, 255, 100, 0, 255, 200, 0);
+	atri_led_fill_scan(scan_frames, 46, 60, 80, 120, 255);
+	atri_led_fill_twinkle(twinkle_frames, 40, 90, 255, 220, 120);
+	atri_led_fill_rainbow_wave(rainbow_wave_frames, 72, 50, 5, 200);
+	atri_led_fill_breathe_sine(breathe_frames, 48, 80, 60, 120, 255);
+	atri_led_fill_gradient(gradient_frames, 48, 60, 255, 60, 0, 0, 80, 255);
 }
 
 struct animation anim_happy = {
@@ -779,4 +950,34 @@ struct animation anim_excited = {
 	.num_init = init_extra_animations,
 	.frames = excited_frames,
 	.frame_count = 60,
+};
+
+struct animation anim_scan = {
+	.name = "scan",
+	.frames = scan_frames,
+	.frame_count = 46,
+};
+
+struct animation anim_twinkle = {
+	.name = "twinkle",
+	.frames = twinkle_frames,
+	.frame_count = 40,
+};
+
+struct animation anim_rainbow_wave = {
+	.name = "rainbow_wave",
+	.frames = rainbow_wave_frames,
+	.frame_count = 72,
+};
+
+struct animation anim_breathe = {
+	.name = "breathe",
+	.frames = breathe_frames,
+	.frame_count = 48,
+};
+
+struct animation anim_gradient = {
+	.name = "gradient",
+	.frames = gradient_frames,
+	.frame_count = 48,
 };

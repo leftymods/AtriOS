@@ -1,12 +1,11 @@
 [Unit]
 Description=Stop Boot Animation on Login Screen
-After=graphical-session-pre.target
+After=graphical-session-pre.target atri-led.service
 Before=graphical-session.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/atrild stop
-RemainAfterExit=yes
+ExecStart=/usr/bin/atrledctl play notification_passive
 
 [Install]
 WantedBy=graphical-session-pre.target

@@ -56,21 +56,26 @@ void atri_led_fill_cycle(struct animation_frame *frames, int n, int ms,
 void atri_led_fill_storm(struct animation_frame *frames, int n, int ms,
 	uint8_t r, uint8_t g, uint8_t b,
 	uint8_t rp, uint8_t gp, uint8_t bp);
+void atri_led_fill_scan(struct animation_frame *frames, int n, int ms,
+	uint8_t r, uint8_t g, uint8_t b);
+void atri_led_fill_twinkle(struct animation_frame *frames, int n, int ms,
+	uint8_t r, uint8_t g, uint8_t b);
+void atri_led_fill_rainbow_wave(struct animation_frame *frames, int n, int ms,
+	int hue_step, uint8_t bright);
+void atri_led_fill_breathe_sine(struct animation_frame *frames, int n, int ms,
+	uint8_t r, uint8_t g, uint8_t b);
+void atri_led_fill_gradient(struct animation_frame *frames, int n, int ms,
+	uint8_t r1, uint8_t g1, uint8_t b1,
+	uint8_t r2, uint8_t g2, uint8_t b2);
 
-extern struct animation anim_red;
-extern struct animation anim_green;
-extern struct animation anim_blue;
-extern struct animation anim_white;
-extern struct animation anim_off;
-extern struct animation anim_chase;
-extern struct animation anim_colors;
-extern struct animation anim_rainbow;
+/*
+ * Builtin animation registry — table-driven discovery.
+ * Iterate atri_led_builtin_animations[] (NULL-terminated) or use
+ * find_builtin()/builtin_count()/builtin_get().
+ */
+extern struct animation *atri_led_builtin_animations[];
 
-extern struct animation anim_happy;
-extern struct animation anim_focused;
-extern struct animation anim_calming;
-extern struct animation anim_love;
-extern struct animation anim_night;
-extern struct animation anim_excited;
+int atri_led_builtin_count(void);
+struct animation *atri_led_builtin_get(int idx);
 
 #endif

@@ -7,46 +7,60 @@
 #include <alsa/asoundlib.h>
 #include <signal.h>
 #include <time.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 #define ADC_PATH "/sys/bus/iio/devices/iio:device0/in_voltage0_raw"
 #define POLL_MS 30
-#define DEBOUNCE 3
 #define ADC_MAX 1023
 #define IDLE_TIMEOUT_MS 1500
-#define FADE_STEPS 60
-#define FADE_MS (POLL_MS * FADE_STEPS)
+#define FADE_STEPS 50
+#define HYSTERESIS 1		/* min % change to apply */
 
 static snd_mixer_t *mixer;
 static snd_mixer_elem_t *elem;
 static long vol_min, vol_max;
 static int running = 1;
-static int prev_pct = -10;
-static int stable_count = 0;
+static int prev_pct = -1;
 static struct atri_led led;
 static int led_inited = 0;
+static int daemon_avail = 0;
 
 static int last_r, last_g, last_b;
 
-static void hsv_to_rgb(int h, int s, int v, uint8_t *r, uint8_t *g, uint8_t *b)
+/* ---- daemon socket (arc rendered by atrled; fallback: direct sysfs) ---- */
+
+static int daemon_send(const char *cmd)
 {
-	int region, remainder, p, q, t;
-	if (s == 0) {
-		*r = *g = *b = v;
-		return;
+	int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (fd < 0) return -1;
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, "/run/atriled.sock", sizeof(addr.sun_path) - 1);
+	if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+		close(fd);
+		return -1;
 	}
-	region = h / 60;
-	remainder = (h % 60) * 255 / 60;
-	p = (v * (255 - s)) / 255;
-	q = (v * (255 - ((s * remainder) / 255))) / 255;
-	t = (v * (255 - ((s * (255 - remainder)) / 255))) / 255;
-	switch (region) {
-	case 0: *r = v; *g = t; *b = p; break;
-	case 1: *r = q; *g = v; *b = p; break;
-	case 2: *r = p; *g = v; *b = t; break;
-	case 3: *r = p; *g = q; *b = v; break;
-	case 4: *r = t; *g = p; *b = v; break;
-	default: *r = v; *g = p; *b = q; break;
-	}
+	int ret = write(fd, cmd, strlen(cmd));
+	close(fd);
+	return ret < 0 ? -1 : 0;
+}
+
+static int daemon_probe(void)
+{
+	/* connect-only probe: must NOT send a command (would disturb
+	 * the daemon's current animation) */
+	int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if (fd < 0) return 0;
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, "/run/atriled.sock", sizeof(addr.sun_path) - 1);
+	int ok = connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0;
+	close(fd);
+	return ok;
 }
 
 static void show_color(int r, int g, int b)
@@ -57,29 +71,49 @@ static void show_color(int r, int g, int b)
 	atri_led_apply(&led);
 }
 
-static void set_color_from_pct(int pct)
+static void show_volume(int pct)
 {
-	int h = (100 - pct) * 240 / 100;
 	uint8_t r, g, b;
-	hsv_to_rgb(h, 255, 200, &r, &g, &b);
+	atri_led_hsv_to_rgb((100 - pct) * 240 / 100, 255, 200, &r, &g, &b);
 	last_r = r; last_g = g; last_b = b;
-	show_color(r, g, b);
+
+	if (daemon_avail) {
+		char cmd[32];
+		/* restore full brightness (may have been dimmed by fade) */
+		daemon_send("brightness 100");
+		snprintf(cmd, sizeof(cmd), "volume %d", pct);
+		if (daemon_send(cmd) == 0)
+			return;
+		daemon_avail = 0;	/* daemon went away: direct mode */
+	}
+
+	/* direct fallback: arc on the ring */
+	if (led_inited) {
+		atri_led_render_arc(&led, pct, r, g, b, 0, 1);
+		atri_led_apply(&led);
+	}
 }
 
 static void fade_out(int step, int total)
 {
 	int t = step * 255 / total;
 	int inv = 255 - t;
-	/* smoothstep: t = t * t * (3 - 2*t), then scale to 0-200 */
+	/* smoothstep on integer math */
 	int s = inv * inv * (3 * 255 - 2 * inv) / (255 * 255);
-	int r = last_r * s / 255;
-	int g = last_g * s / 255;
-	int b = last_b * s / 255;
-	show_color(r, g, b);
+	if (daemon_avail) {
+		/* daemon holds the arc; just dim it via brightness */
+		char cmd[32];
+		snprintf(cmd, sizeof(cmd), "brightness %d", s * 100 / 255);
+		daemon_send(cmd);
+		return;
+	}
+	show_color(last_r * s / 255, last_g * s / 255, last_b * s / 255);
 }
 
 static void volume_off(void)
 {
+	if (daemon_avail)
+		daemon_send("brightness 100");
 	if (!led_inited) return;
 	atri_led_off(&led);
 }
@@ -173,9 +207,14 @@ int main(int argc, char **argv)
 	int idle_ms = 0;
 	int fade_step = -1;
 	int fade_total = FADE_STEPS;
+	int filt = -1;		/* EMA-filtered pct, -1 = uninitialized */
 
-	signal(SIGINT, handle_sig);
-	signal(SIGTERM, handle_sig);
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = handle_sig;
+	sigemptyset(&sa.sa_mask);
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
 	atexit(cleanup);
 
 	if (init_mixer(selem_name) < 0) {
@@ -190,24 +229,26 @@ int main(int argc, char **argv)
 		fprintf(stderr, "no LED ring, volume-only mode\n");
 	}
 
-	fprintf(stderr, "atrivolume: volume range %ld-%ld\n", vol_min, vol_max);
+	daemon_avail = daemon_probe();
+	fprintf(stderr, "atrivolume: volume range %ld-%ld, daemon: %s\n",
+		vol_min, vol_max, daemon_avail ? "yes" : "no (direct mode)");
 
 	while (running) {
 		int adc = read_adc();
 		if (adc >= 0) {
-			int pct = (ADC_MAX - adc) * 100 / ADC_MAX;
-			if (pct != prev_pct) {
-				if (stable_count < DEBOUNCE) {
-					stable_count++;
-				} else {
-					set_volume(pct);
-					set_color_from_pct(pct);
-					prev_pct = pct;
-					idle_ms = 0;
-					fade_step = -1;
-				}
-			} else {
-				stable_count = 0;
+			int raw = (ADC_MAX - adc) * 100 / ADC_MAX;
+			/* EMA filter: smooths ADC jitter, responsive to any
+			 * turn speed (fixes lost slow-turn updates) */
+			if (filt < 0) filt = raw;
+			filt = (filt * 3 + raw) / 4;
+			int pct = filt;
+
+			if (prev_pct < 0 || abs(pct - prev_pct) > HYSTERESIS) {
+				set_volume(pct);
+				show_volume(pct);
+				prev_pct = pct;
+				idle_ms = 0;
+				fade_step = -1;
 			}
 		}
 		if (fade_step >= 0) {

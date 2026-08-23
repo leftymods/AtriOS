@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/socket.h>
+#include <sys/poll.h>
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
@@ -17,9 +18,7 @@
 static const char *anim_dir = "/etc/atriled/animations";
 static const char *pid_file = "/run/atriled.pid";
 static const char *sock_path = "/run/atriled.sock";
-static volatile int running = 1;
-static char current_anim[128] = "";
-static int current_loop = 1;
+static volatile sig_atomic_t running = 1;
 
 static void handle_signal(int sig)
 {
@@ -27,73 +26,209 @@ static void handle_signal(int sig)
 	running = 0;
 }
 
-static int load_and_play(struct atri_led *led, const char *name, int loop)
+static void install_signals(void)
 {
-	struct animation anim;
-	memset(&anim, 0, sizeof(anim));
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = handle_signal;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;	/* no SA_RESTART: poll() must wake on signal */
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
+	signal(SIGPIPE, SIG_IGN);
+}
 
-	strncpy(current_anim, name, sizeof(current_anim) - 1);
-	current_loop = loop;
+/* ---- daemon state machine ---- */
 
-	char path[512];
-	snprintf(path, sizeof(path), "%s/%s.anim", anim_dir, name);
+struct led_state {
+	struct atri_led led;
+	struct animation *builtin;	/* non-NULL if playing a builtin */
+	struct animation file_anim;	/* loaded file animation (owns frames) */
+	int use_file;			/* 1 = play file_anim, 0 = builtin/none */
+	int frame_idx;
+	int loop;
+	int playing;			/* 0 = idle (hold current LEDs) */
+	char current_name[128];
+};
 
-	int ret = atri_led_load_animation(path, &anim);
-	if (ret < 0) {
-		snprintf(path, sizeof(path), "%s/%s.led", anim_dir, name);
-		ret = atri_led_load_animation(path, &anim);
+static struct animation *state_current_anim(struct led_state *st)
+{
+	if (st->playing == 0) return NULL;
+	return st->use_file ? &st->file_anim : st->builtin;
+}
+
+static void state_render_frame(struct led_state *st)
+{
+	struct animation *a = state_current_anim(st);
+	if (!a || st->frame_idx >= a->frame_count) return;
+	for (int r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++) {
+		st->led.brightness[r][RGB_R] = a->frames[st->frame_idx].rgb[r][RGB_R];
+		st->led.brightness[r][RGB_G] = a->frames[st->frame_idx].rgb[r][RGB_G];
+		st->led.brightness[r][RGB_B] = a->frames[st->frame_idx].rgb[r][RGB_B];
 	}
-	if (ret < 0) {
-		fprintf(stderr, "Failed to load animation: %s\n", name);
-		return -1;
+	atri_led_apply(&st->led);
+}
+
+static void state_free_file(struct led_state *st)
+{
+	if (st->use_file && st->file_anim.frames) {
+		free(st->file_anim.frames);
+		st->file_anim.frames = NULL;
 	}
+	st->use_file = 0;
+}
 
-	struct timespec ts;
-	ts.tv_sec = 0;
-
-	while (running) {
-		for (int f = 0; f < anim.frame_count && running; f++) {
-			if (anim.frames[f].duration_ms < 0) {
-				running = 0;
-				break;
-			}
-			for (int r = 0; r < led->ring_count; r++) {
-				led->brightness[r][RGB_R] = anim.frames[f].rgb[r][RGB_R];
-				led->brightness[r][RGB_G] = anim.frames[f].rgb[r][RGB_G];
-				led->brightness[r][RGB_B] = anim.frames[f].rgb[r][RGB_B];
-			}
-			atri_led_apply(led);
-			if (anim.frames[f].duration_ms > 0) {
-				ts.tv_nsec = anim.frames[f].duration_ms * 1000000L;
-				nanosleep(&ts, NULL);
+/* crossfade from current LED state to first frame of the new animation */
+static void state_transition(struct led_state *st, struct animation_frame *target)
+{
+	const int steps = 8, step_ms = 18;
+	uint8_t from[ATRI_LED_MAX_RINGS][3];
+	memcpy(from, st->led.brightness, sizeof(from));
+	for (int s = 1; s <= steps && running; s++) {
+		for (int r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++) {
+			for (int c = 0; c < 3; c++) {
+				int f = from[r][c], t = target->rgb[r][c];
+				st->led.brightness[r][c] = f + (t - f) * s / steps;
 			}
 		}
-		if (!loop) break;
-		if (!running) break;
+		atri_led_apply(&st->led);
+		usleep(step_ms * 1000);
 	}
-
-	free(anim.frames);
-	return 0;
 }
 
-static int daemonize(void)
+static int state_play(struct led_state *st, const char *name, int loop)
 {
-	pid_t pid = fork();
-	if (pid < 0) return -1;
-	if (pid > 0) {
-		_exit(0);
+	struct animation *a = atri_led_find_builtin(name);
+	struct animation_frame first;
+	int new_use_file = 0;
+
+	if (!a) {
+		char path[512];
+		snprintf(path, sizeof(path), "%s/%s.anim", anim_dir, name);
+		struct animation tmp;
+		memset(&tmp, 0, sizeof(tmp));
+		if (atri_led_load_animation(path, &tmp) < 0) {
+			snprintf(path, sizeof(path), "%s/%s.led", anim_dir, name);
+			if (atri_led_load_animation(path, &tmp) < 0)
+				return -1;
+		}
+		if (tmp.frame_count <= 0 || !tmp.frames) {
+			free(tmp.frames);
+			return -1;
+		}
+		state_free_file(st);
+		st->file_anim = tmp;
+		a = &st->file_anim;
+		new_use_file = 1;
 	}
-	if (setsid() < 0) return -1;
-	signal(SIGHUP, SIG_IGN);
-	pid = fork();
-	if (pid < 0) return -1;
-	if (pid > 0) _exit(0);
-	chdir("/");
-	umask(0);
-	FILE *pf = fopen(pid_file, "w");
-	if (pf) { fprintf(pf, "%d\n", getpid()); fclose(pf); }
+
+	memset(&first, 0, sizeof(first));
+	memcpy(&first, &a->frames[0], sizeof(first));
+
+	st->use_file = new_use_file;
+	st->builtin = new_use_file ? NULL : a;
+	st->frame_idx = 0;
+	st->loop = loop;
+	st->playing = 1;
+	snprintf(st->current_name, sizeof(st->current_name), "%s", name);
+
+	state_transition(st, &first);
 	return 0;
 }
+
+static void state_stop(struct led_state *st)
+{
+	st->playing = 0;
+	st->current_name[0] = '\0';
+	state_free_file(st);
+}
+
+/* advance animation; returns ms until next frame, -1 if idle */
+static long state_tick(struct led_state *st)
+{
+	struct animation *a = state_current_anim(st);
+	if (!a) return -1;
+
+	state_render_frame(st);
+
+	int dur = a->frames[st->frame_idx].duration_ms;
+	st->frame_idx++;
+	if (st->frame_idx >= a->frame_count) {
+		if (st->loop) {
+			st->frame_idx = 0;
+		} else {
+			/* hold last frame, go idle */
+			st->playing = 0;
+			state_free_file(st);
+			return -1;
+		}
+	}
+	return dur > 0 ? dur : 20;
+}
+
+/* ---- command handling ---- */
+
+static void handle_command(struct led_state *st, char *cmd)
+{
+	char *nl = strchr(cmd, '\n');
+	if (nl) *nl = '\0';
+	char *save = NULL;
+	char *verb = strtok_r(cmd, " \t", &save);
+	if (!verb) return;
+
+	if (strcmp(verb, "play") == 0 || strcmp(verb, "loop") == 0) {
+		char *name = strtok_r(NULL, " \t", &save);
+		if (!name) return;
+		int loop = (strcmp(verb, "loop") == 0);
+		/* optional explicit loop arg: "play name 1" */
+		char *arg = strtok_r(NULL, " \t", &save);
+		if (arg) loop = atoi(arg);
+		if (state_play(st, name, loop) < 0)
+			fprintf(stderr, "atriled: animation not found: %s\n", name);
+
+	} else if (strcmp(verb, "color") == 0) {
+		char *rs = strtok_r(NULL, " \t", &save);
+		char *gs = strtok_r(NULL, " \t", &save);
+		char *bs = strtok_r(NULL, " \t", &save);
+		if (!rs || !gs || !bs) return;
+		state_stop(st);
+		atri_led_set_all_rgb(&st->led, atoi(rs), atoi(gs), atoi(bs));
+
+	} else if (strcmp(verb, "brightness") == 0) {
+		char *v = strtok_r(NULL, " \t", &save);
+		if (!v) return;
+		int pct = atoi(v);
+		if (pct < 0) pct = 0;
+		if (pct > 100) pct = 100;
+		atri_led_set_master(&st->led, pct * 255 / 100);
+		if (!st->playing) atri_led_apply(&st->led);
+
+	} else if (strcmp(verb, "gamma") == 0) {
+		char *v = strtok_r(NULL, " \t", &save);
+		if (!v) return;
+		atri_led_set_gamma(&st->led, atoi(v));
+		if (!st->playing) atri_led_apply(&st->led);
+
+	} else if (strcmp(verb, "volume") == 0) {
+		char *v = strtok_r(NULL, " \t", &save);
+		if (!v) return;
+		int pct = atoi(v);
+		uint8_t r, g, b;
+		atri_led_hsv_to_rgb((100 - pct) * 240 / 100, 255, 200, &r, &g, &b);
+		state_stop(st);
+		atri_led_render_arc(&st->led, pct, r, g, b, 0, 1);
+		atri_led_apply(&st->led);
+
+	} else if (strcmp(verb, "stop") == 0) {
+		state_stop(st);
+
+	} else if (strcmp(verb, "off") == 0) {
+		state_stop(st);
+		atri_led_off(&st->led);
+	}
+}
+
+/* ---- socket ---- */
 
 static int create_socket(void)
 {
@@ -112,57 +247,88 @@ static int create_socket(void)
 	return fd;
 }
 
-static void handle_command(struct atri_led *led, const char *cmd)
-{
-	if (strncmp(cmd, "play ", 5) == 0) {
-		char name[128];
-		strncpy(name, cmd + 5, sizeof(name) - 1);
-		name[sizeof(name) - 1] = '\0';
-		char *nl = strchr(name, '\n');
-		if (nl) *nl = '\0';
-		char *sp = strchr(name, ' ');
-		int loop = 0;
-		if (sp) { *sp = '\0'; loop = atoi(sp + 1); }
-		running = 0;
-		usleep(100000);
-		running = 1;
-		load_and_play(led, name, loop);
-	}
-}
-
-static void socket_loop(struct atri_led *led)
+/*
+ * Main loop: single process, poll() multiplexes socket commands and
+ * animation frame timing. No forks — commands always responsive.
+ */
+static int daemon_loop(struct led_state *st, const char *start_anim)
 {
 	int sock = create_socket();
-	if (sock < 0) return;
+	if (sock < 0) {
+		fprintf(stderr, "atriled: cannot create %s: %s\n",
+			sock_path, strerror(errno));
+		return 1;
+	}
 
-	char buf[256];
-	struct sockaddr_un client;
-	socklen_t len = sizeof(client);
-	while (1) {
-		int n = recvfrom(sock, buf, sizeof(buf) - 1, 0,
-			(struct sockaddr*)&client, &len);
-		if (n > 0) {
-			buf[n] = '\0';
-			handle_command(led, buf);
+	if (start_anim && state_play(st, start_anim, 1) < 0)
+		fprintf(stderr, "atriled: start animation '%s' not found\n", start_anim);
+
+	while (running) {
+		long tick = state_tick(st);
+		long timeout = tick < 0 ? -1 : tick;	/* idle: wait for commands only */
+
+		struct pollfd pfd = { .fd = sock, .events = POLLIN };
+		int ret = poll(&pfd, 1, (int)timeout);
+		if (ret > 0 && (pfd.revents & POLLIN)) {
+			char buf[256];
+			int n = recvfrom(sock, buf, sizeof(buf) - 1, 0, NULL, NULL);
+			if (n > 0) {
+				buf[n] = '\0';
+				handle_command(st, buf);
+			}
 		}
 	}
+
+	state_stop(st);
+	atri_led_off(&st->led);
 	close(sock);
 	unlink(sock_path);
+	return 0;
 }
+
+/* ---- daemonize (CLI use; systemd runs with -f) ---- */
+
+static int daemonize(void)
+{
+	pid_t pid = fork();
+	if (pid < 0) return -1;
+	if (pid > 0) _exit(0);
+	if (setsid() < 0) return -1;
+	signal(SIGHUP, SIG_IGN);
+	pid = fork();
+	if (pid < 0) return -1;
+	if (pid > 0) _exit(0);
+	if (chdir("/") < 0) { /* best effort */ }
+	umask(0);
+	return 0;
+}
+
+static void write_pidfile(void)
+{
+	FILE *pf = fopen(pid_file, "w");
+	if (pf) { fprintf(pf, "%d\n", getpid()); fclose(pf); }
+}
+
+/* ---- CLI helpers ---- */
 
 static void list_animations(void)
 {
+	printf("Builtin:\n");
+	for (int i = 0; i < atri_led_builtin_count(); i++)
+		printf("  %s\n", atri_led_builtin_get(i)->name);
+
 	DIR *d = opendir(anim_dir);
 	if (!d) {
-		printf("No animations found (directory: %s)\n", anim_dir);
+		printf("Files: no directory %s\n", anim_dir);
 		return;
 	}
+	printf("Files (%s):\n", anim_dir);
 	struct dirent *de;
 	int n = 0;
 	while ((de = readdir(d)) != NULL) {
 		if (strstr(de->d_name, ".anim") || strstr(de->d_name, ".led")) {
 			char name[128];
-			memcpy(name, de->d_name, sizeof(name) - 1);
+			strncpy(name, de->d_name, sizeof(name) - 1);
 			name[sizeof(name) - 1] = '\0';
 			char *dot = strstr(name, ".anim");
 			if (!dot) dot = strstr(name, ".led");
@@ -172,7 +338,7 @@ static void list_animations(void)
 		}
 	}
 	closedir(d);
-	if (n == 0) printf("(no .anim or .led files found in %s)\n", anim_dir);
+	if (n == 0) printf("  (none)\n");
 }
 
 static int show_status(void)
@@ -203,16 +369,18 @@ static void print_usage(const char *prog)
 {
 	printf("Usage: %s <command> [args]\n\n", prog);
 	printf("Commands:\n");
-	printf("  daemon [anim]              Run as daemon with optional animation\n");
-	printf("  play <name>                Play an animation file (once)\n");
-	printf("  loop <name>                Loop an animation file\n");
-	printf("  list                       List available animations\n");
-	printf("  status                     Check if daemon is running\n");
-	printf("  stop                       Stop the daemon\n");
-	printf("  off                        Turn off all LEDs\n");
-	printf("  test                       Play all animations sequentially\n\n");
-	printf("Animations are loaded from: %s\n", anim_dir);
-	printf("Use 'list' to show available animations.\n");
+	printf("  daemon [-f] [anim]       Run as daemon (-f = foreground for systemd)\n");
+	printf("  play <name>              Play an animation (once, builtin or file)\n");
+	printf("  loop <name>              Loop an animation\n");
+	printf("  list                     List builtin + file animations\n");
+	printf("  status                   Check if daemon is running\n");
+	printf("  stop                     Stop the daemon\n");
+	printf("  off                      Turn off all LEDs\n");
+	printf("  color <r> <g> <b>        Set solid color and exit\n");
+	printf("  brightness <0-100>       Set master brightness and exit\n");
+	printf("  test                     Play all animations sequentially\n\n");
+	printf("File animations are loaded from: %s\n", anim_dir);
+	printf("Builtins are always available (see 'list').\n");
 }
 
 int main(int argc, char *argv[])
@@ -222,12 +390,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	signal(SIGINT, handle_signal);
-	signal(SIGTERM, handle_signal);
-	signal(SIGPIPE, SIG_IGN);
+	install_signals();
 
-	struct atri_led led;
-	if (atri_led_init(&led) < 0) {
+	atri_led_init_animations();
+
+	struct led_state st;
+	memset(&st, 0, sizeof(st));
+	if (atri_led_init(&st.led) < 0) {
 		fprintf(stderr, "Failed to initialize LED control\n");
 		return 1;
 	}
@@ -235,30 +404,60 @@ int main(int argc, char *argv[])
 	const char *cmd = argv[1];
 
 	if (strcmp(cmd, "daemon") == 0) {
-		const char *anim_name = argc > 2 ? argv[2] : "notification_passive";
-		if (daemonize() < 0) {
+		int foreground = 0;
+		const char *anim_name = "notification_passive";
+		for (int i = 2; i < argc; i++) {
+			if (strcmp(argv[i], "-f") == 0)
+				foreground = 1;
+			else
+				anim_name = argv[i];
+		}
+		if (!foreground && daemonize() < 0) {
 			fprintf(stderr, "Failed to daemonize\n");
 			return 1;
 		}
-		atri_led_init(&led);
-		/* Start animation in a separate process, then listen for commands */
-		pid_t apid = fork();
-		if (apid == 0) {
-			load_and_play(&led, anim_name, 1);
-			atri_led_off(&led);
-			_exit(0);
-		}
-		socket_loop(&led);
-		kill(apid, SIGTERM);
+		write_pidfile();
+		int ret = daemon_loop(&st, anim_name);
 		unlink(pid_file);
+		return ret;
 
 	} else if (strcmp(cmd, "play") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s play <name>\n", argv[0]); return 1; }
-		return load_and_play(&led, argv[2], 0);
+		if (state_play(&st, argv[2], 0) < 0) {
+			fprintf(stderr, "Animation not found: %s\n", argv[2]);
+			return 1;
+		}
+		while (st.playing && running) {
+			long tick = state_tick(&st);
+			if (tick > 0) usleep(tick * 1000);
+		}
+		return 0;
 
 	} else if (strcmp(cmd, "loop") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s loop <name>\n", argv[0]); return 1; }
-		return load_and_play(&led, argv[2], 1);
+		if (state_play(&st, argv[2], 1) < 0) {
+			fprintf(stderr, "Animation not found: %s\n", argv[2]);
+			return 1;
+		}
+		while (running) {
+			long tick = state_tick(&st);
+			if (tick > 0) usleep(tick * 1000);
+		}
+		return 0;
+
+	} else if (strcmp(cmd, "color") == 0) {
+		if (argc < 5) { fprintf(stderr, "Usage: %s color <r> <g> <b>\n", argv[0]); return 1; }
+		atri_led_set_all_rgb(&st.led, atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
+		return 0;
+
+	} else if (strcmp(cmd, "brightness") == 0) {
+		if (argc < 3) { fprintf(stderr, "Usage: %s brightness <0-100>\n", argv[0]); return 1; }
+		int pct = atoi(argv[2]);
+		if (pct < 0) pct = 0;
+		if (pct > 100) pct = 100;
+		atri_led_set_master(&st.led, pct * 255 / 100);
+		atri_led_apply(&st.led);
+		return 0;
 
 	} else if (strcmp(cmd, "list") == 0) {
 		list_animations();
@@ -281,28 +480,48 @@ int main(int argc, char *argv[])
 		}
 
 	} else if (strcmp(cmd, "off") == 0) {
-		atri_led_off(&led);
+		atri_led_off(&st.led);
 		printf("LEDs turned off\n");
 
 	} else if (strcmp(cmd, "test") == 0) {
-		DIR *d = opendir(anim_dir);
-		if (!d) { fprintf(stderr, "No animations directory\n"); return 1; }
-		struct dirent *de;
 		int count = 0;
-		while ((de = readdir(d)) != NULL) {
-			if (strstr(de->d_name, ".led") || strstr(de->d_name, ".anim")) {
+		printf("== builtins ==\n");
+		for (int i = 0; i < atri_led_builtin_count() && running; i++) {
+			struct animation *a = atri_led_builtin_get(i);
+			printf("[%d] %s\n", ++count, a->name);
+			for (int f = 0; f < a->frame_count && running; f++) {
+				for (int r = 0; r < st.led.ring_count; r++)
+					for (int c = 0; c < 3; c++)
+						st.led.brightness[r][c] = a->frames[f].rgb[r][c];
+				atri_led_apply(&st.led);
+				usleep((a->frames[f].duration_ms > 0 ?
+					a->frames[f].duration_ms : 20) * 1000);
+			}
+		}
+		DIR *d = opendir(anim_dir);
+		if (d) {
+			printf("== files ==\n");
+			struct dirent *de;
+			while ((de = readdir(d)) != NULL && running) {
+				if (!strstr(de->d_name, ".led") && !strstr(de->d_name, ".anim"))
+					continue;
 				char name[128];
-				memcpy(name, de->d_name, sizeof(name) - 1);
+				strncpy(name, de->d_name, sizeof(name) - 1);
 				name[sizeof(name) - 1] = '\0';
 				char *dot = strstr(name, ".anim");
 				if (!dot) dot = strstr(name, ".led");
 				if (dot) *dot = '\0';
-				printf("[%d] Playing: %s\n", ++count, name);
-				load_and_play(&led, name, 0);
-				usleep(500000);
+				printf("[%d] %s\n", ++count, name);
+				if (state_play(&st, name, 0) == 0) {
+					while (st.playing && running) {
+						long tick = state_tick(&st);
+						if (tick > 0) usleep(tick * 1000);
+					}
+				}
+				usleep(300000);
 			}
+			closedir(d);
 		}
-		closedir(d);
 		printf("Test complete: %d animations played\n", count);
 
 	} else {

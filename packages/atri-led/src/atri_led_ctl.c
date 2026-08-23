@@ -17,12 +17,16 @@ static void print_usage(const char *prog)
 	printf("Commands:\n");
 	printf("  play <name>            Play an animation (once)\n");
 	printf("  loop <name>            Loop an animation\n");
+	printf("  color <r> <g> <b>      Set solid color (0-255)\n");
+	printf("  brightness <0-100>     Master brightness\n");
+	printf("  gamma <0|1>            Gamma correction on/off\n");
+	printf("  volume <0-100>         Show volume arc\n");
+	printf("  stop                   Stop animation (hold frame)\n");
+	printf("  off                    Turn off all LEDs\n");
 	printf("  list                   List available animations\n");
 	printf("  status                 Check if daemon is running\n");
-	printf("  stop                   Stop the daemon\n");
-	printf("  off                    Turn off all LEDs\n\n");
-	printf("Animations are loaded from: /etc/atriled/animations\n");
-	printf("Use 'list' to show available animations.\n");
+	printf("  kill                   Stop the daemon\n\n");
+	printf("Animations: builtins + files from /etc/atriled/animations\n");
 }
 
 static int send_cmd(const char *cmd)
@@ -38,9 +42,9 @@ static int send_cmd(const char *cmd)
 		fprintf(stderr, "atriled daemon not running (socket: %s)\n", sock_path);
 		return -1;
 	}
-	write(fd, cmd, strlen(cmd));
+	int ret = write(fd, cmd, strlen(cmd)) < 0 ? -1 : 0;
 	close(fd);
-	return 0;
+	return ret;
 }
 
 static void list_animations(void)
@@ -95,13 +99,55 @@ int main(int argc, char *argv[])
 		snprintf(buf, sizeof(buf), "play %s %d", argv[2], loop);
 		return send_cmd(buf);
 
+	} else if (strcmp(cmd, "color") == 0) {
+		if (argc < 5) {
+			fprintf(stderr, "Usage: %s color <r> <g> <b>\n", argv[0]);
+			return 1;
+		}
+		char buf[64];
+		snprintf(buf, sizeof(buf), "color %s %s %s", argv[2], argv[3], argv[4]);
+		return send_cmd(buf);
+
+	} else if (strcmp(cmd, "brightness") == 0) {
+		if (argc < 3) {
+			fprintf(stderr, "Usage: %s brightness <0-100>\n", argv[0]);
+			return 1;
+		}
+		char buf[32];
+		snprintf(buf, sizeof(buf), "brightness %s", argv[2]);
+		return send_cmd(buf);
+
+	} else if (strcmp(cmd, "gamma") == 0) {
+		if (argc < 3) {
+			fprintf(stderr, "Usage: %s gamma <0|1>\n", argv[0]);
+			return 1;
+		}
+		char buf[32];
+		snprintf(buf, sizeof(buf), "gamma %s", argv[2]);
+		return send_cmd(buf);
+
+	} else if (strcmp(cmd, "volume") == 0) {
+		if (argc < 3) {
+			fprintf(stderr, "Usage: %s volume <0-100>\n", argv[0]);
+			return 1;
+		}
+		char buf[32];
+		snprintf(buf, sizeof(buf), "volume %s", argv[2]);
+		return send_cmd(buf);
+
+	} else if (strcmp(cmd, "stop") == 0) {
+		return send_cmd("stop");
+
+	} else if (strcmp(cmd, "off") == 0) {
+		return send_cmd("off");
+
 	} else if (strcmp(cmd, "list") == 0) {
 		list_animations();
 
 	} else if (strcmp(cmd, "status") == 0) {
 		return show_status();
 
-	} else if (strcmp(cmd, "stop") == 0) {
+	} else if (strcmp(cmd, "kill") == 0) {
 		FILE *pf = fopen(pid_file, "r");
 		if (!pf) { printf("atriled: not running\n"); return 1; }
 		int pid;
@@ -115,9 +161,6 @@ int main(int argc, char *argv[])
 			perror("kill");
 			return 1;
 		}
-
-	} else if (strcmp(cmd, "off") == 0) {
-		return send_cmd("play off 0");
 
 	} else {
 		fprintf(stderr, "Unknown command: %s\n", cmd);

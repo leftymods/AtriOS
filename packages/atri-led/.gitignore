@@ -5,3 +5,7 @@ atrledctl
 atriled-screen
 atrivolume
 quasar_led_ctl
+quasar_led_demo
+quasar_led_info
+quasar_led_test
+quasar_led_text

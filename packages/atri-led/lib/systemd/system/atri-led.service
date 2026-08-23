@@ -1,11 +1,12 @@
 [Unit]
-Description=AtriStation LED Boot Animation
+Description=AtriStation LED ring daemon
 After=local-fs.target
 
 [Service]
-Type=oneshot
-ExecStart=/usr/bin/atrild mood happy
-RemainAfterExit=yes
+Type=simple
+ExecStart=/usr/bin/atrled daemon -f notification_passive
+Restart=always
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
