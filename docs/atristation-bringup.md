@@ -39,7 +39,11 @@ aplay -l && amixer scontrols
 speaker-test -D default -c2 -t wav
 arecord -f S32_LE -r48000 -c4 -d10 /tmp/pdm.wav   # PDM-микрофоны
 ```
-До первого звука мультиметром: VDDIO≈3.3В, PVDD≈20В (GPIOX_10).
+Anti-pop секвенция видна в логе:
+`dmesg | grep "anti-pop"` — шаги 1..5 по порядку.
+Мультиметром: VDDIO≈3.3В появляется сразу, PVDD≈20В — ТОЛЬКО после
+строки "steps 4-5". Если PVDD=0 после "PVDD on" — см.
+docs/atristation-hardware.md, открытый вопрос по пину (X10 vs AO10).
 
 ## 4. WiFi/BT (RTL8822CS)
 
