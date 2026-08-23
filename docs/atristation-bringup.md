@@ -77,7 +77,7 @@ VIDEO_MESON_VDEC, прошивки в /lib/firmware/meson/vdec/g12a_*.
 
 ## Zigbee (Tuya TZ9213-2782)
 
-Модуль на UART_AO_B → `/dev/ttyAML1` (стоковые пины AO2/AO3, конфликтов
+Модуль на UART_AO_B → `/dev/ttyAML2` (стоковые пины AO2/AO3, конфликтов
 с аудио TDM-B нет — проверено по оригинальному DTB). Управление:
 reset=GPIOX_17, boot=GPIOX_11 (`zigbee-control` в DTS).
 

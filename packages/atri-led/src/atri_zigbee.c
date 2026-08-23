@@ -31,7 +31,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-#define DEFAULT_DEV	"/dev/ttyAML1"
+/* serial2 = uart_AO_B (ttyAML1 занят Bluetooth-ом на uart_A) */
+#define DEFAULT_DEV	"/dev/ttyAML2"
 #define DEFAULT_BAUD	B115200
 #define GPIO_EXPORT_FMT "/sys/class/gpio/gpio%s"
 
