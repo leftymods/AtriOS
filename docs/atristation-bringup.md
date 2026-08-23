@@ -68,6 +68,13 @@ atrledctl off           # плавное затухание ~170 мс
 make -C packages/atri-led test   # юнит-тесты библиотеки (на хосте)
 ```
 
+## GPU / видео
+
+Mali-G31 MP2 (Bifrost) — драйвер panfrost включён (DRM_PANFROST=y),
+userspace — Mesa с panfrost. Аппаратное декодирование видео:
+VIDEO_MESON_VDEC, прошивки в /lib/firmware/meson/vdec/g12a_*.
+Проверка: dmesg | grep -E "panfrost|mali" ; ls /sys/class/devfreq.
+
 ## Известные ограничения
 
 - BT wake-линии не подключены (GPIOX_17 = zigbee-reset конфликт;
