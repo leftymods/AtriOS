@@ -981,3 +981,88 @@ struct animation anim_gradient = {
 	.frames = gradient_frames,
 	.frame_count = 48,
 };
+
+/* ---- smooth playback: timeline + linear interpolation ---- */
+
+int atri_led_timeline_build(const struct animation *a, int loop,
+	struct anim_timeline *tl)
+{
+	int i;
+
+	memset(tl, 0, sizeof(*tl));
+	if (!a || a->frame_count <= 0 || !a->frames)
+		return -1;
+
+	tl->n = a->frame_count;
+	tl->loop = loop;
+	tl->cum_ms = calloc(tl->n + 1, sizeof(long));
+	if (!tl->cum_ms)
+		return -1;
+
+	for (i = 0; i < tl->n; i++) {
+		long d = a->frames[i].duration_ms;
+		if (d <= 0)
+			d = 20;	/* degenerate duration guard */
+		tl->cum_ms[i + 1] = tl->cum_ms[i] + d;
+	}
+	tl->total_ms = tl->cum_ms[tl->n];
+	return 0;
+}
+
+void atri_led_timeline_free(struct anim_timeline *tl)
+{
+	if (!tl) return;
+	free(tl->cum_ms);
+	memset(tl, 0, sizeof(*tl));
+}
+
+static void frame_lerp(const struct animation_frame *from,
+	const struct animation_frame *to, int frac /*0..255*/,
+	struct animation_frame *out, int ring_count)
+{
+	int r, c;
+
+	for (r = 0; r < ring_count && r < ATRI_LED_MAX_RINGS; r++) {
+		for (c = 0; c < 3; c++) {
+			int f = from->rgb[r][c];
+			int t = to->rgb[r][c];
+			out->rgb[r][c] = (uint8_t)(f + (t - f) * frac / 255);
+		}
+	}
+	out->duration_ms = from->duration_ms;
+}
+
+int atri_led_timeline_sample(const struct anim_timeline *tl,
+	const struct animation *a, long t_ms, struct animation_frame *out)
+{
+	long pos;
+	int i;
+
+	if (!tl || !a || tl->n <= 0)
+		return 0;
+
+	if (tl->loop) {
+		pos = t_ms % tl->total_ms;
+		if (pos < 0) pos += tl->total_ms;
+	} else {
+		if (t_ms >= tl->total_ms) {
+			*out = a->frames[tl->n - 1];	/* hold last */
+			return 0;
+		}
+		pos = t_ms;
+	}
+
+	/* frames advance monotonically within a cycle; linear scan from
+	 * the start is fine at these sizes (< few hundred frames) */
+	i = 0;
+	while (i < tl->n - 1 && pos >= tl->cum_ms[i + 1])
+		i++;
+	{
+		long seg = tl->cum_ms[i + 1] - tl->cum_ms[i];
+		int frac = (int)(((pos - tl->cum_ms[i]) * 255) / (seg > 0 ? seg : 1));
+		const struct animation_frame *next =
+			&a->frames[(i + 1) % tl->n];
+		frame_lerp(&a->frames[i], next, frac, out, ATRI_LED_MAX_RINGS);
+	}
+	return 1;
+}

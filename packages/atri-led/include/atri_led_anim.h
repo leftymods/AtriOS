@@ -78,4 +78,26 @@ extern struct animation *atri_led_builtin_animations[];
 int atri_led_builtin_count(void);
 struct animation *atri_led_builtin_get(int idx);
 
+/*
+ * Smooth playback: map wall-clock time onto the frame sequence and
+ * linearly interpolate between neighbouring frames ("tweening").
+ * Turns any discrete frame list into continuous motion.
+ */
+struct anim_timeline {
+	long *cum_ms;		/* n+1 entries: start time of each frame */
+	int n;
+	int loop;
+	long total_ms;
+};
+
+int atri_led_timeline_build(const struct animation *a, int loop,
+	struct anim_timeline *tl);
+void atri_led_timeline_free(struct anim_timeline *tl);
+
+/* Sample the blended frame at t ms. Returns 1 while the timeline is
+ * active, 0 after a non-looping timeline has finished (*out holds the
+ * final frame). */
+int atri_led_timeline_sample(const struct anim_timeline *tl,
+	const struct animation *a, long t_ms, struct animation_frame *out);
+
 #endif

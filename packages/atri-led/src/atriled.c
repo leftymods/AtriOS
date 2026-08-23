@@ -20,6 +20,13 @@ static const char *pid_file = "/run/atriled.pid";
 static const char *sock_path = "/run/atriled.sock";
 static volatile sig_atomic_t running = 1;
 
+/* render cadence and change threshold */
+#define RENDER_INTERVAL_MS 8	/* ~125 Hz max render rate */
+#define RENDER_MIN_DELTA 2	/* skip sysfs write if all channels moved < 2 */
+#define FADE_STEPS 12
+#define FADE_TICK_MS 14
+#define ARC_TICK_MS 10
+
 static void handle_signal(int sig)
 {
 	(void)sig;
@@ -38,75 +45,114 @@ static void install_signals(void)
 	signal(SIGPIPE, SIG_IGN);
 }
 
-/* ---- daemon state machine ---- */
+static long long now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
 
+/*
+ * Daemon state machine.
+ *
+ * Playback is time-based: a timeline maps wall-clock ms onto frames and
+ * every tick samples an interpolated frame (tweening). Absolute
+ * deadlines mean socket command handling never shifts animation phase.
+ * Switching animations crossfades asynchronously; volume arc eases to
+ * its target instead of jumping.
+ */
 struct led_state {
 	struct atri_led led;
-	struct animation *builtin;	/* non-NULL if playing a builtin */
-	struct animation file_anim;	/* loaded file animation (owns frames) */
-	int use_file;			/* 1 = play file_anim, 0 = builtin/none */
-	int frame_idx;
+
+	/* active animation */
+	struct animation *builtin;	/* non-NULL if builtin */
+	struct animation file_anim;	/* owns frames when use_file */
+	int use_file;
+	struct anim_timeline tl;
+	long long t0;
 	int loop;
-	int playing;			/* 0 = idle (hold current LEDs) */
+	int playing;
 	char current_name[128];
+
+	uint8_t last_render[ATRI_LED_MAX_RINGS][3];
+	int last_valid;
+	int dirty;		/* master/gamma changed, force apply */
+
+	/* pending switch (crossfade target) */
+	struct animation pend_builtin;
+	struct animation pend_file;	/* owns frames once loaded */
+	int pend_use_file;
+	char pend_name[128];
+	int pend_loop;
+	struct anim_timeline pend_tl;
+	long long pend_t0;
+	struct animation_frame fade_from;
+	int fade_pos;		/* -1 = no fade in progress */
+
+	/* volume arc easing */
+	int arc_active;
+	int arc_cur;
+	int arc_target;
+	uint8_t arc_rgb[3];
 };
-
-static struct animation *state_current_anim(struct led_state *st)
-{
-	if (st->playing == 0) return NULL;
-	return st->use_file ? &st->file_anim : st->builtin;
-}
-
-static void state_render_frame(struct led_state *st)
-{
-	struct animation *a = state_current_anim(st);
-	if (!a || st->frame_idx >= a->frame_count) return;
-	for (int r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++) {
-		st->led.brightness[r][RGB_R] = a->frames[st->frame_idx].rgb[r][RGB_R];
-		st->led.brightness[r][RGB_G] = a->frames[st->frame_idx].rgb[r][RGB_G];
-		st->led.brightness[r][RGB_B] = a->frames[st->frame_idx].rgb[r][RGB_B];
-	}
-	atri_led_apply(&st->led);
-}
 
 static void state_free_file(struct led_state *st)
 {
 	if (st->use_file && st->file_anim.frames) {
 		free(st->file_anim.frames);
-		st->file_anim.frames = NULL;
+		memset(&st->file_anim, 0, sizeof(st->file_anim));
 	}
 	st->use_file = 0;
+	st->playing = 0;
+	st->current_name[0] = '\0';
+	atri_led_timeline_free(&st->tl);
+	st->last_valid = 0;
 }
 
-/* crossfade from current LED state to first frame of the new animation */
-static void state_transition(struct led_state *st, struct animation_frame *target)
+static struct animation *state_current_anim(struct led_state *st)
 {
-	const int steps = 8, step_ms = 18;
-	uint8_t from[ATRI_LED_MAX_RINGS][3];
-	memcpy(from, st->led.brightness, sizeof(from));
-	for (int s = 1; s <= steps && running; s++) {
-		for (int r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++) {
-			for (int c = 0; c < 3; c++) {
-				int f = from[r][c], t = target->rgb[r][c];
-				st->led.brightness[r][c] = f + (t - f) * s / steps;
-			}
-		}
-		atri_led_apply(&st->led);
-		usleep(step_ms * 1000);
+	return st->use_file ? &st->file_anim : st->builtin;
+}
+
+/* activate already-resolved animation (no fade): builds its timeline */
+static void state_activate(struct led_state *st,
+	struct animation *builtin, struct animation *file, int use_file,
+	const char *name, int loop)
+{
+	state_free_file(st);
+
+	st->builtin = builtin;
+	if (use_file) {
+		st->file_anim = *file;
+		st->use_file = 1;
+	} else {
+		st->use_file = 0;
+	}
+
+	if (atri_led_timeline_build(state_current_anim(st), loop, &st->tl) == 0) {
+		st->loop = loop;
+		st->playing = 1;
+		snprintf(st->current_name, sizeof(st->current_name), "%s", name);
+		st->t0 = now_ms();
+		st->dirty = 1;
 	}
 }
 
+/*
+ * Start playing `name` (builtin or file). If something is playing,
+ * resolve the new animation now and crossfade to it asynchronously —
+ * the socket loop keeps serving commands while fading.
+ */
 static int state_play(struct led_state *st, const char *name, int loop)
 {
 	struct animation *a = atri_led_find_builtin(name);
-	struct animation_frame first;
-	int new_use_file = 0;
+	struct animation tmp;
+	int loaded = 0;
 
 	if (!a) {
 		char path[512];
-		snprintf(path, sizeof(path), "%s/%s.anim", anim_dir, name);
-		struct animation tmp;
 		memset(&tmp, 0, sizeof(tmp));
+		snprintf(path, sizeof(path), "%s/%s.anim", anim_dir, name);
 		if (atri_led_load_animation(path, &tmp) < 0) {
 			snprintf(path, sizeof(path), "%s/%s.led", anim_dir, name);
 			if (atri_led_load_animation(path, &tmp) < 0)
@@ -116,54 +162,161 @@ static int state_play(struct led_state *st, const char *name, int loop)
 			free(tmp.frames);
 			return -1;
 		}
-		state_free_file(st);
-		st->file_anim = tmp;
-		a = &st->file_anim;
-		new_use_file = 1;
+		a = &tmp;
+		loaded = 1;
 	}
 
-	memset(&first, 0, sizeof(first));
-	memcpy(&first, &a->frames[0], sizeof(first));
+	if (st->fade_pos >= 0) {
+		/* fade still running: finish it into the current target first */
+		state_activate(st,
+			st->pend_use_file ? NULL : &st->pend_builtin,
+			&st->pend_file, st->pend_use_file,
+			st->pend_name, st->pend_loop);
+	}
 
-	st->use_file = new_use_file;
-	st->builtin = new_use_file ? NULL : a;
-	st->frame_idx = 0;
-	st->loop = loop;
-	st->playing = 1;
-	snprintf(st->current_name, sizeof(st->current_name), "%s", name);
+	if (!st->playing) {
+		if (loaded) {
+			state_activate(st, NULL, &tmp, 1, name, loop);
+		} else {
+			state_activate(st, a, NULL, 0, name, loop);
+		}
+		return 0;
+	}
 
-	state_transition(st, &first);
+	/* prepare async switch */
+	memcpy(&st->fade_from, &st->led.brightness, sizeof(st->fade_from));
+	st->pend_builtin = *a;	/* shallow: builtins are static */
+	st->pend_use_file = loaded;
+	if (loaded)
+		st->pend_file = tmp;	/* ownership moves here */
+	snprintf(st->pend_name, sizeof(st->pend_name), "%s", name);
+	st->pend_loop = loop;
+	atri_led_timeline_build(a, loop, &st->pend_tl);
+	st->pend_t0 = now_ms();
+	st->fade_pos = 0;
 	return 0;
 }
 
 static void state_stop(struct led_state *st)
 {
-	st->playing = 0;
-	st->current_name[0] = '\0';
+	st->fade_pos = -1;
+	st->arc_active = 0;
+	atri_led_timeline_free(&st->pend_tl);
 	state_free_file(st);
 }
 
-/* advance animation; returns ms until next frame, -1 if idle */
-static long state_tick(struct led_state *st)
+static inline uint8_t chan_lerp(int from, int to, int frac)
 {
-	struct animation *a = state_current_anim(st);
-	if (!a) return -1;
+	return (uint8_t)(from + ((to - from) * frac) / 255);
+}
 
-	state_render_frame(st);
+static void state_apply_if_changed(struct led_state *st,
+	const struct animation_frame *f)
+{
+	int r, c, diff = 0;
 
-	int dur = a->frames[st->frame_idx].duration_ms;
-	st->frame_idx++;
-	if (st->frame_idx >= a->frame_count) {
-		if (st->loop) {
-			st->frame_idx = 0;
-		} else {
-			/* hold last frame, go idle */
-			st->playing = 0;
-			state_free_file(st);
-			return -1;
+	if (st->last_valid && !st->dirty) {
+		for (r = 0; r < st->led.ring_count && !diff; r++)
+			for (c = 0; c < 3; c++)
+				if (abs((int)f->rgb[r][c] -
+					(int)st->last_render[r][c]) >= RENDER_MIN_DELTA) {
+					diff = 1;
+					break;
+				}
+		if (!diff)
+			return;
+	}
+
+	for (r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++) {
+		for (c = 0; c < 3; c++) {
+			st->led.brightness[r][c] = f->rgb[r][c];
+			st->last_render[r][c] = f->rgb[r][c];
 		}
 	}
-	return dur > 0 ? dur : 20;
+	st->last_valid = 1;
+	st->dirty = 0;
+	atri_led_apply(&st->led);
+}
+
+/*
+ * One render pass. Returns ms until the next pass is due, -1 if idle.
+ */
+static long state_tick(struct led_state *st)
+{
+	struct animation_frame f;
+
+	/* volume arc easing has priority while active */
+	if (st->arc_active) {
+		int step = abs(st->arc_target - st->arc_cur) / 4;
+		if (step < 2) step = 2;
+		if (st->arc_cur < st->arc_target)
+			st->arc_cur += (st->arc_target - st->arc_cur < step)
+				? st->arc_target - st->arc_cur : step;
+		else if (st->arc_cur > st->arc_target)
+			st->arc_cur -= (st->arc_cur - st->arc_target < step)
+				? st->arc_cur - st->arc_target : step;
+
+		atri_led_render_arc(&st->led, st->arc_cur,
+			st->arc_rgb[0], st->arc_rgb[1], st->arc_rgb[2], 0, 1);
+		atri_led_apply(&st->led);
+		st->last_valid = 0;	/* arc bypasses change detection */
+
+		if (st->arc_cur == st->arc_target)
+			st->arc_active = 0;
+		return ARC_TICK_MS;
+	}
+
+	/* asynchronous crossfade towards pending animation */
+	if (st->fade_pos >= 0) {
+		struct animation *pa = st->pend_use_file ? &st->pend_file
+							 : &st->pend_builtin;
+		int s = st->fade_pos * 255 / FADE_STEPS;
+		int r, c;
+
+		atri_led_timeline_sample(&st->pend_tl, pa,
+					 now_ms() - st->pend_t0, &f);
+		for (r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++)
+			for (c = 0; c < 3; c++)
+				st->led.brightness[r][c] =
+					chan_lerp(st->fade_from.rgb[r][c],
+						  f.rgb[r][c], s);
+		atri_led_apply(&st->led);
+		st->last_valid = 0;
+
+		if (++st->fade_pos > FADE_STEPS) {
+			struct animation file_copy = st->pend_file;
+			int use_file = st->pend_use_file;
+			char name[128];
+			int loop = st->pend_loop;
+
+			memcpy(name, st->pend_name, sizeof(name));
+			memset(&st->pend_file, 0, sizeof(st->pend_file));
+			atri_led_timeline_free(&st->pend_tl);
+			st->fade_pos = -1;
+			state_activate(st, use_file ? NULL : pa,
+				       &file_copy, use_file, name, loop);
+		}
+		return FADE_TICK_MS;
+	}
+
+	/* normal interpolated playback */
+	if (!st->playing || !state_current_anim(st))
+		return -1;
+
+	{
+		struct animation *cur = state_current_anim(st);
+		int active = atri_led_timeline_sample(&st->tl, cur,
+			now_ms() - st->t0, &f);
+
+		if (!active) {
+			/* one-shot finished: hold the final frame, go idle */
+			state_apply_if_changed(st, &f);
+			state_stop(st);
+			return -1;
+		}
+		state_apply_if_changed(st, &f);
+	}
+	return RENDER_INTERVAL_MS;
 }
 
 /* ---- command handling ---- */
@@ -180,7 +333,6 @@ static void handle_command(struct led_state *st, char *cmd)
 		char *name = strtok_r(NULL, " \t", &save);
 		if (!name) return;
 		int loop = (strcmp(verb, "loop") == 0);
-		/* optional explicit loop arg: "play name 1" */
 		char *arg = strtok_r(NULL, " \t", &save);
 		if (arg) loop = atoi(arg);
 		if (state_play(st, name, loop) < 0)
@@ -201,23 +353,30 @@ static void handle_command(struct led_state *st, char *cmd)
 		if (pct < 0) pct = 0;
 		if (pct > 100) pct = 100;
 		atri_led_set_master(&st->led, pct * 255 / 100);
-		if (!st->playing) atri_led_apply(&st->led);
+		st->dirty = 1;
+		if (!st->playing && !st->arc_active)
+			atri_led_apply(&st->led);
 
 	} else if (strcmp(verb, "gamma") == 0) {
 		char *v = strtok_r(NULL, " \t", &save);
 		if (!v) return;
 		atri_led_set_gamma(&st->led, atoi(v));
-		if (!st->playing) atri_led_apply(&st->led);
+		st->dirty = 1;
+		if (!st->playing && !st->arc_active)
+			atri_led_apply(&st->led);
 
 	} else if (strcmp(verb, "volume") == 0) {
 		char *v = strtok_r(NULL, " \t", &save);
 		if (!v) return;
 		int pct = atoi(v);
 		uint8_t r, g, b;
+		if (pct < 0) pct = 0;
+		if (pct > 100) pct = 100;
 		atri_led_hsv_to_rgb((100 - pct) * 240 / 100, 255, 200, &r, &g, &b);
+		st->arc_rgb[0] = r; st->arc_rgb[1] = g; st->arc_rgb[2] = b;
+		st->arc_target = pct;
+		st->arc_active = 1;	/* eased in the tick loop */
 		state_stop(st);
-		atri_led_render_arc(&st->led, pct, r, g, b, 0, 1);
-		atri_led_apply(&st->led);
 
 	} else if (strcmp(verb, "stop") == 0) {
 		state_stop(st);
@@ -248,8 +407,9 @@ static int create_socket(void)
 }
 
 /*
- * Main loop: single process, poll() multiplexes socket commands and
- * animation frame timing. No forks — commands always responsive.
+ * Main loop: poll() multiplexes socket commands against animation
+ * deadlines computed from CLOCK_MONOTONIC — command handling never
+ * delays or shifts frame timing.
  */
 static int daemon_loop(struct led_state *st, const char *start_anim)
 {
@@ -261,11 +421,13 @@ static int daemon_loop(struct led_state *st, const char *start_anim)
 	}
 
 	if (start_anim && state_play(st, start_anim, 1) < 0)
-		fprintf(stderr, "atriled: start animation '%s' not found\n", start_anim);
+		fprintf(stderr, "atriled: start animation '%s' not found\n",
+			start_anim);
 
 	while (running) {
-		long tick = state_tick(st);
-		long timeout = tick < 0 ? -1 : tick;	/* idle: wait for commands only */
+		long timeout = state_tick(st);
+		if (timeout < 0)
+			timeout = -1;	/* idle: wait for commands only */
 
 		struct pollfd pfd = { .fd = sock, .events = POLLIN };
 		int ret = poll(&pfd, 1, (int)timeout);
@@ -365,6 +527,52 @@ static int show_status(void)
 	return 0;
 }
 
+/* shared foreground playback for play/loop CLI commands */
+static int run_foreground(struct led_state *st, const char *name, int loop)
+{
+	struct animation *a = atri_led_find_builtin(name);
+	struct animation tmp = {0};
+	struct anim_timeline tl;
+	int loaded = 0;
+
+	if (!a) {
+		char path[512];
+		snprintf(path, sizeof(path), "%s/%s.anim", anim_dir, name);
+		if (atri_led_load_animation(path, &tmp) < 0) {
+			snprintf(path, sizeof(path), "%s/%s.led", anim_dir, name);
+			if (atri_led_load_animation(path, &tmp) < 0) {
+				fprintf(stderr, "Animation not found: %s\n", name);
+				return 1;
+			}
+		}
+		a = &tmp;
+		loaded = 1;
+	}
+	if (atri_led_timeline_build(a, loop, &tl) != 0)
+		return 1;
+
+	long long t0 = now_ms();
+	while (running) {
+		struct animation_frame f;
+		if (!atri_led_timeline_sample(&tl, a, now_ms() - t0, &f)) {
+			if (!loop) break;
+			t0 = now_ms();	/* safety, sampler wraps anyway */
+			continue;
+		}
+		for (int r = 0; r < st->led.ring_count && r < ATRI_LED_MAX_RINGS; r++)
+			for (int c = 0; c < 3; c++)
+				st->led.brightness[r][c] = f.rgb[r][c];
+		atri_led_apply(&st->led);
+		usleep(RENDER_INTERVAL_MS * 1000);
+		if (!loop)
+			break;
+	}
+
+	if (loaded) free(tmp.frames);
+	atri_led_timeline_free(&tl);
+	return 0;
+}
+
 static void print_usage(const char *prog)
 {
 	printf("Usage: %s <command> [args]\n\n", prog);
@@ -396,6 +604,7 @@ int main(int argc, char *argv[])
 
 	struct led_state st;
 	memset(&st, 0, sizeof(st));
+	st.fade_pos = -1;
 	if (atri_led_init(&st.led) < 0) {
 		fprintf(stderr, "Failed to initialize LED control\n");
 		return 1;
@@ -423,27 +632,11 @@ int main(int argc, char *argv[])
 
 	} else if (strcmp(cmd, "play") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s play <name>\n", argv[0]); return 1; }
-		if (state_play(&st, argv[2], 0) < 0) {
-			fprintf(stderr, "Animation not found: %s\n", argv[2]);
-			return 1;
-		}
-		while (st.playing && running) {
-			long tick = state_tick(&st);
-			if (tick > 0) usleep(tick * 1000);
-		}
-		return 0;
+		return run_foreground(&st, argv[2], 0);
 
 	} else if (strcmp(cmd, "loop") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s loop <name>\n", argv[0]); return 1; }
-		if (state_play(&st, argv[2], 1) < 0) {
-			fprintf(stderr, "Animation not found: %s\n", argv[2]);
-			return 1;
-		}
-		while (running) {
-			long tick = state_tick(&st);
-			if (tick > 0) usleep(tick * 1000);
-		}
-		return 0;
+		return run_foreground(&st, argv[2], 1);
 
 	} else if (strcmp(cmd, "color") == 0) {
 		if (argc < 5) { fprintf(stderr, "Usage: %s color <r> <g> <b>\n", argv[0]); return 1; }
@@ -489,14 +682,7 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < atri_led_builtin_count() && running; i++) {
 			struct animation *a = atri_led_builtin_get(i);
 			printf("[%d] %s\n", ++count, a->name);
-			for (int f = 0; f < a->frame_count && running; f++) {
-				for (int r = 0; r < st.led.ring_count; r++)
-					for (int c = 0; c < 3; c++)
-						st.led.brightness[r][c] = a->frames[f].rgb[r][c];
-				atri_led_apply(&st.led);
-				usleep((a->frames[f].duration_ms > 0 ?
-					a->frames[f].duration_ms : 20) * 1000);
-			}
+			run_foreground(&st, a->name, 0);
 		}
 		DIR *d = opendir(anim_dir);
 		if (d) {
@@ -512,12 +698,7 @@ int main(int argc, char *argv[])
 				if (!dot) dot = strstr(name, ".led");
 				if (dot) *dot = '\0';
 				printf("[%d] %s\n", ++count, name);
-				if (state_play(&st, name, 0) == 0) {
-					while (st.playing && running) {
-						long tick = state_tick(&st);
-						if (tick > 0) usleep(tick * 1000);
-					}
-				}
+				run_foreground(&st, name, 0);
 				usleep(300000);
 			}
 			closedir(d);
