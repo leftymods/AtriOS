@@ -10,3 +10,5 @@ quasar_led_info
 quasar_led_test
 quasar_led_text
 atri-screen-test
+atri-hwprobe
+test_atri_led

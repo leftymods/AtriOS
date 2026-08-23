@@ -155,8 +155,10 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		RemainAfterExit=yes
 		# Wait for sound card device to appear
 		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done'
-		# Initialize SY6045S DSP config via I2C (EQ, DRC, volume curves)
-		ExecStart=/usr/libexec/sy6045s-init.sh
+		# SY6045S DSP config is applied by the kernel driver at probe
+		# (firmware settings via request_firmware). Keep
+		# /usr/libexec/sy6045s-init.sh installed for manual rescue.
+		# ExecStart=/usr/libexec/sy6045s-init.sh
 		# Restore ALSA mixer state
 		ExecStart=/usr/sbin/alsactl restore 0 || true
 

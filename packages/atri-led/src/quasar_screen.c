@@ -227,8 +227,10 @@ void screen_flush(quasar_screen_t *scr)
 {
 	if (scr->fb_fd < 0)
 		return;
-	int blank = FB_BLANK_UNBLANK;
-	ioctl(scr->fb_fd, FBIOBLANK, blank);
+	/* gowin_led_device pushes the frame in .fb_sync == fsync();
+	 * FBIOBLANK does not transfer anything. */
+	if (fsync(scr->fb_fd))
+		perror("screen_flush: fsync");
 }
 
 void screen_send_raw(quasar_screen_t *scr, const uint8_t *data, int len)

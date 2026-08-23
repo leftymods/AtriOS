@@ -20,8 +20,17 @@ static uint8_t gamma_lut[256];
 static uint8_t gamma_inv[256];	/* command value for a given linear level */
 static int gamma_ready = 0;
 
-const uint8_t *atri_led_get_gamma_lut(void) { return gamma_lut; }
-const uint8_t *atri_led_get_gamma_inv(void) { return gamma_inv; }
+static void build_gamma_lut(void);
+const uint8_t *atri_led_get_gamma_lut(void)
+{
+	if (!gamma_ready) build_gamma_lut();
+	return gamma_lut;
+}
+const uint8_t *atri_led_get_gamma_inv(void)
+{
+	if (!gamma_ready) build_gamma_lut();
+	return gamma_inv;
+}
 
 static void build_gamma_lut(void)
 {
