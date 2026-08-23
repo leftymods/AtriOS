@@ -26,13 +26,14 @@ QINFO_BIN = quasar_led_info
 SCREEN_BINS = $(QTST_BIN) $(QTXT_BIN) $(QDEMO_BIN) $(QINFO_BIN)
 SCRTEST_BIN = atri-screen-test
 HWPROBE_BIN = atri-hwprobe
+ZGBIN = atri-zigbee
 TEST_BIN = test_atri_led
 ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -91,6 +92,9 @@ $(SCRTEST_BIN): src/atri_screen_test.c
 $(HWPROBE_BIN): src/atri_hwprobe.c
 	$(CC) $(CFLAGS) $< -o $@
 
+$(ZGBIN): src/atri_zigbee.c
+	$(CC) $(CFLAGS) $< -o $@
+
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
@@ -112,6 +116,7 @@ install: all
 	cp $(QCTL_BIN) $(DESTDIR)/usr/bin/
 	cp $(SCRTEST_BIN) $(DESTDIR)/usr/bin/
 	cp $(HWPROBE_BIN) $(DESTDIR)/usr/bin/
+	cp $(ZGBIN) $(DESTDIR)/usr/bin/
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
 else

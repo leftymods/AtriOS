@@ -75,6 +75,24 @@ userspace — Mesa с panfrost. Аппаратное декодирование 
 VIDEO_MESON_VDEC, прошивки в /lib/firmware/meson/vdec/g12a_*.
 Проверка: dmesg | grep -E "panfrost|mali" ; ls /sys/class/devfreq.
 
+## Zigbee (Tuya TZ9213-2782)
+
+Модуль на UART_AO_B → `/dev/ttyAML1` (стоковые пины AO2/AO3, конфликтов
+с аудио TDM-B нет — проверено по оригинальному DTB). Управление:
+reset=GPIOX_17, boot=GPIOX_11 (`zigbee-control` в DTS).
+
+```
+atri-hwprobe | grep -A2 tty        # порт жив?
+atri-zigbee info                   # открытие + ambient-трафик
+atri-zigbee listen 30              # сырые байты от модуля
+# перепрошивка в координатор:
+atri-zigbee bootloader
+atri-zigbee send coordinator.bin   # XMODEM-CRC (Z-Stack/EmberZNet NCP)
+atri-zigbee raw                    # passthrough для z2m/bellows
+```
+Стоковая прошивка говорит на протоколе Яндекса; для zigbee2mqtt/ZHA
+нужна координаторская прошивка соответствующего чипа.
+
 ## Известные ограничения
 
 - BT wake-линии не подключены (GPIOX_17 = zigbee-reset конфликт;
