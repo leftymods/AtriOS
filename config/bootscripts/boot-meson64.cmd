@@ -134,7 +134,7 @@ else
 	if test "${console}" = "display" || test "${console}" = "both"; then setenv consoleargs "console=ttyAML0,115200 console=tty1"; fi
 	if test "${console}" = "serial"; then setenv consoleargs "console=ttyAML0,115200"; fi
 	if test "${bootlogo}" = "true"; then
-		setenv consoleargs "splash plymouth.ignore-serial-consoles ${consoleargs}"
+		setenv consoleargs "splash plymouth.ignore-serial-consoles quiet ${consoleargs}"
 	else
 		setenv consoleargs "splash=verbose ${consoleargs}"
 	fi

@@ -33,13 +33,14 @@ function post_family_tweaks_bsp__rotary_poll_add_binary() {
 		[Unit]
 		Description=${BOARD} Rotary Encoder Polling Daemon
 		After=local-fs.target
-		StartLimitIntervalSec=0
+		StartLimitIntervalSec=60
+		StartLimitBurst=3
 
 		[Service]
 		Type=simple
 		ExecStart=${bin_path} ${ROTARY_GPIO_A} ${ROTARY_GPIO_B}
-		Restart=always
-		RestartSec=2
+		Restart=on-failure
+		RestartSec=5
 
 		[Install]
 		WantedBy=multi-user.target
