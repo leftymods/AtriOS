@@ -447,7 +447,7 @@ function install_distribution_agnostic() {
 	run_host_command_logged rm -fv "${SDCARD}"/root/*.deb
 
 	# copy boot splash images
-	run_host_command_logged cp -v "${SRC}"/packages/blobs/splash/atrios-u-boot.bmp "${SDCARD}"/boot/boot.bmp
+	run_host_command_logged cp -v "${SRC}"/packages/blobs/splash/atrios-station-720p.bmp "${SDCARD}"/boot/boot.bmp
 
 	# execute $LINUXFAMILY-specific tweaks
 	if [[ $(type -t family_tweaks) == function ]]; then

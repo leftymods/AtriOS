@@ -11,7 +11,7 @@ setenv overlay_error "false"
 setenv rootdev "/dev/mmcblk1p1"
 setenv verbosity "1"
 setenv console "both"
-setenv bootlogo "false"
+setenv bootlogo "true"
 setenv rootfstype "ext4"
 setenv docker_optimizations "on"
 
@@ -142,6 +142,15 @@ else
 	setenv bootargs "root=${rootdev} rootwait rootfstype=${rootfstype} ${consoleargs} consoleblank=0 coherent_pool=2M loglevel=${verbosity} ubootpart=${partuuid} libata.force=noncq usb-storage.quirks=${usbstoragequirks} ${usbhidquirks} ${extraargs} ${extraboardargs}"
 	if test "${docker_optimizations}" = "on"; then setenv bootargs "${bootargs} cgroup_enable=memory"; fi
 	echo "Mainline bootargs: ${bootargs}"
+
+	# Boot splash: show logo on the active video output; with
+	# CONFIG_VIDEO_DT_SIMPLEFB the same scanout is handed to Linux
+	# through /chosen/simple-framebuffer (no flicker until DRM loads)
+	if test "${bootlogo}" = "true"; then
+		if load ${devtype} ${devnum} ${kernel_addr_r} ${prefix}boot.bmp; then
+			bmp display ${kernel_addr_r}
+		fi
+	fi
 
 	load ${devtype} ${devnum} ${ramdisk_addr_r} ${prefix}uInitrd
 	load ${devtype} ${devnum} ${kernel_addr_r} ${prefix}Image
