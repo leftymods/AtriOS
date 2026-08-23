@@ -345,7 +345,6 @@ static void probe_tty(void)
 	P("  hints: ttyAML0=console ttyAML1=BT(uart_A) ttyAML2=Zigbee(uart_AO_B)");
 }
 
-static struct gpiochip_info info_tmp;
 
 
 static long now_ms(void)
@@ -360,43 +359,12 @@ static long now_ms(void)
 
 #include <linux/gpio.h>
 
-#define WATCH_MAXLINES 128
-
-struct snap { unsigned int lines; uint8_t val[WATCH_MAXLINES]; };
-
-static int chip_watch(const char *path, struct snap *s)
-{
-	int fd = open(path, O_RDONLY);
-	struct gpiohandle_request req;
-	int i, ret;
-
-	if (fd < 0) return -1;
-	memset(&req, 0, sizeof(req));
-	if (ioctl(fd, GPIO_GET_CHIPINFO_IOCTL, &info_tmp) < 0) {
-		close(fd); return -1;
-	}
-	s->lines = info_tmp.lines > WATCH_MAXLINES ? WATCH_MAXLINES
-						   : info_tmp.lines;
-	/* request all lines as inputs (nonexclusive fails on claimed:
-	 * those are skipped silently — we only watch free lines) */
-	for (i = 0; i < (int)s->lines; i++)
-		req.lineoffsets[i] = i;
-	req.lines = s->lines;
-	req.flags = GPIOHANDLE_REQUEST_INPUT;
-	ret = ioctl(fd, GPIO_GET_LINEHANDLE_IOCTL, &req);
-	if (ret < 0) { close(fd); return -2; }	/* some lines claimed */
-
-	struct gpiohandle_data data;
-	memset(&data, 0, sizeof(data));
-	if (ioctl(req.fd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, &data) < 0) {
-		close(req.fd); close(fd); return -3;
-	}
-	for (i = 0; i < (int)s->lines; i++)
-		s->val[i] = data.values[i] & 1;
-	close(req.fd);
-	close(fd);
-	return 0;
-}
+struct lineh {
+	int fd;			/* linehandle fd, -1 = skip */
+	unsigned int offset;
+	uint8_t last;
+	char consumer[64];	/* from lineinfo, if claimed */
+};
 
 static void watch_gpio(int seconds)
 {
@@ -405,41 +373,104 @@ static void watch_gpio(int seconds)
 	char chips[16][64];
 	int nchips = 0;
 
-	WATCH_LOG("watching free GPIO lines for %ds — rotate the knob now!", seconds);
+	WATCH_LOG("watching all free GPIO lines for %ds — rotate the knob now!",
+		  seconds);
 	if (!d) return;
 	while ((de = readdir(d)) && nchips < 16) {
 		if (strncmp(de->d_name, "gpiochip", 8)) continue;
 		if (strlen(de->d_name) >= 56) continue;
-		snprintf(chips[nchips++], sizeof(chips[0]), "/dev/%s", de->d_name);
+		snprintf(chips[nchips++], sizeof(chips[0]), "/dev/%s",
+			 de->d_name);
 	}
 	closedir(d);
 
-	struct snap prev[16], cur[16];
-	int valid[16] = {0};
-	long end = now_ms() + seconds * 1000L;
+	/* open per-line handles once; lines claimed by the kernel are
+	 * reported (with consumer) but cannot be watched */
+	static struct lineh h[16][128];
+	static int nlines[16];
+	int cidx;
 
-	/* initial snapshots best-effort */
-	for (int i = 0; i < nchips; i++) {
-		if (chip_watch(chips[i], &prev[i]) == 0)
-			valid[i] = 1;
+	for (cidx = 0; cidx < nchips; cidx++) {
+		int fd = open(chips[cidx], O_RDONLY);
+		struct gpiochip_info ci;
+
+		nlines[cidx] = 0;
+		if (fd < 0) continue;
+		if (ioctl(fd, GPIO_GET_CHIPINFO_IOCTL, &ci)) { close(fd); continue; }
+		unsigned lim = ci.lines > 96 ? 96 : ci.lines;
+		for (unsigned o = 0; o < lim && nlines[cidx] < 96; o++) {
+			struct gpioline_info li;
+			memset(&li, 0, sizeof(li));
+			li.line_offset = o;
+			if (ioctl(fd, GPIO_GET_LINEINFO_IOCTL, &li))
+				continue;
+			struct lineh *L = &h[cidx][nlines[cidx]];
+			L->offset = o;
+			snprintf(L->consumer, sizeof(L->consumer), "%s",
+				 li.consumer[0] ? li.consumer : "-");
+			L->fd = -1;
+			if (li.flags & GPIOLINE_FLAG_KERNEL) {
+				L->last = 2;	/* unwatchable */
+				nlines[cidx]++;
+				continue;
+			}
+			struct gpiohandle_request rq;
+			memset(&rq, 0, sizeof(rq));
+			rq.lineoffsets[0] = o;
+			rq.lines = 1;
+			rq.flags = GPIOHANDLE_REQUEST_INPUT;
+			strcpy(rq.consumer_label, "atri-hwprobe");
+			if (ioctl(fd, GPIO_GET_LINEHANDLE_IOCTL, &rq) == 0) {
+				L->fd = rq.fd;
+				struct gpiohandle_data d0;
+				memset(&d0, 0, sizeof(d0));
+				if (ioctl(rq.fd,
+				    GPIOHANDLE_GET_LINE_VALUES_IOCTL, &d0) == 0)
+					L->last = d0.values[0] & 1;
+				else L->fd = -1;
+			} else {
+				L->last = 2;	/* claimed */
+			}
+			nlines[cidx]++;
+		}
+		close(fd);
+
+		/* контекст: занятые линии с владельцами */
+		for (int i = 0; i < nlines[cidx]; i++)
+			if (h[cidx][i].last == 2)
+				WATCH_LOG("  %s line %u claimed by '%s' "
+					  "(unwatchable)",
+					  chips[cidx], h[cidx][i].offset,
+					  h[cidx][i].consumer);
 	}
 
+	long end = now_ms() + seconds * 1000L;
 	while (now_ms() < end) {
-		usleep(120000);
-		for (int i = 0; i < nchips; i++) {
-			if (!valid[i]) continue;
-			if (chip_watch(chips[i], &cur[i]) != 0)
-				continue;
-			for (unsigned l = 0; l < cur[i].lines; l++) {
-				if (valid[i] && cur[i].val[l] != prev[i].val[l]) {
+		usleep(100000);
+		for (cidx = 0; cidx < nchips; cidx++) {
+			for (int i = 0; i < nlines[cidx]; i++) {
+				struct lineh *L = &h[cidx][i];
+				struct gpiohandle_data d0;
+				if (L->fd < 0) continue;
+				memset(&d0, 0, sizeof(d0));
+				if (ioctl(L->fd,
+				    GPIOHANDLE_GET_LINE_VALUES_IOCTL, &d0))
+					continue;
+				uint8_t v = d0.values[0] & 1;
+				if (v != L->last) {
 					WATCH_LOG("  %s line %u: %u -> %u",
-					    chips[i], l,
-					    prev[i].val[l], cur[i].val[l]);
+						  chips[cidx], L->offset,
+						  L->last, v);
+					L->last = v;
 				}
 			}
-			memcpy(&prev[i], &cur[i], sizeof(cur[i]));
 		}
 	}
+
+	for (cidx = 0; cidx < nchips; cidx++)
+		for (int i = 0; i < nlines[cidx]; i++)
+			if (h[cidx][i].fd >= 0)
+				close(h[cidx][i].fd);
 	WATCH_LOG("watch done");
 }
 
