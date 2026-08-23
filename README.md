@@ -1,5 +1,7 @@
 # AtriOS
 
+![AtriOS](docs/assets/atrios-logo.png)
+
 Offline replacement firmware for **Yandex Station 2** (AtriStation,
 Amlogic S905X3 / SM1). Replaces the cloud stack with local services:
 LED ring + SPI matrix screen, laser volume knob, Zigbee radio,
