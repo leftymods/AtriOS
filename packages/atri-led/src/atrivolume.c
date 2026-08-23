@@ -175,8 +175,12 @@ static void show_arc(int pct)
 
 static void arc_off(void)
 {
-	if (daemon_avail)
+	if (daemon_avail) {
+		/* clear the daemon-held arc completely; plain brightness
+		 * restore would leave the last arc lit forever */
+		daemon_send("off");
 		daemon_send("brightness 100");
+	}
 	if (led_inited)
 		atri_led_off(&led);
 }

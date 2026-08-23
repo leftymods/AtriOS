@@ -590,7 +590,7 @@ function custom_kernel_config__atristation_trim() {
 	# BT: non-RTL UART variants and USB/SDIO transports
 	opts_n+=("BT_6LOWPAN" "BT_ATH3K" "BT_BCM" "BT_HCIBCM203X" )
 	opts_n+=("BT_HCIBCM4377" "BT_HCIBFUSB" "BT_HCIBPA10X" "BT_HCIBTSDIO" )
-	opts_n+=("BT_HCIBTUSB" "BT_HCIRSI" "BT_HCIUART" "BT_HCIUART_NOKIA" )
+	opts_n+=("BT_HCIBTUSB" "BT_HCIRSI" "BT_HCIUART_NOKIA" )
 	opts_n+=("BT_HCIVHCI" "BT_INTEL" "BT_MRVL" "BT_MRVL_SDIO" )
 	opts_n+=("BT_MTK" "BT_MTKSDIO" "BT_MTKUART" "BT_NXPUART" )
 	opts_n+=("BT_QCA" "BT_VIRTIO" )
@@ -893,6 +893,10 @@ function custom_kernel_config__atristation_trim() {
 	opts_n+=("PWM_SUN4I" "ALTERA_MBOX" "PL320_MBOX" 	)
 	# GPU / video acceleration (S905X3: Mali-G31 MP2 Bifrost + VDEC + GE2D)
 	opts_y+=("DRM_PANFROST" "VIDEO_DEV" "VIDEO_MESON_VDEC" "VIDEO_MESON_GE2D" 	)
+
+	# Board essentials (BT UART transport + CPU freq scaling)
+	# CPU freq scaling: generic cpufreq-dt (CPUFREQ_DT=y in base) + OPPs from DTS
+	opts_y+=("BT_HCIUART" "BT_HCIUART_H4" "BT_HCIUART_RTL" "BT_HCIUART_3WIRE" 	)
 
 	# Top-level =y: PCI (no PCIe on S905X3), KVM, Android binder, ATA/MD/HWMON/VIDEO_DEV core
 	opts_n+=("ANDROID" "ANDROID_BINDERFS" "ANDROID_BINDER_IPC" "ATA" )
