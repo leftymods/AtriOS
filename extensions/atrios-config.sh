@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # AtriOS config extension placeholder.
 # The original armbian-config (now atrios-config) was fetched from an external repo.
 # Until a custom configng repo is ready, this extension does nothing.

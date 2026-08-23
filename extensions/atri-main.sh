@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2154,SC2153
 #
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2025-2026 leftymods
@@ -54,6 +55,7 @@ Section: utils
 Priority: optional
 Architecture: ${arch}
 Maintainer: leftymods <ggalab33@gmail.com>
+        # shellcheck disable=SC2154
 Depends: ${shlibs:Depends}${shlibs:Depends:+, }systemd
 Description: Offline userspace daemon for AtriStation
  atri-main drives the LED matrix framebuffer, RGB ring LEDs,
