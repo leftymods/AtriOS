@@ -23,6 +23,7 @@ for conventions.
 |---|---|
 | [`docs/atristation-bringup.md`](docs/atristation-bringup.md) | bring-up checklist per subsystem (screen/audio/wifi/bt/knob/zigbee) |
 | [`docs/atristation-hardware.md`](docs/atristation-hardware.md) | pin map decoded from stock DTB, anti-pop sequencing, open questions |
+| [`docs/branding.md`](docs/branding.md) | logo assets, regeneration commands, design rules |
 | `AGENTS.md` | repo conventions for agents/builders |
 
 ## Board tooling (installed to /usr/bin)

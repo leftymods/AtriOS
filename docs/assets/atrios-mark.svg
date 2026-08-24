@@ -1,0 +1,20 @@
+<svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer ring: explicit arc, gap centered at -55° -->
+  <path d="M 331.06 108.23 A 160 160 0 1 1 241.41 45.45" fill="none" stroke="url(#ring)" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Middle ring, clean and solid -->
+  <circle cx="200" cy="200" r="112" fill="none" stroke="url(#ring)" stroke-width="12"/>
+
+  <!-- Inner filled core, perfectly concentric -->
+  <circle cx="200" cy="200" r="58" fill="url(#ring)"/>
+
+  <!-- Accent dot at the gap's center angle -->
+  <circle cx="291.77" cy="68.94" r="11" fill="#F59E0B"/>
+</svg>
