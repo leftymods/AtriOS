@@ -1,5 +1,11 @@
 # Conventions for AI Agents
 
+## Session memory
+
+**Read [`docs/ai-memory.md`](docs/ai-memory.md) first** — distilled
+knowledge from all development sessions: decisions, stock-DTB pin
+decodes, gotchas, pending hardware items. Update it at session end.
+
 ## House rule
 
 - The maintainer always builds images themselves. Agents analyze and edit — do NOT run `./compile.sh build` or other full builds.
