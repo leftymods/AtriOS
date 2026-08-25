@@ -368,109 +368,36 @@ struct lineh {
 
 static void watch_gpio(int seconds)
 {
-	DIR *d = opendir("/dev");
-	struct dirent *de;
-	char chips[16][64];
-	int nchips = 0;
+	/* Passive watcher: diffs /sys/kernel/debug/gpio snapshots.
+	 * NEVER claim lines here - requesting pins with side effects
+	 * (BOOT straps, JTAG reconfig, clock enables) hard-hung the board. */
+	FILE *f;
+	static char prev[16384], cur[16384];
+	long n;
 
-	WATCH_LOG("watching all free GPIO lines for %ds — rotate the knob now!",
-		  seconds);
-	if (!d) return;
-	while ((de = readdir(d)) && nchips < 16) {
-		if (strncmp(de->d_name, "gpiochip", 8)) continue;
-		if (strlen(de->d_name) >= 56) continue;
-		snprintf(chips[nchips++], sizeof(chips[0]), "/dev/%s",
-			 de->d_name);
+	f = fopen("/sys/kernel/debug/gpio", "r");
+	if (!f) { WATCH_LOG("cannot read /sys/kernel/debug/gpio"); return; }
+	n = fread(prev, 1, sizeof(prev) - 1, f);
+	fclose(f);
+	prev[n > 0 ? n : 0] = '\0';
+
+	WATCH_LOG("passive GPIO watch %ds - press micmute / turn knob now!", seconds);
+
+	for (int t = 0; t < seconds * 4; t++) {
+		usleep(250000);
+		f = fopen("/sys/kernel/debug/gpio", "r");
+		if (!f) continue;
+		n = fread(cur, 1, sizeof(cur) - 1, f);
+		fclose(f);
+		cur[n > 0 ? n : 0] = '\0';
+		if (n <= 0 || !strcmp(cur, prev)) continue;
+		WATCH_LOG("---- GPIO state changed ----");
+		for (char *p = cur; *p; p++)
+			if ((p == cur || p[-1] == '\n') &&
+			    !strncmp(p, " gpio-", 6))
+				WATCH_LOG("%.*s", (int)strcspn(p, "\n"), p);
+		memcpy(prev, cur, (size_t)n + 1);
 	}
-	closedir(d);
-
-	/* open per-line handles once; lines claimed by the kernel are
-	 * reported (with consumer) but cannot be watched */
-	static struct lineh h[16][128];
-	static int nlines[16];
-	int cidx;
-
-	for (cidx = 0; cidx < nchips; cidx++) {
-		int fd = open(chips[cidx], O_RDONLY);
-		struct gpiochip_info ci;
-
-		nlines[cidx] = 0;
-		if (fd < 0) continue;
-		if (ioctl(fd, GPIO_GET_CHIPINFO_IOCTL, &ci)) { close(fd); continue; }
-		unsigned lim = ci.lines > 96 ? 96 : ci.lines;
-		for (unsigned o = 0; o < lim && nlines[cidx] < 96; o++) {
-			struct gpioline_info li;
-			memset(&li, 0, sizeof(li));
-			li.line_offset = o;
-			if (ioctl(fd, GPIO_GET_LINEINFO_IOCTL, &li))
-				continue;
-			struct lineh *L = &h[cidx][nlines[cidx]];
-			L->offset = o;
-			snprintf(L->consumer, sizeof(L->consumer), "%s",
-				 li.consumer[0] ? li.consumer : "-");
-			L->fd = -1;
-			if (li.flags & GPIOLINE_FLAG_KERNEL) {
-				L->last = 2;	/* unwatchable */
-				nlines[cidx]++;
-				continue;
-			}
-			struct gpiohandle_request rq;
-			memset(&rq, 0, sizeof(rq));
-			rq.lineoffsets[0] = o;
-			rq.lines = 1;
-			rq.flags = GPIOHANDLE_REQUEST_INPUT;
-			strcpy(rq.consumer_label, "atri-hwprobe");
-			if (ioctl(fd, GPIO_GET_LINEHANDLE_IOCTL, &rq) == 0) {
-				L->fd = rq.fd;
-				struct gpiohandle_data d0;
-				memset(&d0, 0, sizeof(d0));
-				if (ioctl(rq.fd,
-				    GPIOHANDLE_GET_LINE_VALUES_IOCTL, &d0) == 0)
-					L->last = d0.values[0] & 1;
-				else L->fd = -1;
-			} else {
-				L->last = 2;	/* claimed */
-			}
-			nlines[cidx]++;
-		}
-		close(fd);
-
-		/* контекст: занятые линии с владельцами */
-		for (int i = 0; i < nlines[cidx]; i++)
-			if (h[cidx][i].last == 2)
-				WATCH_LOG("  %s line %u claimed by '%s' "
-					  "(unwatchable)",
-					  chips[cidx], h[cidx][i].offset,
-					  h[cidx][i].consumer);
-	}
-
-	long end = now_ms() + seconds * 1000L;
-	while (now_ms() < end) {
-		usleep(100000);
-		for (cidx = 0; cidx < nchips; cidx++) {
-			for (int i = 0; i < nlines[cidx]; i++) {
-				struct lineh *L = &h[cidx][i];
-				struct gpiohandle_data d0;
-				if (L->fd < 0) continue;
-				memset(&d0, 0, sizeof(d0));
-				if (ioctl(L->fd,
-				    GPIOHANDLE_GET_LINE_VALUES_IOCTL, &d0))
-					continue;
-				uint8_t v = d0.values[0] & 1;
-				if (v != L->last) {
-					WATCH_LOG("  %s line %u: %u -> %u",
-						  chips[cidx], L->offset,
-						  L->last, v);
-					L->last = v;
-				}
-			}
-		}
-	}
-
-	for (cidx = 0; cidx < nchips; cidx++)
-		for (int i = 0; i < nlines[cidx]; i++)
-			if (h[cidx][i].fd >= 0)
-				close(h[cidx][i].fd);
 	WATCH_LOG("watch done");
 }
 

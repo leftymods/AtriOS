@@ -169,44 +169,56 @@ static int find_adc(char *path, size_t sz)
 
 static int adc_mode(void)
 {
-	char path[192];
+	char paths[8][160];
+	int nch = 0;
 
-	if (find_adc(path, sizeof(path)) < 0) {
-		fprintf(stderr,
-			"no IIO ADC channel found (is saradc enabled?).\n");
+	DIR *d = opendir("/sys/bus/iio/devices/iio:device0");
+	if (d) {
+		struct dirent *de;
+		while ((de = readdir(d)) && nch < 8) {
+			size_t L = strlen(de->d_name);
+			if (L > 24 || strncmp(de->d_name, "in_voltage", 10))
+				continue;
+			if (strcmp(de->d_name + L - 4, "_raw")) continue;
+			snprintf(paths[nch], sizeof(paths[0]),
+				 "/sys/bus/iio/devices/iio:device0/%s", de->d_name);
+			nch++;
+		}
+		closedir(d);
+	}
+	if (!nch) {
+		fprintf(stderr, "no IIO ADC channels found (saradc up?)\n");
 		return 1;
 	}
-	printf("== atri-knob adc: %s ==\n", path);
-	printf("Turn the volume knob. Ctrl+C to stop.\n\n");
 
-	/* SAR ADC on this board is noisy (~10 LSB jitter): smooth with
-	 * an EMA and only report moves outside a deadband */
-	const int deadband = 15;
-	int ema = -1, last_report = -1, total = 0;
+	printf("== atri-knob adc: %d channel(s), live view ==\n", nch);
+	printf("Turn the volume knob - watch which chN moves. Ctrl+C stop.\n\n");
+
+	int last[8];
+	for (int i = 0; i < nch; i++) last[i] = -1;
+
 	for (;;) {
-		char buf[32];
-		int fd = open(path, O_RDONLY);
-		if (fd < 0) { usleep(100000); continue; }
-		int n = read(fd, buf, sizeof(buf) - 1);
-		close(fd);
-		if (n <= 0) { usleep(10000); continue; }
-		buf[n] = 0;
-		int v = atoi(buf);
-		if (ema < 0) {
-			ema = v;
-			last_report = v;
-			continue;
+		char line[512];
+		int off = 0, moved = -1;
+		for (int i = 0; i < nch; i++) {
+			char buf[32];
+			int v = last[i];
+			int fd = open(paths[i], O_RDONLY);
+			if (fd >= 0) {
+				int n = read(fd, buf, sizeof(buf) - 1);
+				close(fd);
+				if (n > 0) { buf[n] = 0; v = atoi(buf); }
+			}
+			off += snprintf(line + off, sizeof(line) - off,
+				       "%sch%d%c%d", off ? "  " : "", i,
+				       last[i] >= 0 && abs(v - last[i]) >= 12
+					       ? '*' : '=', v);
+			if (last[i] >= 0 && abs(v - last[i]) >= 12) moved = i;
+			last[i] = v;
 		}
-		ema += (v - ema) / 4;          /* alpha = 0.25 */
-		int d = ema - last_report;
-		if (abs(d) >= deadband) {
-			total += d;
-			printf("\rraw %4d  [%c] step %+4d   total %+6d   ",
-			       ema, d > 0 ? '+' : '-', d, total);
-			fflush(stdout);
-			last_report = ema;
-		}
-		usleep(20000);
+		printf("\r%-70s%s", line, moved >= 0 ? "  <-- MOVE" : "");
+		fflush(stdout);
+		usleep(150000);
 	}
 	return 0;
 }

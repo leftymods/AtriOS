@@ -16,7 +16,7 @@ fi
 echo "AtriOS initramfs USB Gadget UMS: ums=yes found in /proc/cmdline, continuing..."
 sleep 1
 
-deviceinfo_name="AtriOS on %%BOARD%%"
+deviceinfo_name="AtriStation USB Mode"
 deviceinfo_manufacturer="AtriOS on %%BOARD%%"
 usb_idVendor="0x1d6b" # Linux Foundation
 usb_idProduct="0x104" # Multifunction Composite Gadget.
