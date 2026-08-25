@@ -179,7 +179,10 @@ static int adc_mode(void)
 	printf("== atri-knob adc: %s ==\n", path);
 	printf("Turn the volume knob. Ctrl+C to stop.\n\n");
 
-	int last = -1, total = 0;
+	/* SAR ADC on this board is noisy (~10 LSB jitter): smooth with
+	 * an EMA and only report moves outside a deadband */
+	const int deadband = 15;
+	int ema = -1, last_report = -1, total = 0;
 	for (;;) {
 		char buf[32];
 		int fd = open(path, O_RDONLY);
@@ -189,13 +192,20 @@ static int adc_mode(void)
 		if (n <= 0) { usleep(10000); continue; }
 		buf[n] = 0;
 		int v = atoi(buf);
-		if (last >= 0 && abs(v - last) > 2) {
-			total += v - last;
-			printf("\rraw %4d  [%c] %+3d   total %+6d   ",
-			       v, v > last ? '+' : '-', v - last, total);
-			fflush(stdout);
+		if (ema < 0) {
+			ema = v;
+			last_report = v;
+			continue;
 		}
-		last = v;
+		ema += (v - ema) / 4;          /* alpha = 0.25 */
+		int d = ema - last_report;
+		if (abs(d) >= deadband) {
+			total += d;
+			printf("\rraw %4d  [%c] step %+4d   total %+6d   ",
+			       ema, d > 0 ? '+' : '-', d, total);
+			fflush(stdout);
+			last_report = ema;
+		}
 		usleep(20000);
 	}
 	return 0;
