@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:4642995194f6ed7a6579f8e05aa7e0a65affff92"
+		declare -g KERNELBRANCH="commit:4dc4e742942dce46a6aeec047b1d87866f43c892"
 		declare -g DISABLE_KERNEL_PATCHES="no"
 		;;
 
@@ -88,6 +88,7 @@ function custom_kernel_config__enable_sy6045s() {
 	opts_y+=("CONFIG_SND_SOC_SY6045S")
 	opts_y+=("CONFIG_BT_HCIUART_3WIRE")
 	opts_y+=("CONFIG_BT_HCIUART_RTL")
+	opts_m+=("CONFIG_SND_SOC_DMIC")
 	opts_m+=("CONFIG_SND_SOC_ES7210")
 	opts_m+=("CONFIG_SND_SOC_ES8156")
 	opts_m+=("CONFIG_SND_SOC_TLV320ADC3XXX")
