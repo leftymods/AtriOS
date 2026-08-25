@@ -89,19 +89,19 @@ $(QCTL_BIN): src/quasar_led_ctl.c $(SCR_LIB) include/quasar_screen.h
 	$(CC) $(CFLAGS) -I./include $< -L. -lquasar_screen $(LDFLAGS) -o $@
 
 $(SCRTEST_BIN): src/atri_screen_test.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 $(HWPROBE_BIN): src/atri_hwprobe.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 $(ZGBIN): src/atri_zigbee.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 $(BTNS_BIN): src/atri_buttons.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 $(KNOB_BIN): src/atri_knob.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 test: $(TEST_BIN)
 	./$(TEST_BIN)
