@@ -53,10 +53,10 @@ static int input_mode(void)
 
 	if (find_dial_device(devname, sizeof(devname)) < 0) {
 		fprintf(stderr,
-			"no REL_DIAL input device found.\n"
-			"Is rotary-poll.service running? "
-			"(or use raw mode: atri-knob raw <chip> <offA> <offB>)\n");
-		return 1;
+			"no REL_DIAL input device found "
+			"(rotary-poll daemon not running, or no rotary hardware).\n"
+			"Falling back to ADC volume pot mode...\n\n");
+		return -1;
 	}
 
 	char path[112];
@@ -145,13 +145,75 @@ static int raw_mode(const char *label, int oa, int ob)
 	}
 }
 
+/* ---- SAR ADC volume pot (actual knob wiring on AtriStation) ---- */
+static int find_adc(char *path, size_t sz)
+{
+	DIR *d = opendir("/sys/bus/iio/devices");
+	struct dirent *de;
+	char p[256];
+
+	while ((de = readdir(d))) {
+		if (strncmp(de->d_name, "iio:device", 10)) continue;
+		snprintf(p, sizeof(p), "/sys/bus/iio/devices/%s/in_voltage0_raw",
+			 de->d_name);
+		int fd = open(p, O_RDONLY);
+		if (fd < 0) continue;
+		close(fd);
+		snprintf(path, sz, "%s", p);
+		closedir(d);
+		return 0;
+	}
+	closedir(d);
+	return -1;
+}
+
+static int adc_mode(void)
+{
+	char path[192];
+
+	if (find_adc(path, sizeof(path)) < 0) {
+		fprintf(stderr,
+			"no IIO ADC channel found (is saradc enabled?).\n");
+		return 1;
+	}
+	printf("== atri-knob adc: %s ==\n", path);
+	printf("Turn the volume knob. Ctrl+C to stop.\n\n");
+
+	int last = -1, total = 0;
+	for (;;) {
+		char buf[32];
+		int fd = open(path, O_RDONLY);
+		if (fd < 0) { usleep(100000); continue; }
+		int n = read(fd, buf, sizeof(buf) - 1);
+		close(fd);
+		if (n <= 0) { usleep(10000); continue; }
+		buf[n] = 0;
+		int v = atoi(buf);
+		if (last >= 0 && abs(v - last) > 2) {
+			total += v - last;
+			printf("\rraw %4d  [%c] %+3d   total %+6d   ",
+			       v, v > last ? '+' : '-', v - last, total);
+			fflush(stdout);
+		}
+		last = v;
+		usleep(20000);
+	}
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
+	if (argc > 1 && !strcmp(argv[1], "adc"))
+		return adc_mode();
 	if (argc > 1 && !strcmp(argv[1], "raw") && argc >= 5)
 		return raw_mode(argv[2], atoi(argv[3]), atoi(argv[4]));
 	if (argc > 1 && !strcmp(argv[1], "-h")) {
-		printf("usage: atri-knob [raw <chip_label> <off_a> <off_b>]\n");
+		printf("usage: atri-knob [adc | raw <chip_label> <off_a> <off_b>]\n");
+		printf("  default: REL_DIAL listener; auto-falls back to adc mode\n");
 		return 0;
 	}
-	return input_mode();
+	int rc = input_mode();
+	if (rc == -1)
+		rc = adc_mode();
+	return rc;
 }
