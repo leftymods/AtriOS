@@ -12,6 +12,9 @@
 
 static char *ring_multi_intensity[ATRI_LED_MAX_RINGS];
 static char *ring_brightness[ATRI_LED_MAX_RINGS];
+static char *ring_chan[ATRI_LED_MAX_RINGS][3];	/* rgbN-{red,green,blue} fallback */
+static int ring_rgb_mode[ATRI_LED_MAX_RINGS];
+static const char *atri_chan_names[3] = { "red", "green", "blue" };
 
 static int ring_found[ATRI_LED_MAX_RINGS];
 
@@ -78,6 +81,20 @@ static void load_ring_leds(void)
 			ring_brightness[r] = strdup(gl.gl_pathv[0]);
 		if (gr == 0)
 			globfree(&gl);
+
+		/* fallback: individual rgbN channels when multicolor groups absent */
+		if (!ring_found[r]) {
+			int ok = 1;
+			for (int c = 0; c < 3; c++) {
+				char pbuf[160];
+				snprintf(pbuf, sizeof(pbuf), LED_CLASS_PATH "/rgb%d-%s/brightness",
+					 r, atri_chan_names[c]);
+				if (access(pbuf, W_OK) != 0) { ok = 0; break; }
+				free(ring_chan[r][c]);
+				ring_chan[r][c] = strdup(pbuf);
+			}
+			if (ok) { ring_found[r] = 1; ring_rgb_mode[r] = 1; }
+		}
 	}
 }
 
@@ -161,6 +178,16 @@ int atri_led_apply(struct atri_led *led)
 	int err = 0;
 	for (int r = 0; r < led->ring_count; r++) {
 		if (!ring_found[r]) continue;
+		if (ring_rgb_mode[r]) {
+			for (int c = 0; c < 3; c++) {
+				char vbuf[16];
+				snprintf(vbuf, sizeof(vbuf), "%d",
+					 scale_chan(led, led->brightness[r][c]));
+				if (write_sysfs(ring_chan[r][c], vbuf) < 0)
+					err = -1;
+			}
+			continue;
+		}
 		if (ring_brightness[r])
 			write_sysfs_val(ring_brightness[r], 255);
 		if (ring_multi_intensity[r]) {

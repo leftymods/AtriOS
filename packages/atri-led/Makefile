@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS = -O2 -Wall -I./include -D_GNU_SOURCE
-LDFLAGS = -lm
+LDFLAGS = -static -lm
 ASOUND_LIBS = -lasound
 
 # LED ring library

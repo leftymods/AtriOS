@@ -178,7 +178,7 @@ function local_apt_deb_cache_prepare() {
 				sdcard_var_cache_apt_files_count=$(find "${sdcard_var_cache_apt_dir}" -type f | wc -l)
 				if [[ "${sdcard_var_cache_apt_files_count}" -gt 1 ]]; then # 1 cos of lockfile that might or not be there
 					display_alert "WARNING: SDCARD /var/cache/apt dir is not empty" "${when_used} :: ${sdcard_var_cache_apt_dir} (${sdcard_var_cache_apt_files_count} files)" "wrn"
-					run_host_command_logged ls -lahtR "${sdcard_var_cache_apt_dir}" # list the contents so we can try and identify what is polluting it
+					run_host_command_logged bash -c "ls -lahtR '${sdcard_var_cache_apt_dir}' || true" # list the contents so we can try and identify what is polluting it
 				fi
 			fi
 		fi
@@ -191,7 +191,7 @@ function local_apt_deb_cache_prepare() {
 				sdcard_var_lib_apt_lists_files_count=$(find "${sdcard_var_lib_apt_lists_dir}" -type f | wc -l)
 				if [[ "${sdcard_var_lib_apt_lists_files_count}" -gt 1 ]]; then # 1 cos of lockfile that might or not be there
 					display_alert "WARNING: SDCARD /var/lib/apt/lists dir is not empty" "${when_used} :: ${sdcard_var_lib_apt_lists_dir} (${sdcard_var_lib_apt_lists_files_count} files)" "wrn"
-					run_host_command_logged ls -lahtR "${sdcard_var_lib_apt_lists_dir}" # list the contents so we can try and identify what is polluting it
+					run_host_command_logged bash -c "ls -lahtR '${sdcard_var_lib_apt_lists_dir}' || true" # list the contents so we can try and identify what is polluting it
 				fi
 			fi
 		fi

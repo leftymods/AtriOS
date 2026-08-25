@@ -20,7 +20,7 @@ function apt_purge_unneeded_packages_and_clean_apt_caches() {
 	dir_var_cache_apt_file_count="$(find "${SDCARD}${dir_var_cache_apt}" -type f | wc -l)"
 	if [[ "${dir_var_cache_apt_file_count}" -gt 1 ]]; then # there is sometimes at least one file, the lock file
 		display_alert "SDCARD ${dir_var_cache_apt} is not empty" "${dir_var_cache_apt} :: ${dir_var_cache_apt_file_count} files" "wrn"
-		run_host_command_logged ls -lahtR "${SDCARD}${dir_var_cache_apt}"
+		run_host_command_logged bash -c "ls -lahtR '${SDCARD}${dir_var_cache_apt}' || true"
 		wait_for_disk_sync "after listing ${SDCARD}${dir_var_cache_apt}"
 	else
 		display_alert "SDCARD ${dir_var_cache_apt} is empty" "${dir_var_cache_apt} :: ${dir_var_cache_apt_file_count} files" "debug"
@@ -34,7 +34,7 @@ function apt_purge_unneeded_packages_and_clean_apt_caches() {
 	dir_var_lib_apt_lists_file_count="$(find "${SDCARD}${dir_var_lib_apt_lists}" -type f | wc -l)"
 	if [[ "${dir_var_lib_apt_lists_file_count}" -gt 1 ]]; then # there is sometimes at least one file, the lock file
 		display_alert "SDCARD ${dir_var_lib_apt_lists} is not empty" "${dir_var_lib_apt_lists} :: ${dir_var_lib_apt_lists_file_count} files" "wrn"
-		run_host_command_logged ls -lahtR "${SDCARD}${dir_var_lib_apt_lists}"
+		run_host_command_logged bash -c "ls -lahtR '${SDCARD}${dir_var_lib_apt_lists}' || true"
 		wait_for_disk_sync "after listing ${SDCARD}${dir_var_cache_apt}"
 	else
 		display_alert "SDCARD ${dir_var_lib_apt_lists} is empty" "${dir_var_lib_apt_lists} :: ${dir_var_lib_apt_lists_file_count} files" "debug"
