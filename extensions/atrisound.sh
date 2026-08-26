@@ -147,15 +147,22 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	mkdir -pv "${destination}"/etc/modules-load.d
 	echo "rotary_encoder" > "${destination}"/etc/modules-load.d/rotary.conf
 
-	# RTL8822CS Bluetooth firmware. WiFi blobs (rtw88/*) are already
-	# shipped by atrios-firmware package - do NOT duplicate them here
-	# or dpkg aborts with "trying to overwrite" during rootfs build.
-	# The vendor rtl8822cs_config.bin (115200/no-FC) REPLACES the
-	# distro one copied earlier by atrios-firmware.
-	run_host_command_logged mkdir -pv "${destination}"/lib/firmware/rtl_bt
-	cp "${SRC}"/packages/atri-fw/rtl8822cs_fw.bin     "${destination}"/lib/firmware/rtl_bt/
-	echo "Overwriting distro RTL8822CS BT config with board vendor one"
-	cp -f "${SRC}"/packages/atri-fw/rtl8822cs_config.bin "${destination}"/lib/firmware/rtl_bt/
+	# RTL8822CS BT: the firmware files belong to atrios-firmware pkg,
+	# so we must NOT ship them again (dpkg "trying to overwrite").
+	# We only REPLACE the config with the board-vendor one AFTER all
+	# packages are unpacked - this runs in chroot, but extension file
+	# hooks run at each build; safest is to stage replacement via a
+	# systemd-tmpfiles style drop or direct copy during image finalize.
+	# atrios-firmware owns /lib/firmware/rtl_bt/rtl8822cs_{fw,config}.bin
+
+run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
+	cp "${SRC}"/packages/atri-fw/rtl8822cs_config.bin "${destination}"/usr/share/atri-fw-vendor/
+
+	# Replace at boot via tmpfiles.d (runs before bluetooth.service)
+	mkdir -pv "${destination}"/etc/tmpfiles.d
+	cat <<- TMPF > "${destination}"/etc/tmpfiles.d/rtl8822cs-vendor-config.conf
+		C /lib/firmware/rtl_bt/rtl8822cs_config.bin 0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
+	TMPF
 
 	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
 	run_host_command_logged mkdir -pv "${destination}"/usr/libexec
