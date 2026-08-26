@@ -1,5 +1,9 @@
 # AtriOS AtriStation — накопленные знания (append-only)
 
+## 2026-08-26: Wi-Fi module = обычный RTL8822CS (NOT -VS)
+Owner initially said -VS, later corrected: standard RTL8822CS.
+The 0xc0=0x52 byte in vendor BT config is a Yandex-image quirk, not -VS specific.
+
 ## 2026-08-26: LED RING — РАБОТАЕТ, НЕ ТРОГАТЬ
 User explicitly said: "ledring работают и запомни это" — IS31FL3236 LED ring
 nodes (both i2c0 @0x3c and @0x3f) functioning on device. NEVER modify these.
