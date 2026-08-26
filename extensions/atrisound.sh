@@ -128,6 +128,25 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		}
 	UCM_VC
 
+	# ALSA default device -> ATRISTATION card (no UCM needed for
+	# plain aplay/speaker-test)
+	mkdir -pv "${destination}"/etc
+	cat <<- ASOUND_CONF > "${destination}"/etc/asound.conf
+		pcm.!default {
+		    type plug
+		    slave.pcm "hw:ATRISTATION,0"
+		}
+		ctl.!default {
+		    type hw
+		    card "ATRISTATION"
+		}
+	ASOUND_CONF
+
+	# rotary encoder driver has no modalias autoload path on this
+	# board; force-load it at boot
+	mkdir -pv "${destination}"/etc/modules-load.d
+	echo "rotary_encoder" > "${destination}"/etc/modules-load.d/rotary.conf
+
 	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
 	run_host_command_logged mkdir -pv "${destination}"/usr/libexec
 	cp "${SRC}/tools/audio/sy6045s-init.sh" "${destination}/usr/libexec/sy6045s-init.sh"
