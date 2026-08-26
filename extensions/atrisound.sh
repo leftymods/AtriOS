@@ -147,6 +147,14 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	mkdir -pv "${destination}"/etc/modules-load.d
 	echo "rotary_encoder" > "${destination}"/etc/modules-load.d/rotary.conf
 
+	# RTL8822CS: ship Bluetooth firmware + config and current WiFi fw.
+	# Source: upstream linux-firmware (git.kernel.org), 2026-08 snapshot.
+	run_host_command_logged mkdir -pv "${destination}"/lib/firmware/rtl_bt "${destination}"/lib/firmware/rtw88
+	cp "${SRC}"/packages/atri-fw/rtl8822cs_fw.bin     "${destination}"/lib/firmware/rtl_bt/
+	cp "${SRC}"/packages/atri-fw/rtl8822cs_config.bin "${destination}"/lib/firmware/rtl_bt/
+	cp "${SRC}"/packages/atri-fw/rtw8822c_fw.bin      "${destination}"/lib/firmware/rtw88/
+	cp "${SRC}"/packages/atri-fw/rtw8822c_wow_fw.bin  "${destination}"/lib/firmware/rtw88/
+
 	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
 	run_host_command_logged mkdir -pv "${destination}"/usr/libexec
 	cp "${SRC}/tools/audio/sy6045s-init.sh" "${destination}/usr/libexec/sy6045s-init.sh"
