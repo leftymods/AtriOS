@@ -194,8 +194,11 @@ static int adc_mode(void)
 	printf("== atri-knob adc: %d channel(s), live view ==\n", nch);
 	printf("Turn the volume knob - watch which chN moves. Ctrl+C stop.\n\n");
 
-	int last[8];
-	for (int i = 0; i < nch; i++) last[i] = -1;
+	/* Unconnected ADC inputs float noisily; judge every channel
+	 * against its BASELINE with a wide gate so only a real event
+	 * (button pulling the line toward a rail) gets flagged */
+	int base[8], last[8], maxd[8];
+	for (int i = 0; i < nch; i++) { base[i] = -1; last[i] = -1; maxd[i] = 0; }
 
 	for (;;) {
 		char line[512];
@@ -209,16 +212,19 @@ static int adc_mode(void)
 				close(fd);
 				if (n > 0) { buf[n] = 0; v = atoi(buf); }
 			}
+			if (base[i] < 0) { base[i] = v; last[i] = v; }
+			int d = abs(v - base[i]);
+			if (d > maxd[i]) maxd[i] = d;
 			off += snprintf(line + off, sizeof(line) - off,
-				       "%sch%d%c%d", off ? "  " : "", i,
-				       last[i] >= 0 && abs(v - last[i]) >= 12
-					       ? '*' : '=', v);
-			if (last[i] >= 0 && abs(v - last[i]) >= 12) moved = i;
+				       "%sch%d=%d(%+d)", off ? "  " : "", i,
+				       v, v - base[i]);
+			if (d >= 400) moved = i;
 			last[i] = v;
 		}
-		printf("\r%-70s%s", line, moved >= 0 ? "  <-- MOVE" : "");
+		printf("\r%-90s%s", line,
+		       moved >= 0 ? "  <-- BUTTON ON THIS CH" : "");
 		fflush(stdout);
-		usleep(150000);
+		usleep(120000);
 	}
 	return 0;
 }
