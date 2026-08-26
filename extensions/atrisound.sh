@@ -147,13 +147,15 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	mkdir -pv "${destination}"/etc/modules-load.d
 	echo "rotary_encoder" > "${destination}"/etc/modules-load.d/rotary.conf
 
-	# RTL8822CS: ship Bluetooth firmware + config and current WiFi fw.
-	# Source: upstream linux-firmware (git.kernel.org), 2026-08 snapshot.
-	run_host_command_logged mkdir -pv "${destination}"/lib/firmware/rtl_bt "${destination}"/lib/firmware/rtw88
+	# RTL8822CS Bluetooth firmware. WiFi blobs (rtw88/*) are already
+	# shipped by atrios-firmware package - do NOT duplicate them here
+	# or dpkg aborts with "trying to overwrite" during rootfs build.
+	# The vendor rtl8822cs_config.bin (115200/no-FC) REPLACES the
+	# distro one copied earlier by atrios-firmware.
+	run_host_command_logged mkdir -pv "${destination}"/lib/firmware/rtl_bt
 	cp "${SRC}"/packages/atri-fw/rtl8822cs_fw.bin     "${destination}"/lib/firmware/rtl_bt/
-	cp "${SRC}"/packages/atri-fw/rtl8822cs_config.bin "${destination}"/lib/firmware/rtl_bt/
-	cp "${SRC}"/packages/atri-fw/rtw8822c_fw.bin      "${destination}"/lib/firmware/rtw88/
-	cp "${SRC}"/packages/atri-fw/rtw8822c_wow_fw.bin  "${destination}"/lib/firmware/rtw88/
+	echo "Overwriting distro RTL8822CS BT config with board vendor one"
+	cp -f "${SRC}"/packages/atri-fw/rtl8822cs_config.bin "${destination}"/lib/firmware/rtl_bt/
 
 	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
 	run_host_command_logged mkdir -pv "${destination}"/usr/libexec
