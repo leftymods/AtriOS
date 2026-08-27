@@ -160,6 +160,8 @@ run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
 	# Vendor RTL8822CS WiFi firmware (from Yandex 88x2es.ko, ver 9.9.15)
 	cp "${SRC}"/packages/atri-fw/wifi_vendor_fw.bin   "${destination}"/usr/share/atri-fw-vendor/
 	cp "${SRC}"/packages/atri-fw/vendor_bt_fw.bin      "${destination}"/usr/share/atri-fw-vendor/
+	cp "${SRC}"/packages/atri-fw/vendor_led_screen_fpga.bin "${destination}"/usr/share/atri-fw-vendor/
+	cp "${SRC}"/packages/atri-fw/yandex-led-screen.bin       "${destination}"/usr/share/atri-fw-vendor/
 
 	# Replace at boot via tmpfiles.d (runs before bluetooth.service)
 	mkdir -pv "${destination}"/etc/tmpfiles.d
@@ -167,6 +169,9 @@ run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
 		C /lib/firmware/rtl_bt/rtl8822cs_config.bin 0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
 		C /lib/firmware/rtw88/rtw8822c_fw.bin       0644 root root - /usr/share/atri-fw-vendor/wifi_vendor_fw.bin
 		C /lib/firmware/rtl_bt/rtl8822cs_fw.bin     0644 root root - /usr/share/atri-fw-vendor/vendor_bt_fw.bin
+		C /lib/firmware/yandex_led_panel.bin            0644 root root - /usr/share/atri-fw-vendor/vendor_led_screen_fpga.bin
+		C /lib/firmware/yandex_led_screen_fpga.bin      0644 root root - /usr/share/atri-fw-vendor/vendor_led_screen_fpga.bin
+		C /lib/firmware/yandex-led-screen.bin           0644 root root - /usr/share/atri-fw-vendor/yandex-led-screen.bin
 	TMPF
 
 	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
