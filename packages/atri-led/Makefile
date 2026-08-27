@@ -29,13 +29,14 @@ HWPROBE_BIN = atri-hwprobe
 ZGBIN = atri-zigbee
 BTNS_BIN = atri-buttons
 KNOB_BIN = atri-knob
+ATRALS_BIN = atri-als
 TEST_BIN = test_atri_led
-ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(BTNS_BIN) $(KNOB_BIN)
+ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -102,6 +103,9 @@ $(BTNS_BIN): src/atri_buttons.c
 
 $(KNOB_BIN): src/atri_knob.c
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
+$(ATRALS_BIN): src/atri_als.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 test: $(TEST_BIN)
 	./$(TEST_BIN)
