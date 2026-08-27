@@ -56,3 +56,15 @@ nodes (both i2c0 @0x3c and @0x3f) functioning on device. NEVER modify these.
 4. sed on shared strings breaks DTB (duplicate props). Always anchor uniquely.
 5. speaker-test needs plughw or asound.conf default→hw:ATRISTATION,0.
 6. rtw88 backport patch 001-drivers-net-wireless-realtek-rtw88-upstream-wireless.patch rewrites efuse.c wholesale - any fork efuse edits need userpatch delivery.
+
+## 2026-08-27: Vendor module port status
+| Module | Status | Notes |
+|---|---|---|
+| ltr308als01 | PORTED full | mainline ltrf216a + atri-als (--auto-led) |
+| rotary-volume | PORTED full | gpio-keys-polled VOL+- kernel-native |
+| RTL8822CS wifi fw | PORTED blob | vendor 199K fw via tmpfiles overlay |
+| RTL8822CS BT fw+cfg | PORTED blob | 85B TLV config + 44K fw overlay |
+| zigbee-control | PORTED equiv | DTS GPIOs+uart_AO_B, atri-zigbee userspace |
+| quasar_pcba_ids | PORTED userspace | NEW atri-pcba JSON reader |
+| tb_detect | SKIP | PPMGR deinterlace TBFF; mainline drm deint covers hw path |
+| gowin_led_device | SUPERSEDED | our atri_led_panel works (user confirmed) |
