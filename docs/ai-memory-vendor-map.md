@@ -1,8 +1,27 @@
 # AtriOS AtriStation — накопленные знания (append-only)
 
-## 2026-08-26: Wi-Fi module = обычный RTL8822CS (NOT -VS)
-Owner initially said -VS, later corrected: standard RTL8822CS.
-The 0xc0=0x52 byte in vendor BT config is a Yandex-image quirk, not -VS specific.
+## 2026-08-27: 🔴 ГЛАВНОЕ: Wi-Fi чип = UNISOC UWE5621, НЕ RTL8822CS!
+Dissected original Android 9 firmware (yandex_1.99.img):
+- Vendor ships BOTH sprdwl_ng.ko+uwe5621_bsp_sdio.ko (SDIO WiFi) and
+  88x2es.ko (Realtek RTL8822ES) modules; UNISOC is primary for rev375f DTB
+- Firmware blob: /vendor/lib/firmware/wcnmodem.bin (832KB) — Marlin3E
+- RF calibration files extracted to repo/tools/vendor-wifi-configs/
+  * wifi_56630001_2ant.ini (WiFi calib, TPC LUT)
+  * bt_configure_rf_marlin3e_2.ini + bt_configure_pskey.ini
+- SDIO card mmc0:0001 that we saw = UWE5621 responding, NOT Realtek!
+- rtw88_8822cs efuse stuck because it probed wrong chip
+=> NEXT STEP: port UNISOC UWE5621 driver stack instead of fixing rtw88
+
+## 2026-08-27: Original firmware layout parsed successfully
+aml_upgrade_package format v0xDD471D39: records stride 0x240 bytes at 
+offset 0x280: [u64 idx][u64 off][u64 size][name@0x20]. Extracted parts:
+part_09=vendor ext4 512M, part_07=system ext4 1479M, part_06=boot w/ramdisk,
+part_02=dtbo container(AML_DT magic 0x1EABB7D7), boot images are
+"AMLSECU!"-encrypted (need Amlogic keys), but vendor partition mounts fine.
+
+## 2026-08-26: Wi-Fi module = обычный RTL8822CS (NOT -VS) [ОБНОВЛЕНО 08-27]
+Initial assumption WRONG - real chip is UWE5621 per 2026-08-27 entry.
+rtw88 patches stay in repo as dead-end, do not spend more time on them.
 
 ## 2026-08-26: LED RING — РАБОТАЕТ, НЕ ТРОГАТЬ
 User explicitly said: "ledring работают и запомни это" — IS31FL3236 LED ring
