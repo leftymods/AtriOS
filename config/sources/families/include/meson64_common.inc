@@ -44,7 +44,7 @@ case $BRANCH in
 	current)
 		declare -g KERNEL_MAJOR_MINOR="6.18"
 		declare -g KERNELSOURCE="https://github.com/leftymods/linux-6.18.y.git"
-		declare -g KERNELBRANCH="commit:f0a9afcc9d35ac7d4ecbf96645447d58b1a9c342"
+		declare -g KERNELBRANCH="commit:cfdc3d2458338dc31d5641288e1228a8e965dc07"
 		declare -g DISABLE_KERNEL_PATCHES="no"
 		;;
 
@@ -103,6 +103,11 @@ function custom_kernel_config__enable_sy6045s() {
 	opts_m+=("CONFIG_LTRF216A")
 	opts_m+=("CONFIG_SERIO_AMS_DELTA")
 	opts_m+=("CONFIG_GPIO_SYSFS")
+	opts_m+=("CONFIG_ZIGBEE_CONTROL")
+	opts_m+=("CONFIG_INPUT_ROTARY_VOLUME")
+	opts_m+=("CONFIG_LTR308ALS")
+	opts_m+=("CONFIG_LEDS_GOWIN_SCREEN")
+	opts_m+=("CONFIG_ATRI_PCBA_IDS")
 }
 
 # this helper function includes postprocess for s400 and its variants.
