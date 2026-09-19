@@ -285,10 +285,10 @@
 		};
 	};
 
-	zigbee-control {
+	zigbee_control: zigbee-control {
 		compatible = "yandex,zigbee-control";
-		reset-gpios = <&gpio GPIOX_17 GPIO_ACTIVE_HIGH>;
-		boot-gpios = <&gpio GPIOX_11 GPIO_ACTIVE_HIGH>;
+		zb-reset-gpios = <&gpio GPIOX_17 GPIO_ACTIVE_LOW>;
+		zb-boot-gpios = <&gpio GPIOX_11 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 
@@ -330,22 +330,17 @@
 
 	gpio-keys-polled {
 		compatible = "gpio-keys-polled";
-		poll-interval = <100>;
+		poll-interval = <50>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&button_pullup_pins>;
 		status = "okay";
 
-		button-function {
-			label = "function";
+		button-micmute {
+			label = "micmute";
 			gpios = <&gpio GPIOA_15 GPIO_ACTIVE_LOW>;
-			/* vendor DTB key_code 0x246 == KEY_HOMEPAGE */
-			linux,code = <KEY_HOMEPAGE>;
+			/* Key 248: KEY_MICMUTE / Yandex vendor MUTE */
+			linux,code = <KEY_MICMUTE>;
 		};
-
-		/* Vendor DTB wires the front key to gpio 0x16 0x40 ==
-		 * periphs index 64 == GPIOA_15. The red-latching mute
-		 * switch is analog-only hardware without an SoC line.
-		 * GPIOX_0 stays untouched: it is SDIO_D0 (WiFi). */
 	};
 
 	/* RGB LED ring - 24 multicolor groups */
