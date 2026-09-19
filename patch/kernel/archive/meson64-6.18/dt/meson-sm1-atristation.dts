@@ -1,0 +1,1323 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2024 AtriMods
+ * Author: Lefty <leftymods@gmail.com>
+ *
+ * AtriStation - Amlogic S905X3-based smart display board
+ * Features: HDMI, LED ring, microphone array, speakers, WiFi/BT
+ */
+
+/dts-v1/;
+
+#include "meson-sm1.dtsi"
+#include <dt-bindings/gpio/meson-g12a-gpio.h>
+#include <dt-bindings/input/linux-event-codes.h>
+#include <dt-bindings/leds/common.h>
+#include <dt-bindings/clock/axg-audio-clkc.h>
+#include <dt-bindings/sound/meson-g12a-toacodec.h>
+#include <dt-bindings/sound/meson-g12a-tohdmitx.h>
+
+/ {
+	compatible = "atristation,atristation", "amlogic,sm1";
+	model = "AtriStation";
+
+	aliases {
+		serial0 = &uart_AO;
+		serial1 = &uart_A;	/* Bluetooth -> ttyAML1 */
+		serial2 = &uart_AO_B;	/* Zigbee    -> ttyAML2 */
+		ethernet0 = &ethmac;
+		led-controller0 = &is31fl3236_3c;
+		led-controller1 = &is31fl3236_3f;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	vrtc_alarm: rtc {
+		compatible = "amlogic,aml_vrtc";
+		alarm_reg_addr = <0xff8000a8>;
+		timer_e_addr = <0xffd0f188>;
+		init_date = "2015/01/01";
+		status = "okay";
+	};
+
+	pcba_ids: pcba-ids {
+		compatible = "atri,pcba-ids";
+		eeproms = <&pcba_eeprom>;
+		eeprom-names = "mainboard";
+		status = "okay";
+	};
+
+	emmc_pwrseq: emmc-pwrseq {
+		compatible = "mmc-pwrseq-emmc";
+		reset-gpios = <&gpio BOOT_12 GPIO_ACTIVE_LOW>;
+	};
+
+	sdio_pwrseq: sdio-pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		/* Android DTB: wifi.power_on_pin = GPIOX_8 (0x48), asserted high */
+		reset-gpios = <&gpio GPIOX_8 GPIO_ACTIVE_HIGH>;
+		clocks = <&wifi32k>;
+		clock-names = "ext_clock";
+		post-power-on-delay-ms = <200>;
+	};
+
+	vddcpu: regulator-vddcpu {
+		compatible = "pwm-regulator";
+		pwms = <&pwm_AO_cd 1 1500 0>;
+		pwm-dutycycle-range = <100 0>;
+		regulator-name = "VDDCPU";
+		regulator-min-microvolt = <721000>;
+		regulator-max-microvolt = <1022000>;
+		regulator-boot-on;
+		regulator-always-on;
+		vin-supply = <&dc_in>;
+	};
+
+	/* GPU rail: all SM1 GPU OPPs run at 0.8V; board feeds MALI from an
+	 * always-on buck, so declare a fixed 0.8V supply for panfrost devfreq */
+	vddgpu: regulator-vddgpu {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDGPU";
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <800000>;
+		vin-supply = <&main_12v>;
+		regulator-always-on;
+	};
+
+	/* Station 2 has no microSD slot; GPIOAO_3 is the Zigbee UART RX
+	 * (stock DTB: uart_ao_b rx_b_3). Node kept disabled for reference. */
+	tflash_vdd: regulator-tflash_vdd {
+		compatible = "regulator-fixed";
+		regulator-name = "TFLASH_VDD";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		vin-supply = <&vcc_5v>;
+		gpio = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-boot-on;
+		status = "disabled";	};
+
+	flash_1v8: regulator-flash_1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "FLASH_1V8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vcc_3v3>;
+		regulator-boot-on;
+	};
+
+	main_12v: regulator-main_12v {
+		compatible = "regulator-fixed";
+		regulator-name = "MAIN_12V";
+		regulator-min-microvolt = <12000000>;
+		regulator-max-microvolt = <12000000>;
+		vin-supply = <&dc_in>;
+		regulator-boot-on;
+	};
+
+	vcc_5v: regulator-vcc_5v {
+		compatible = "regulator-fixed";
+		regulator-name = "VCC_5V";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		vin-supply = <&main_12v>;
+		regulator-boot-on;
+	};
+
+	vcc_1v8: regulator-vcc_1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "VCC_1V8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vcc_3v3>;
+		regulator-always-on;
+	};
+
+	vcc_3v3: regulator-vcc_3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "VCC_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		vin-supply = <&main_12v>;
+		regulator-boot-on;
+	};
+
+	vddao_3v3: regulator-vddao_3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDAO_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		vin-supply = <&main_12v>;
+		regulator-boot-on;
+	};
+
+	dc_in: regulator-dc_in {
+		compatible = "regulator-fixed";
+		regulator-name = "DC_IN";
+		regulator-min-microvolt = <12000000>;
+		regulator-max-microvolt = <12000000>;
+		regulator-boot-on;
+	};
+
+	sound {
+		compatible = "amlogic,axg-sound-card";
+		model = "ATRISTATION";
+		audio-aux-devs = <&tdmout_b>;
+		audio-widgets = "Headphone", "Headphones";
+		audio-routing =
+			"Headphones", "LOUT",
+			"Headphones", "ROUT",
+			"TDMOUT_B IN 0", "FRDDR_A OUT 0";
+
+		clocks = <&clkc CLKID_MPLL2>,
+			 <&clkc CLKID_MPLL0>;
+		assigned-clocks = <&clkc CLKID_MPLL2>,
+				  <&clkc CLKID_MPLL0>;
+		assigned-clock-rates = <294912000>,
+				       <270950400>;
+
+		dai-link-0 {
+			sound-dai = <&frddr_a>;
+		};
+
+		dai-link-3 {
+			sound-dai = <&tdmif_b>;
+			dai-format = "i2s";
+			bitclock-master = <&tdmif_b>;
+			frame-master = <&tdmif_b>;
+			dai-tdm-slot-tx-mask-0 = <1 1>;
+			mclk-fs = <256>;
+
+			codec-0 { sound-dai = <&tweeter_amp>; };
+			codec-1 { sound-dai = <&woofer_amp>; };
+			codec-2 { sound-dai = <&es8156>; };
+		};
+	};
+
+	/* PDM microphone array (4 channels) */
+	dmics: dmics {
+		compatible = "dmic-codec";
+		#sound-dai-cells = <0>;
+		num-channels = <4>;
+		wakeup-delay-ms = <50>;
+		sound-name-prefix = "DMIC";
+	};
+
+	/* HDMI connector */
+	hdmi-connector {
+		compatible = "hdmi-connector";
+		type = "a";
+
+		port {
+			hdmi_connector_in: endpoint {
+				remote-endpoint = <&hdmi_tx_tmds_out>;
+			};
+		};
+	};
+
+	/* USB power enable
+	 * No VBUS GPIO on this board (stock Yandex DTB wires none);
+	 * GPIOH_6 is the FPGA JTAG TDO line, do not claim it here. */
+	usb_pwr_en: regulator-usb-pwr-en {
+		compatible = "regulator-fixed";
+		regulator-name = "USB_PWR_EN";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		vin-supply = <&vcc_5v>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	/* 32.768kHz clock for WiFi */
+	wifi32k: wifi32k {
+		compatible = "pwm-clock";
+		#clock-cells = <0>;
+		clock-frequency = <32768>;
+		/* Android DTB: pwm@19000 ch0, period 30541 (~32.756 kHz), duty ~48% */
+		pwms = <&pwm_ef 0 30541 0>;
+	};
+
+	/* VDDAO 1.8V for SDIO/BT I/O */
+	vddio_ao1v8: regulator-vddio-ao1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDIO_AO1V8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&vddao_3v3>;
+		regulator-always-on;
+	};
+
+	/* SY6045S amplifier 20V supply enable.
+	 * Board owner confirmed: ampl_pwr = GPIOX_10 (the old AO_10 was
+	 * a misparse of the vendor dump). This frees GPIOAO_10 for the
+	 * volume knob phase B. sy6045s driver sequences it at step 4. */
+	amp_20v: regulator-20v-amp {
+		compatible = "regulator-fixed";
+		regulator-name = "20V_AMPL";
+		regulator-min-microvolt = <20000000>;
+		regulator-max-microvolt = <20000000>;
+		gpio = <&gpio GPIOX_10 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+	/* Volume knob per vendor: push A/B emitting KEY_VOLUMEUP/DOWN */
+	rotary-volume {
+		compatible = "gpio-keys-polled";
+		poll-interval = <20>;
+
+		vol-up {
+			label = "volume-up";
+			linux,code = <KEY_VOLUMEUP>;
+			gpios = <&gpio GPIOZ_10 GPIO_ACTIVE_LOW>;
+		};
+
+		vol-down {
+			label = "volume-down";
+			linux,code = <KEY_VOLUMEDOWN>;
+			gpios = <&gpio_ao GPIOAO_10 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	zigbee-control {
+		compatible = "yandex,zigbee-control";
+		reset-gpios = <&gpio GPIOX_17 GPIO_ACTIVE_HIGH>;
+		boot-gpios = <&gpio GPIOX_11 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+
+	/* Bluetooth: matches vendor DTB gpio_reset=0x16 0x53,
+	 * gpio_hostwake=0x16 0x55 */
+	bt-dev {
+		compatible = "amlogic,bt-dev";
+		dev_name = "bt-dev";
+		status = "okay";
+		gpio_reset = <&gpio 0x53 GPIO_ACTIVE_HIGH>;
+		gpio_hostwake = <&gpio 0x55 GPIO_ACTIVE_HIGH>;
+	};
+
+	/* WiFi: matches vendor DTB aml_wifi:
+	 * interrupt_pin=0x16 0x49, power_on_pin=0x16 0x48 */
+	wifi {
+		compatible = "amlogic,aml_wifi";
+		dev_name = "aml_wifi";
+		status = "okay";
+		interrupt_pin = <&gpio 0x49 GPIO_ACTIVE_LOW>;
+		irq_trigger_type = "GPIO_IRQ_LOW";
+		power_on_pin = <&gpio 0x48 GPIO_ACTIVE_HIGH>;
+		pwm_config = <&wifi_pwm_conf>;
+	};
+
+	/* WiFi/BT 32.768kHz PWM config as in vendor DTB */
+	wifi_pwm_conf: wifi-pwm-conf {
+		pwm_channel1_conf {
+			pwms = <&pwm_ef 0 0x774d 0x00>;
+			duty-cycle = <0x3ba6>;
+			times = <0x0a>;
+		};
+		pwm_channel2_conf {
+			pwms = <&pwm_ef 2 0x7724 0x00>;
+			duty-cycle = <0x3b92>;
+			times = <0x0c>;
+		};
+	};
+
+	gpio-keys-polled {
+		compatible = "gpio-keys-polled";
+		poll-interval = <100>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&button_pullup_pins>;
+		status = "okay";
+
+		button-function {
+			label = "function";
+			gpios = <&gpio GPIOA_15 GPIO_ACTIVE_LOW>;
+			/* vendor DTB key_code 0x246 == KEY_HOMEPAGE */
+			linux,code = <KEY_HOMEPAGE>;
+		};
+
+		/* Vendor DTB wires the front key to gpio 0x16 0x40 ==
+		 * periphs index 64 == GPIOA_15. The red-latching mute
+		 * switch is analog-only hardware without an SoC line.
+		 * GPIOX_0 stays untouched: it is SDIO_D0 (WiFi). */
+	};
+
+	/* RGB LED ring - 24 multicolor groups */
+	ring0: rgb0 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring0";
+		leds = <&led_3c_blue0>, <&led_3c_green0>, <&led_3c_red0>;
+	};
+	ring1: rgb1 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring1";
+		leds = <&led_3c_blue1>, <&led_3c_green1>, <&led_3c_red1>;
+	};
+	ring2: rgb2 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring2";
+		leds = <&led_3c_blue2>, <&led_3c_green2>, <&led_3c_red2>;
+	};
+	ring3: rgb3 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring3";
+		leds = <&led_3c_blue3>, <&led_3c_green3>, <&led_3c_red3>;
+	};
+	ring4: rgb4 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring4";
+		leds = <&led_3c_blue4>, <&led_3c_green4>, <&led_3c_red4>;
+	};
+	ring5: rgb5 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring5";
+		leds = <&led_3c_blue5>, <&led_3c_green5>, <&led_3c_red5>;
+	};
+	ring6: rgb6 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring6";
+		leds = <&led_3c_blue6>, <&led_3c_green6>, <&led_3c_red6>;
+	};
+	ring7: rgb7 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring7";
+		leds = <&led_3c_blue7>, <&led_3c_green7>, <&led_3c_red7>;
+	};
+	ring8: rgb8 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring8";
+		leds = <&led_3c_blue8>, <&led_3c_green8>, <&led_3c_red8>;
+	};
+	ring9: rgb9 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring9";
+		leds = <&led_3c_blue9>, <&led_3c_green9>, <&led_3c_red9>;
+	};
+	ring10: rgb10 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring10";
+		leds = <&led_3c_blue10>, <&led_3c_green10>, <&led_3c_red10>;
+	};
+	ring11: rgb11 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring11";
+		leds = <&led_3c_blue11>, <&led_3c_green11>, <&led_3c_red11>;
+	};
+	ring12: rgb12 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring12";
+		leds = <&led_3f_blue12>, <&led_3f_green12>, <&led_3f_red12>;
+	};
+	ring13: rgb13 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring13";
+		leds = <&led_3f_blue13>, <&led_3f_green13>, <&led_3f_red13>;
+	};
+	ring14: rgb14 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring14";
+		leds = <&led_3f_blue14>, <&led_3f_green14>, <&led_3f_red14>;
+	};
+	ring15: rgb15 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring15";
+		leds = <&led_3f_blue15>, <&led_3f_green15>, <&led_3f_red15>;
+	};
+	ring16: rgb16 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring16";
+		leds = <&led_3f_blue16>, <&led_3f_green16>, <&led_3f_red16>;
+	};
+	ring17: rgb17 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring17";
+		leds = <&led_3f_blue17>, <&led_3f_green17>, <&led_3f_red17>;
+	};
+	ring18: rgb18 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring18";
+		leds = <&led_3f_blue18>, <&led_3f_green18>, <&led_3f_red18>;
+	};
+	ring19: rgb19 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring19";
+		leds = <&led_3f_blue19>, <&led_3f_green19>, <&led_3f_red19>;
+	};
+	ring20: rgb20 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring20";
+		leds = <&led_3f_blue20>, <&led_3f_green20>, <&led_3f_red20>;
+	};
+	ring21: rgb21 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring21";
+		leds = <&led_3f_blue21>, <&led_3f_green21>, <&led_3f_red21>;
+	};
+	ring22: rgb22 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring22";
+		leds = <&led_3f_blue22>, <&led_3f_green22>, <&led_3f_red22>;
+	};
+	ring23: rgb23 {
+		compatible = "leds-group-multicolor";
+		color = <LED_COLOR_ID_RGB>;
+		label = "ring23";
+		leds = <&led_3f_blue23>, <&led_3f_green23>, <&led_3f_red23>;
+	};
+};
+
+&arb {
+	status = "okay";
+};
+
+&cec_AO {
+	pinctrl-0 = <&cec_ao_a_h_pins>;
+	pinctrl-names = "default";
+	status = "disabled";
+	hdmi-phandle = <&hdmi_tx>;
+};
+
+&cecb_AO {
+	pinctrl-0 = <&cec_ao_b_h_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+	hdmi-phandle = <&hdmi_tx>;
+};
+
+&clk_msr {
+	status = "okay";
+};
+
+&clkc_audio {
+	status = "okay";
+};
+
+&cpu0 {
+	cpu-supply = <&vddcpu>;
+};
+
+&cpu1 {
+	cpu-supply = <&vddcpu>;
+};
+
+&cpu2 {
+	cpu-supply = <&vddcpu>;
+};
+
+&cpu3 {
+	cpu-supply = <&vddcpu>;
+};
+
+&ethmac {
+	status = "okay";
+	pinctrl-0 = <&eth_pins>, <&eth_rgmii_pins>;
+	pinctrl-names = "default";
+	phy-mode = "rgmii";
+	phy-handle = <&external_phy>;
+	amlogic,tx-delay-ns = <2>;
+};
+
+&ext_mdio {
+	external_phy: ethernet-phy@0 {
+		reg = <0>;
+		max-speed = <1000>;
+	};
+};
+
+&frddr_a {
+	status = "okay";
+};
+
+&frddr_b {
+	status = "okay";
+};
+
+&frddr_c {
+	status = "okay";
+};
+
+&hdmi_tx {
+	status = "okay";
+	pinctrl-0 = <&hdmitx_hpd_pins>, <&hdmitx_ddc_pins>;
+	pinctrl-names = "default";
+	hdmi-supply = <&vcc_5v>;
+};
+
+&hdmi_tx_tmds_port {
+	hdmi_tx_tmds_out: endpoint {
+		remote-endpoint = <&hdmi_connector_in>;
+	};
+};
+
+&ir {
+	status = "okay";
+	pinctrl-0 = <&remote_input_ao_pins>;
+	pinctrl-names = "default";
+};
+
+&mali {
+	mali-supply = <&vddgpu>;
+};
+
+&pwm_AO_ab {
+	pinctrl-0 = <&pwm_ao_a_pins>;
+	pinctrl-names = "default";
+};
+
+&pwm_AO_cd {
+	pinctrl-0 = <&pwm_ao_d_e_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&saradc {
+	status = "okay";
+	vref-supply = <&vddio_ao1v8>;
+};
+
+/* SD card - disabled, no SD slot on AtriStation */
+&sd_emmc_b {
+	status = "disabled";
+};
+
+/* eMMC */
+&sd_emmc_c {
+	status = "okay";
+	pinctrl-0 = <&emmc_ctrl_pins>, <&emmc_data_8b_pins>, <&emmc_ds_pins>;
+	pinctrl-1 = <&emmc_clk_gate_pins>;
+	pinctrl-names = "default", "clk-gate";
+	bus-width = <8>;
+	cap-mmc-highspeed;
+	mmc-ddr-1_8v;
+	mmc-hs200-1_8v;
+	max-frequency = <200000000>;
+	disable-wp;
+	mmc-pwrseq = <&emmc_pwrseq>;
+	vmmc-supply = <&vcc_3v3>;
+	vqmmc-supply = <&flash_1v8>;
+};
+
+&tdmif_a {
+	status = "okay";
+	pinctrl-0 = <&tdm_a_dout0_pins>, <&tdm_a_din0_pins>,
+		    <&tdm_a_fs_pins>, <&tdm_a_sclk_pins>;
+	pinctrl-names = "default";
+};
+
+&tdmif_b {
+	status = "okay";
+	pinctrl-0 = <&tdm_ao_b_dout2_pins>, <&tdm_ao_b_din0_pins>,
+		    <&tdm_ao_b_fs_pins>, <&tdm_ao_b_sclk_pins>,
+		    <&mclk0_ao_pins>;
+	pinctrl-names = "default";
+};
+
+&tdmout_a {
+	status = "okay";
+};
+
+&tdmout_b {
+	status = "okay";
+};
+
+&tdmin_b {
+	status = "okay";
+};
+
+&toddr_a {
+	status = "okay";
+};
+
+&toddr_b {
+	status = "okay";
+};
+
+&toddr_c {
+	status = "okay";
+};
+
+&pdm {
+	status = "okay";
+	pinctrl-0 = <&pdm_dclk_c_pins>, <&pdm_din0_c_pins>,
+		    <&pdm_din1_c_pins>, <&pdm_din2_c_pins>,
+		    <&pdm_din3_c_pins>;
+	pinctrl-names = "default";
+};
+
+&toacodec {
+	status = "okay";
+};
+
+&tohdmitx {
+	status = "okay";
+};
+
+&uart_AO {
+	status = "okay";
+	pinctrl-0 = <&uart_ao_a_pins>;
+	pinctrl-names = "default";
+};
+
+&usb {
+	status = "okay";
+	vbus-supply = <&usb_pwr_en>;
+};
+
+&usb2_phy0 {
+	phy-supply = <&vcc_5v>;
+};
+
+/* I2C0 - LED ring, light sensor, EEPROM (GPIOZ pins to avoid SD card conflict) */
+&i2c0 {
+	status = "okay";
+	pinctrl-0 = <&i2c0_sda_c_pins>, <&i2c0_sck_c_pins>;
+	pinctrl-names = "default";
+	clock-frequency = <400000>;
+
+	is31fl3236_3c: led-controller@3c {
+		compatible = "issi,is31fl3236";
+		reg = <0x3c>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "okay";
+		led_3c_red0: led@1 {
+			reg = <1>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb0-blue";
+		};
+		led_3c_green0: led@2 {
+			reg = <2>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb0-green";
+		};
+		led_3c_blue0: led@3 {
+			reg = <3>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb0-red";
+		};
+		led_3c_red1: led@4 {
+			reg = <4>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb1-blue";
+		};
+		led_3c_green1: led@5 {
+			reg = <5>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb1-green";
+		};
+		led_3c_blue1: led@6 {
+			reg = <6>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb1-red";
+		};
+		led_3c_red2: led@7 {
+			reg = <7>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb2-blue";
+		};
+		led_3c_green2: led@8 {
+			reg = <8>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb2-green";
+		};
+		led_3c_blue2: led@9 {
+			reg = <9>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb2-red";
+		};
+		led_3c_red3: led@10 {
+			reg = <10>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb3-blue";
+		};
+		led_3c_green3: led@11 {
+			reg = <11>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb3-green";
+		};
+		led_3c_blue3: led@12 {
+			reg = <12>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb3-red";
+		};
+		led_3c_red4: led@13 {
+			reg = <13>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb4-blue";
+		};
+		led_3c_green4: led@14 {
+			reg = <14>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb4-green";
+		};
+		led_3c_blue4: led@15 {
+			reg = <15>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb4-red";
+		};
+		led_3c_red5: led@16 {
+			reg = <16>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb5-blue";
+		};
+		led_3c_green5: led@17 {
+			reg = <17>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb5-green";
+		};
+		led_3c_blue5: led@18 {
+			reg = <18>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb5-red";
+		};
+		led_3c_red6: led@19 {
+			reg = <19>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb6-blue";
+		};
+		led_3c_green6: led@20 {
+			reg = <20>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb6-green";
+		};
+		led_3c_blue6: led@21 {
+			reg = <21>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb6-red";
+		};
+		led_3c_red7: led@22 {
+			reg = <22>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb7-blue";
+		};
+		led_3c_green7: led@23 {
+			reg = <23>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb7-green";
+		};
+		led_3c_blue7: led@24 {
+			reg = <24>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb7-red";
+		};
+		led_3c_red8: led@25 {
+			reg = <25>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb8-blue";
+		};
+		led_3c_green8: led@26 {
+			reg = <26>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb8-green";
+		};
+		led_3c_blue8: led@27 {
+			reg = <27>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb8-red";
+		};
+		led_3c_red9: led@28 {
+			reg = <28>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb9-blue";
+		};
+		led_3c_green9: led@29 {
+			reg = <29>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb9-green";
+		};
+		led_3c_blue9: led@30 {
+			reg = <30>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb9-red";
+		};
+		led_3c_red10: led@31 {
+			reg = <31>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb10-blue";
+		};
+		led_3c_green10: led@32 {
+			reg = <32>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb10-green";
+		};
+		led_3c_blue10: led@33 {
+			reg = <33>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb10-red";
+		};
+		led_3c_red11: led@34 {
+			reg = <34>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb11-blue";
+		};
+		led_3c_green11: led@35 {
+			reg = <35>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb11-green";
+		};
+		led_3c_blue11: led@36 {
+			reg = <36>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb11-red";
+		};
+	};
+
+	is31fl3236_3f: led-controller@3f {
+		compatible = "issi,is31fl3236";
+		reg = <0x3f>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "okay";
+		led_3f_red12: led@1 {
+			reg = <1>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb12-blue";
+		};
+		led_3f_green12: led@2 {
+			reg = <2>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb12-green";
+		};
+		led_3f_blue12: led@3 {
+			reg = <3>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb12-red";
+		};
+		led_3f_red13: led@4 {
+			reg = <4>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb13-blue";
+		};
+		led_3f_green13: led@5 {
+			reg = <5>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb13-green";
+		};
+		led_3f_blue13: led@6 {
+			reg = <6>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb13-red";
+		};
+		led_3f_red14: led@7 {
+			reg = <7>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb14-blue";
+		};
+		led_3f_green14: led@8 {
+			reg = <8>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb14-green";
+		};
+		led_3f_blue14: led@9 {
+			reg = <9>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb14-red";
+		};
+		led_3f_red15: led@10 {
+			reg = <10>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb15-blue";
+		};
+		led_3f_green15: led@11 {
+			reg = <11>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb15-green";
+		};
+		led_3f_blue15: led@12 {
+			reg = <12>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb15-red";
+		};
+		led_3f_red16: led@13 {
+			reg = <13>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb16-blue";
+		};
+		led_3f_green16: led@14 {
+			reg = <14>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb16-green";
+		};
+		led_3f_blue16: led@15 {
+			reg = <15>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb16-red";
+		};
+		led_3f_red17: led@16 {
+			reg = <16>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb17-blue";
+		};
+		led_3f_green17: led@17 {
+			reg = <17>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb17-green";
+		};
+		led_3f_blue17: led@18 {
+			reg = <18>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb17-red";
+		};
+		led_3f_red18: led@19 {
+			reg = <19>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb18-blue";
+		};
+		led_3f_green18: led@20 {
+			reg = <20>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb18-green";
+		};
+		led_3f_blue18: led@21 {
+			reg = <21>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb18-red";
+		};
+		led_3f_red19: led@22 {
+			reg = <22>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb19-blue";
+		};
+		led_3f_green19: led@23 {
+			reg = <23>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb19-green";
+		};
+		led_3f_blue19: led@24 {
+			reg = <24>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb19-red";
+		};
+		led_3f_red20: led@25 {
+			reg = <25>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb20-blue";
+		};
+		led_3f_green20: led@26 {
+			reg = <26>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb20-green";
+		};
+		led_3f_blue20: led@27 {
+			reg = <27>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb20-red";
+		};
+		led_3f_red21: led@28 {
+			reg = <28>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb21-blue";
+		};
+		led_3f_green21: led@29 {
+			reg = <29>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb21-green";
+		};
+		led_3f_blue21: led@30 {
+			reg = <30>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb21-red";
+		};
+		led_3f_red22: led@31 {
+			reg = <31>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb22-blue";
+		};
+		led_3f_green22: led@32 {
+			reg = <32>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb22-green";
+		};
+		led_3f_blue22: led@33 {
+			reg = <33>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb22-red";
+		};
+		led_3f_red23: led@34 {
+			reg = <34>;
+			color = <LED_COLOR_ID_BLUE>;
+			label = "rgb23-blue";
+		};
+		led_3f_green23: led@35 {
+			reg = <35>;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "rgb23-green";
+		};
+		led_3f_blue23: led@36 {
+			reg = <36>;
+			color = <LED_COLOR_ID_RED>;
+			label = "rgb23-red";
+		};
+	};
+
+	pcba_eeprom: eeprom@50 {
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+		vcc-supply = <&vcc_3v3>;
+		status = "okay";
+	};
+
+	als@53 {
+		compatible = "liteon,ltrf216a";
+		reg = <0x53>;
+		status = "okay";
+	};
+};
+
+/* SPI1 - Quasar LED screen.
+ * Bus pins (spicc1_pins -> GPIOH_4/5/6) are muxed by the led_panel child:
+ * it owns the default/jtag pinctrl states for FPGA JTAG bit-banging.
+ * Duplicating spicc1_pins on the parent makes pinctrl refuse the child's
+ * request ("pin GPIOH_4 already requested by ffd15000.spi") and the panel
+ * never binds. */
+&spicc1 {
+	status = "okay";
+	pinctrl-names = "default";
+	num-cs = <1>;
+	cs-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_LOW>;
+
+	led_panel: led-panel@0 {
+		compatible = "atri,led-panel", "ya,led-panel";
+		reg = <0>;
+		spi-max-frequency = <4000000>;
+		max-brightness = <200>;
+		pinctrl-names = "default", "jtag";
+		pinctrl-0 = <&spicc1_pins>;
+		pinctrl-1 = <&led_panel_jtag_pins>;
+		reset-gpios = <&gpio GPIOX_9 GPIO_ACTIVE_LOW>;
+		/* GPIOH output register, bit 8 = GPIOH_8 (JTAG TCK) */
+		jtag_tck_desc = <0xff634468 0x08>;
+		jtag_reconfig-gpios = <&gpio BOOT_0 GPIO_ACTIVE_LOW>;
+		jtag_sel-gpios = <&gpio_ao GPIOE_2 GPIO_ACTIVE_HIGH>;
+		jtag_tck-gpios = <&gpio GPIOH_8 GPIO_ACTIVE_HIGH>;
+		jtag_tdi-gpios = <&gpio GPIOH_5 GPIO_ACTIVE_HIGH>;
+		jtag_tdo-gpios = <&gpio GPIOH_6 GPIO_ACTIVE_HIGH>;
+		jtag_tms-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+};
+
+/*
+ * FPGA JTAG bit-bang shares the spicc1 pins. The meson pinctrl driver
+ * does not re-mux pins on gpio_request, so switching between SPI and
+ * JTAG requires explicit pinctrl states on the led_panel node.
+ */
+&periphs_pinctrl {
+	led_panel_jtag_pins: led-panel-jtag {
+		mux {
+			groups = "GPIOH_5", "GPIOH_6", "GPIOH_7", "GPIOH_8";
+			function = "gpio_periphs";
+			bias-disable;
+		};
+	};
+
+	/* Buttons idle high; without internal pull-up the micmute line
+	 * floats and reports a stuck key */
+	button_pullup_pins: button-pullup {
+		mux {
+			groups = "GPIOA_15";
+			function = "gpio_periphs";
+			bias-pull-up;
+		};
+	};
+};
+
+/* I2C2 on Z-pins (GPIOZ_14/15) - SY6045S amps, ES7210 ADC, IS31FL3733 LED */
+&i2c2 {
+	status = "okay";
+	pinctrl-0 = <&i2c2_sda_z_pins>, <&i2c2_sck_z_pins>;
+	pinctrl-names = "default";
+	clock-frequency = <300000>;
+
+	es8156: es8156@8 {
+		compatible = "everest,es8156";
+		#sound-dai-cells = <0>;
+		reg = <0x08>;
+		clocks = <&clkc_audio AUD_CLKID_MST_B_MCLK>;
+		clock-names = "mclk";
+		status = "okay";
+	};
+
+	tweeter_amp: sy6045s@2a {
+		compatible = "silergy,sy6045s";
+		reg = <0x2a>;
+		#sound-dai-cells = <0>;
+		sound-name-prefix = "Tweeters";
+		vddio-supply = <&vcc_3v3>;
+		pvdd-supply = <&amp_20v>;
+		firmware = "sy6045s-tweeters-settings.txt";
+		/* reg must be <= SY6045S_MAX_REGISTER (0xb0): the old
+		 * <0xff 0x06> pair came from a misread vendor dump (ff was
+		 * its EOF marker, not a register) and NAKed the whole probe */
+		restore-regs = <0x06 0x08>;
+		status = "okay";
+	};
+
+	woofer_amp: sy6045s@2b {
+		compatible = "silergy,sy6045s";
+		reg = <0x2b>;
+		#sound-dai-cells = <0>;
+		sound-name-prefix = "Woofer";
+		pbtl-mode;
+		vddio-supply = <&vcc_3v3>;
+		pvdd-supply = <&amp_20v>;
+		firmware = "sy6045s-woofer-settings.txt";
+		/* reg must be <= SY6045S_MAX_REGISTER (0xb0): the old
+		 * <0xff 0x06> pair came from a misread vendor dump (ff was
+		 * its EOF marker, not a register) and NAKed the whole probe */
+		restore-regs = <0x06 0x08>;
+		status = "okay";
+	};
+
+	feedback_adc: es7210@40 {
+		compatible = "everest,es7210_2ch";
+		reg = <0x40>;
+		#sound-dai-cells = <0>;
+		clocks = <&clkc_audio AUD_CLKID_MST_B_MCLK>;
+		clock-names = "mclk";
+		status = "okay";
+	};
+
+	rtc: pcf8563@51 {
+		compatible = "nxp,pcf8563";
+		reg = <0x51>;
+		status = "okay";
+	};
+
+	ltr308: light-sensor@53 {
+		compatible = "liteon,ltr308als01", "liteon,ltr308";
+		reg = <0x53>;
+		status = "okay";
+	};
+};
+
+/* I2C3 - not used on this board (no TAS5707/AD82584F) */
+&i2c3 {
+	status = "disabled";
+};
+
+&gpio_ao {
+};
+
+/* WiFi RTL8822CS SDIO (matches vendor caps) */
+&sd_emmc_a {
+	status = "okay";
+	pinctrl-0 = <&sdio_pins>;
+	pinctrl-1 = <&sdio_clk_gate_pins>;
+	pinctrl-names = "default", "clk-gate";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	bus-width = <4>;
+	/* cap-sd-highspeed intentionally omitted: RTL8822CS efuse dump
+	 * (long CMD53) corrupted at HS on meson-gx-mmc w/o tuning */
+	cap-sdio-irq;
+	/* Safe RTL8822CS timing for first bring-up.
+	 * Re-enable UHS modes one at a time once rtw88 probing and
+	 * throughput are verified on hardware. */
+	max-frequency = <25000000>;
+	non-removable;
+	disable-wp;
+	keep-power-in-suspend;
+	mmc-pwrseq = <&sdio_pwrseq>;
+	vmmc-supply = <&vddao_3v3>;
+	vqmmc-supply = <&vddio_ao1v8>;
+
+	wifi@1 {
+		reg = <1>;
+		compatible = "realtek,rtl8822cs";
+	};
+};
+
+/* Bluetooth RTL8822CS-BT on UART_A */
+&uart_A {
+	status = "okay";
+	pinctrl-0 = <&uart_a_pins>;
+
+	bluetooth: bluetooth {
+		compatible = "realtek,rtl8822cs-bt";
+		/* 0x53 == GPIOX_18 (verified against sm1 pin table) */
+		enable-gpios = <&gpio GPIOX_18 GPIO_ACTIVE_HIGH>;
+		/*
+		 * Wake lines intentionally omitted:
+		 *  - device-wake was GPIOX_17 which conflicts with the
+		 *    zigbee radio reset line;
+		 *  - host-wake decoded to GPIOAO_0, unverified trace.
+		 * btrtl serdev works without them; add back only after
+		 * tracing the board.
+		 */
+		/* vendor config keeps FW init at 115200; H5 negotiates up */
+		max-speed = <115200>;
+		status = "okay";
+	};
+};
+
+/* Zigbee radio on UART_AO_B (GPIOAO_8 TX, GPIOAO_9 RX)
+ * Disabled: GPIOAO_8 conflicts with tdm_ao_b_sclk needed for audio TDM B.
+ * Enable only if Zigbee module is populated and audio TDM B moved to different pins. */
+/* Zigbee radio (Tuya TZ9213-2782 module) on UART_AO_B.
+ * Stock DTB routes it to pins 2/3 (uart_ao_b_2_3_pins), which do NOT
+ * conflict with audio TDM-B (AO4/6/7/8 + MCLK AO9).
+ * No serdev driver: userspace talks to /dev/ttyAML1 directly
+ * (coordinator firmware flash + NCP passthrough). */
+&uart_AO_B {
+	status = "okay";
+	pinctrl-0 = <&uart_ao_b_2_3_pins>;
+	pinctrl-names = "default";
+};
+
+/* PWM_E for 32.768kHz WiFi clock */
+&pwm_ef {
+	status = "okay";
+	pinctrl-0 = <&pwm_e_pins>;
+	pinctrl-names = "default";
+};
+
+/* Volume potentiometer on SAR ADC channel 0
+ * Handled by userspace daemon (atrivolume) via IIO */
+
+/* SPI LED screen (Gowin FPGA / Yandex LED screen) */
+&spicc1 {
+	status = "okay";
+	pinctrl-0 = <&spicc1_pins>, <&spicc1_ss0_pins>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpio GPIOH_8 GPIO_ACTIVE_LOW>;
+
+	led_screen: led-screen@0 {
+		compatible = "gowin,led-screen", "yandex,led-screen", "yandex,station-max-led-screen";
+		reg = <0>;
+		spi-max-frequency = <25000000>;
+		max-brightness = <200>;
+		reset-gpios = <&gpio GPIOX_9 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+};
+
