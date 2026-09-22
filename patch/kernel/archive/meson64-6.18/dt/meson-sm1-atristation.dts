@@ -292,26 +292,15 @@
 		status = "okay";
 	};
 
-	/* Bluetooth: matches vendor DTB gpio_reset=0x16 0x53,
-	 * gpio_hostwake=0x16 0x55 */
+	/* Legacy vendor BT/WiFi nodes (disabled; mainline uses serdev on uart_A & mmc-pwrseq on sd_emmc_a) */
 	bt-dev {
 		compatible = "amlogic,bt-dev";
-		dev_name = "bt-dev";
-		status = "okay";
-		gpio_reset = <&gpio 0x53 GPIO_ACTIVE_HIGH>;
-		gpio_hostwake = <&gpio 0x55 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
 	};
 
-	/* WiFi: matches vendor DTB aml_wifi:
-	 * interrupt_pin=0x16 0x49, power_on_pin=0x16 0x48 */
 	wifi {
 		compatible = "amlogic,aml_wifi";
-		dev_name = "aml_wifi";
-		status = "okay";
-		interrupt_pin = <&gpio 0x49 GPIO_ACTIVE_LOW>;
-		irq_trigger_type = "GPIO_IRQ_LOW";
-		power_on_pin = <&gpio 0x48 GPIO_ACTIVE_HIGH>;
-		pwm_config = <&wifi_pwm_conf>;
+		status = "disabled";
 	};
 
 	/* WiFi/BT 32.768kHz PWM config as in vendor DTB */
@@ -1232,13 +1221,12 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	bus-width = <4>;
-	/* cap-sd-highspeed intentionally omitted: RTL8822CS efuse dump
-	 * (long CMD53) corrupted at HS on meson-gx-mmc w/o tuning */
+	cap-sd-highspeed;
+	sd-uhs-sdr12;
+	sd-uhs-sdr25;
+	sd-uhs-sdr50;
+	max-frequency = <100000000>;
 	cap-sdio-irq;
-	/* Safe RTL8822CS timing for first bring-up.
-	 * Re-enable UHS modes one at a time once rtw88 probing and
-	 * throughput are verified on hardware. */
-	max-frequency = <25000000>;
 	non-removable;
 	disable-wp;
 	keep-power-in-suspend;
@@ -1255,22 +1243,18 @@
 /* Bluetooth RTL8822CS-BT on UART_A */
 &uart_A {
 	status = "okay";
-	pinctrl-0 = <&uart_a_pins>;
+	pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
+	pinctrl-names = "default";
+	uart-has-rtscts;
 
 	bluetooth: bluetooth {
 		compatible = "realtek,rtl8822cs-bt";
-		/* 0x53 == GPIOX_18 (verified against sm1 pin table) */
-		enable-gpios = <&gpio GPIOX_18 GPIO_ACTIVE_HIGH>;
-		/*
-		 * Wake lines intentionally omitted:
-		 *  - device-wake was GPIOX_17 which conflicts with the
-		 *    zigbee radio reset line;
-		 *  - host-wake decoded to GPIOAO_0, unverified trace.
-		 * btrtl serdev works without them; add back only after
-		 * tracing the board.
-		 */
-		/* vendor config keeps FW init at 115200; H5 negotiates up */
-		max-speed = <115200>;
+		/* Vendor DTB: reset=0x53 (GPIOX_19), hostwake=0x55 (GPIOX_21) */
+		enable-gpios = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
+		host-wake-gpios = <&gpio GPIOX_21 GPIO_ACTIVE_HIGH>;
+		max-speed = <3000000>;
+		clocks = <&wifi32k>;
+		clock-names = "lpo";
 		status = "okay";
 	};
 };

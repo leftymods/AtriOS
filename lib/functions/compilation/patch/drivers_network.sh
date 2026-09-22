@@ -517,7 +517,14 @@ driver_rtw88_lwfinger() {
 		# Copy firmware files (rtw8822c_fw.bin etc.) into kernel firmware dir for installation
 		mkdir -p "$kerneldir/firmware/rtw88"
 		cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}"/firmware/*.bin \
-			"$kerneldir/firmware/rtw88/"
+			"$kerneldir/firmware/rtw88/" 2>/dev/null || true
+		if [[ -f "${SRC}/packages/atri-fw/rtl8822cs_efuse.bin" ]]; then
+			cp "${SRC}/packages/atri-fw/rtl8822cs_efuse.bin" "$kerneldir/firmware/rtw88/"
+		fi
+
+		# Patch efuse.c: fallback to virtual efuse when physical HW efuse is unprogrammed/blank (0xFF)
+		perl -i -0777 -pe '
+			s/(ret = rtw_dump_physical_efuse_map\(rtwdev, phy_map\);\n\tif \(ret\) \{\n\t\trtw_err\(rtwdev, "failed to dump efuse physical map\\n"\);\n\t\tgoto out;\n\t\})/\1\n\n\tif \(phy_map[0] == 0xff && phy_map[1] == 0xff\) {\n\t\tconst struct firmware *efw = NULL;\n\t\trtw_info(rtwdev, "HW efuse is blank, loading virtual efuse map\\n");\n\t\tif (request_firmware_direct(&efw, "rtw88\\/rtl8822cs_efuse.bin", rtwdev->dev) == 0 && efw) {\n\t\t\tif (efw->size <= rtwdev->efuse.physical_size) {\n\t\t\t\tmemcpy(phy_map, efw->data, efw->size);\n\t\t\t\trtw_info(rtwdev, "loaded virtual efuse from file (%zu bytes)\\n", efw->size);\n\t\t\t}\n\t\t\trelease_firmware(efw);\n\t\t} else {\n\t\t\tstatic const u8 def_efuse[49] = {\n\t\t\t\t0x03, 0x29, 0x81, 0x7e, 0x7f, 0x3f, 0x80, 0x20,\n\t\t\t\t0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n\t\t\t\t0x8a, 0x00, 0x00, 0x00, 0x45, 0x55, 0x8c, 0x33,\n\t\t\t\t0x33, 0x00, 0x00, 0x00, 0x00, 0x8e, 0x00, 0x00,\n\t\t\t\t0x00, 0x00, 0x00, 0x00, 0x0f, 0x68, 0x02, 0x1a,\n\t\t\t\t0x2b, 0x7c, 0x45, 0x9a\n\t\t\t};\n\t\t\tmemcpy(phy_map, def_efuse, sizeof(def_efuse));\n\t\t\trtw_info(rtwdev, "applied built-in fallback efuse table for 8822C\\n");\n\t\t}\n\t}/' "$kerneldir/drivers/net/wireless/realtek/rtw88/efuse.c"
 
 		# Add ITON RW8822-50B1 SDIO ID (0xA822) as a separate array element before the {} terminator
 		# This is needed for all kernel versions since it's a hardware ID addition

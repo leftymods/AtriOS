@@ -31,13 +31,14 @@ BTNS_BIN = atri-buttons
 KNOB_BIN = atri-knob
 ATRALS_BIN = atri-als
 PCBA_BIN = atri-pcba
+WIFI_DIAG_BIN = atri-wifi-diag
 TEST_BIN = test_atri_led
-ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN)
+ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -111,6 +112,9 @@ $(ATRALS_BIN): src/atri_als.c
 $(PCBA_BIN): src/atri_pcba.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
+$(WIFI_DIAG_BIN): src/atri_wifi_diag.c
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
@@ -135,6 +139,8 @@ install: all
 	cp $(ZGBIN) $(DESTDIR)/usr/bin/
 	cp $(BTNS_BIN) $(DESTDIR)/usr/bin/
 	cp $(KNOB_BIN) $(DESTDIR)/usr/bin/
+	cp $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/
+	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
 else
