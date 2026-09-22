@@ -41,14 +41,15 @@ All hardware features — from the Gowin FPGA LED matrix display and dual IS31FL
 | **LED Matrix Display** | Gowin GW1N FPGA (25×16 LED matrix) | SPI (`spicc1`) + JTAG GPIO | `gowin_led_screen` / `atri-screen-test` | **Supported** |
 | **LED Ring** | Dual IS31FL3236 (24 multicolor RGB zones) | I2C (`i2c0` @ `0x3c`, `0x3f`) | `leds-is31fl32xx` / `atrled` daemon | **Supported** |
 | **Speaker Amplifiers** | Silergy SY6045S (PBTL Woofer + Stereo Tweeters) | I2C (`i2c2` @ `0x2a`, `0x2b`) + TDM B | `snd-soc-sy6045s` + anti-pop sequencer | **Supported** |
-| **Headphone DAC** | Everest ES8156 (3.5mm headphone out) | I2C (`i2c2` @ `0x08`) + TDM B | `snd-soc-es8156` (mainline ASoC) | **Supported** |
-| **Microphone ADC** | Everest ES7210 4-channel ADC | I2C (`i2c2` @ `0x40`) + TDM B | `snd-soc-es7210` (acoustic echo ref) | **Supported** |
+| **Headphone DAC** | Everest ES8156 (3.5mm AUX line out) | I2C (`i2c2` @ `0x08`) + TDM B | `snd-soc-es8156` (mainline ASoC) | **Supported** |
+| **Microphone ADC** | Everest ES7210 4-channel AEC reference ADC | I2C (`i2c2` @ `0x40`) + TDM B | `snd-soc-es7210` (acoustic echo ref) | **Supported** |
 | **Digital Mic Array** | 4-channel PDM microphone array | Amlogic PDM controller | `dmic-codec` / `pdm` DAI link | **Supported** |
 | **Wi-Fi** | Realtek RTL8822CS (802.11ac 2×2 Dual-Band) | SDIO (`sd_emmc_a`, SDR50 100MHz) | `rtw88_8822cs` + virtual eFuse loader | **Supported** |
 | **Bluetooth** | Realtek RTL8822CS Bluetooth 5.0 (H5) | UART_A (`/dev/ttyAML1`, 3MBaud, RTS/CTS) | `hci_h5` / `btrtl` serdev (`hci0`) | **Supported** |
-| **Volume Knob** | Laser quadrature rotary encoder | Polled GPIO input (`REL_DIAL`) | `gpio-keys-polled` / `atrivolume` | **Supported** |
+| **Volume Knob** | Laser quadrature rotary encoder | Polled GPIO input (`REL_DIAL`) | `rotary_volume` / `atrivolume` | **Supported** |
 | **Zigbee 3.0** | Tuya TZ9213-2782 / Silicon Labs EFR32 | UART_AO_B (`/dev/ttyAML2`) + GPIOs | `atri-zigbee` (Z2M / ZHA coordinator) | **Supported** |
-| **Light Sensor** | Lite-On LTR-308ALS ambient light sensor | I2C (`i2c2` @ `0x53`) | `ltr308als01` / `atri-als` daemon | **Supported** |
+| **Light Sensor** | Lite-On LTR-308ALS ambient light sensor | I2C (`i2c0` / `i2c2` @ `0x53`) | `ltr308als01` / `atri-als` daemon | **Supported** |
+| **RTC (Real-Time Clock)** | NXP PCF8563 real-time clock | I2C (`i2c2` @ `0x51`) | `rtc-pcf8563` (`/dev/rtc0`) | **Supported** |
 | **GPU / Video** | ARM Mali-G31 MP2 + Amlogic VDEC | PCIe / System bus | Panfrost DRM + Meson VDEC (4K HW) | **Supported** |
 
 > *Примечание: драйверы, DTS и модули интегрированы в дерево сборки, однако требуют валидации непосредственно на физическом образце устройства.*
@@ -66,6 +67,8 @@ AtriOS packages dedicated native tools and background services installed into `/
 - **`atri-hwprobe`**: Comprehensive hardware audit tool. Enumerate GPIO lines, consumers, I2C addresses, SPI chips, and active input events (`--watch-gpio` tracks unknown pins).
 - **`atri-zigbee`**: Tuya/EFR32 module manager: hardware reset, bootloader activation, XMODEM-CRC coordinator firmware flashing, and raw passthrough mode.
 - **`atri-als`**: Ambient light sensor service with automatic screen & ring brightness adaptation.
+- **`atri-buttons`**: Physical button monitor (Mute / Action) decoding hardware GPIO state changes.
+- **`atri-pcba`**: On-board EEPROM PCBA revision inspector.
 
 ### Wireless & Diagnostic Suite
 - **`atri-wifi-diag`** (alias **`atri-wireless`**): Native diagnostic utility for Realtek RTL8822CS Wi-Fi and Bluetooth.
@@ -84,12 +87,12 @@ AtriOS packages dedicated native tools and background services installed into `/
 ## Local Voice Biometrics & Neural Speaker Verification
 
 Located in `packages/atri-led/tools/`:
-- **`voice_biometrics_gui.py`**: Interactive PyQt5 calibration GUI for recording owner voice profiles, testing speaker identification, and tuning noise thresholds.
-- **`realtime_voice_listener.py`**: Background real-time audio listener matching incoming speech against `owner_profile.json` using TFLite neural embeddings (`models/head.tflite`, `models/body.tflite`).
-- **Anti-Spoofing & Artifact Rejection**: Built-in harmonic and spectral filters protecting against synthetic artifacts, hand-clapping/pops, coughing, and non-owner interference.
+- **`voice_biometrics_gui.py`**: Interactive Tkinter calibration GUI for enrolling owner voice profiles, singing adaptation, cough signature calibration, and noise rejection tuning.
+- **`realtime_voice_listener.py`**: Background real-time audio listener matching incoming speech against `owner_profile.json` using ECAPA-TDNN neural embeddings (`models/head.tflite`, `models/body.tflite`, 512-dimensional vectors).
+- **Anti-Spoofing & Artifact Rejection**: Built-in Kaldi 80-bin Mel filterbanks, F0 harmonic pitch tracking (60–650 Hz), singing voice adaptation, owner cough biometric filter, and rejection of clapping/pops/mechanical transients.
 
 ```bash
-# Launch calibration GUI
+# Launch calibration GUI (Tkinter, no external GUI framework needed)
 python3 packages/atri-led/tools/voice_biometrics_gui.py
 
 # Start background speaker authentication listener
@@ -107,12 +110,16 @@ AtriOS uses an optimized, reproducible build framework based on Armbian:
 git clone https://github.com/leftymods/AtriOS.git
 cd AtriOS
 
-# Build minimal firmware image for AtriStation
+# Build minimal firmware image for AtriStation (Amlogic S905X3 / SM1)
 ./compile.sh build BOARD=atristation BRANCH=current BUILD_MINIMAL=yes
+
+# OR build for Yandex Station Max (Amlogic S905X2 / G12A)
+./compile.sh build BOARD=stationmax BRANCH=current BUILD_MINIMAL=yes
 ```
 
 ### Build Parameters
-- `BOARD=atristation`: Target board configuration (`config/boards/atristation.conf`).
+- `BOARD=atristation`: Target board configuration for Amlogic SM1 (`config/boards/atristation.conf`).
+- `BOARD=stationmax`: Target board configuration for Amlogic G12A (`config/boards/stationmax.conf`).
 - `BRANCH=current`: Kernel version 6.18.y (`leftymods/linux-6.18.y`).
 - `BUILD_MINIMAL=yes`: Clean, lightweight installation without unnecessary desktop bloat.
 
