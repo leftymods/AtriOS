@@ -14,8 +14,15 @@
   <img src="https://img.shields.io/badge/SoC-Amlogic%20SM1%20%2F%20G12A-ea580c?style=flat-square" alt="SoC" />
   <img src="https://img.shields.io/badge/Audio-24--bit%20Hi--Fi%20%7C%20SY6045S-16a34a?style=flat-square" alt="Audio" />
   <img src="https://img.shields.io/badge/Wireless-RTL8822CS%20Wi--Fi%20%26%20BT-blue?style=flat-square" alt="Wireless" />
+  <img src="https://img.shields.io/badge/Hardware%20Testing-Untested%20on%20Physical%20Device-amber?style=flat-square" alt="Hardware Testing" />
   <img src="https://img.shields.io/badge/License-GPL--2.0-slate?style=flat-square" alt="License" />
 </p>
+
+> [!WARNING]
+> **Experimental / Work in Progress / Не проверено на реальном железе**:
+> Прошивка, модификации ядра Linux 6.18, DTS и виртуальный eFuse для RTL8822CS находятся в стадии активной разработки и **пока не были протестированы на физическом реальном устройстве (Yandex Station Max)**. Используйте с осторожностью при первом включении и отладке (bring-up).
+>
+> *(Firmware, kernel patches, and device-tree modifications are experimental and have **not yet been verified on real physical hardware**).*
 
 ---
 
@@ -43,6 +50,8 @@ All hardware features — from the Gowin FPGA LED matrix display and dual IS31FL
 | **Zigbee 3.0** | Tuya TZ9213-2782 / Silicon Labs EFR32 | UART_AO_B (`/dev/ttyAML2`) + GPIOs | `atri-zigbee` (Z2M / ZHA coordinator) | **Supported** |
 | **Light Sensor** | Lite-On LTR-308ALS ambient light sensor | I2C (`i2c2` @ `0x53`) | `ltr308als01` / `atri-als` daemon | **Supported** |
 | **GPU / Video** | ARM Mali-G31 MP2 + Amlogic VDEC | PCIe / System bus | Panfrost DRM + Meson VDEC (4K HW) | **Supported** |
+
+> *Примечание: драйверы, DTS и модули интегрированы в дерево сборки, однако требуют валидации непосредственно на физическом образце устройства.*
 
 ---
 
