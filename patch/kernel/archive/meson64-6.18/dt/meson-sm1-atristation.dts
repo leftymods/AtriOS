@@ -278,7 +278,7 @@
 		vol-up {
 			label = "volume-up";
 			linux,code = <KEY_VOLUMEUP>;
-			gpios = <&gpio GPIOZ_10 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio GPIOA_0 GPIO_ACTIVE_LOW>;
 		};
 
 		vol-down {
@@ -1093,7 +1093,7 @@
 	cs-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_LOW>;
 
 	led_panel: led-panel@0 {
-		compatible = "atri,led-panel", "ya,led-panel";
+		compatible = "gowin,led-screen", "atri,led-panel", "ya,led-panel", "yandex,station-max-led-screen", "yandex,led-screen";
 		reg = <0>;
 		spi-max-frequency = <4000000>;
 		max-brightness = <200>;
@@ -1285,21 +1285,3 @@
 
 /* Volume potentiometer on SAR ADC channel 0
  * Handled by userspace daemon (atrivolume) via IIO */
-
-/* SPI LED screen (Gowin FPGA / Yandex LED screen) */
-&spicc1 {
-	status = "okay";
-	pinctrl-0 = <&spicc1_pins>, <&spicc1_ss0_pins>;
-	pinctrl-names = "default";
-	cs-gpios = <&gpio GPIOH_8 GPIO_ACTIVE_LOW>;
-
-	led_screen: led-screen@0 {
-		compatible = "gowin,led-screen", "yandex,led-screen", "yandex,station-max-led-screen";
-		reg = <0>;
-		spi-max-frequency = <25000000>;
-		max-brightness = <200>;
-		reset-gpios = <&gpio GPIOX_9 GPIO_ACTIVE_LOW>;
-		status = "okay";
-	};
-};
-

@@ -35,34 +35,29 @@
 	/* Mic Mute Push-Button */
 	gpio_keys: gpio-keys {
 		compatible = "gpio-keys";
-		pinctrl-0 = <&keypad_pins>;
-		pinctrl-names = "default";
 
 		button-micmute {
 			label = "Mic Mute";
 			linux,code = <KEY_MICMUTE>; /* 248 */
-			gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio GPIOA_15 GPIO_ACTIVE_LOW>;
 			debounce-interval = <20>;
 			wakeup-source;
 		};
 	};
 
-	/* Rotary Volume Encoder */
+	/* Rotary Volume Encoder (A: GPIOA_0 [0x31], B: GPIOAO_10 [0x0a]) */
 	rotary_volume: rotary-volume {
 		compatible = "rotary-volume";
-		pinctrl-0 = <&rotary_pins>;
-		pinctrl-names = "default";
-		gpios = <&gpio GPIOH_4 GPIO_ACTIVE_HIGH>,
-			<&gpio GPIOH_5 GPIO_ACTIVE_HIGH>;
+		gpios = <&gpio GPIOA_0 GPIO_ACTIVE_LOW>,
+			<&gpio_ao GPIOAO_10 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 
-	/* ZigBee Hardware Control */
+	/* ZigBee Hardware Control (reset: GPIOX_17 [0x52], boot: GPIOX_11 [0x4c]) */
 	zigbee_control: zigbee-control {
 		compatible = "yandex,zigbee-control";
-		zb-power-gpios = <&gpio GPIOZ_3 GPIO_ACTIVE_HIGH>;
-		zb-reset-gpios = <&gpio GPIOZ_4 GPIO_ACTIVE_LOW>;
-		zb-boot-gpios  = <&gpio GPIOZ_5 GPIO_ACTIVE_LOW>;
+		zb-reset-gpios = <&gpio GPIOX_17 GPIO_ACTIVE_LOW>;
+		zb-boot-gpios  = <&gpio GPIOX_11 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 
