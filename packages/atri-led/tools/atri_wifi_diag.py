@@ -3,12 +3,12 @@
 atri_wifi_diag.py — AtriStation RTL8822CS Wi-Fi & Bluetooth Diagnostic Tool (Python CLI)
 
 Comprehensive diagnostic tool for Realtek RTL8822CS on Yandex Station Max / AtriStation:
-- SDIO bus & clock detection (WL_REG_ON / GPIOX_8, 32.768kHz LPO clock)
+- SDIO bus & clock detection (WL_REG_ON / GPIOX_7, 32.768kHz LPO clock)
 - Kernel rtw88 driver & firmware probe
 - eFuse validation (detects unprogrammed 0xFF blank OTP efuse)
 - Virtual eFuse injection (/lib/firmware/rtw88/rtl8822cs_efuse.bin)
 - Active Wi-Fi scan benchmark (latency in ms, discovered networks, RSSI)
-- Bluetooth UART_A (/dev/ttyAML1), serdev, BT_EN (GPIOX_19), BT_HOST_WAKE (GPIOX_21)
+- Bluetooth UART_A (/dev/ttyAML1), serdev, BT_EN (GPIOX_18), BT_HOST_WAKE (GPIOX_21)
 - HCI device inquiry & status
 
 Usage:
@@ -106,7 +106,7 @@ def probe_sdio():
 
     if not res["sdio_present"]:
         fail_msg("No SDIO devices detected under /sys/bus/sdio/devices/")
-        info_msg("Verify WL_REG_ON (GPIOX_8 active-high) and power sequencing")
+        info_msg("Verify WL_REG_ON (GPIOX_7) and power sequencing")
 
     return res
 

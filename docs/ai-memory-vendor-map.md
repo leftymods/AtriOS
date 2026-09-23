@@ -27,13 +27,12 @@ rtw88 patches stay in repo as dead-end, do not spend more time on them.
 User explicitly said: "ledring работают и запомни это" — IS31FL3236 LED ring
 nodes (both i2c0 @0x3c and @0x3f) functioning on device. NEVER modify these.
 
-## Original Yandex Android DTB pin map (decoded from real S905X2 dump)
-| Function | Vendor | Was in our DTS |
+| Function | Vendor (hex in DTB) | Decoded via meson-g12a-gpio.h |
 |---|---|---|
-| WL_REG_ON | GPIOX_8 active-high (0x16/0x48) | X7 low (wrong) |
-| WiFi HostWake IRQ | GPIOX_9 active-low (0x49) | not wired |
-| BT reset | GPIOX_19 (0x53) | X18 (was wrong!) |
-| BT hostwake | GPIOX_21 (0x55) | not wired |
+| WL_REG_ON | `0x16 0x48` (72 decimal) | **GPIOX_7** (active-low in mmc-pwrseq-simple) |
+| WiFi HostWake IRQ | `0x16 0x49` (73 decimal) | **GPIOX_8** |
+| BT reset (BT_EN) | `0x16 0x53` (83 decimal) | **GPIOX_18** (active-high) |
+| BT hostwake | `0x16 0x55` (85 decimal) | **GPIOX_20 / GPIOX_19** |
 | LPO 32k clock | pwm_ef ch0 period 30541 duty~48% (pwm@19000) | pwm_ef correct |
 | Knob volume | PUSH A/B selector, periphs idx49 + AO_10 → KEY_VOLUMEUP/DOWN polled | was GPIOA_0+AO10 quadrature |
 | Front button | GPIOA_15 code 0x246 = KEY_HOMEPAGE | had KEY_VOICECOMMAND |

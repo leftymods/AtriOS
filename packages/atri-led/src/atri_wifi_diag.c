@@ -191,7 +191,7 @@ static void test_sdio_subsystem(void) {
 		}
 	} else {
 		P_FAIL("No SDIO device found under /sys/bus/sdio/devices/");
-		P_INFO("Checking power line (WL_REG_ON / GPIOX_8)...");
+		P_INFO("Checking power line (WL_REG_ON / GPIOX_7)...");
 		record_result(false, false);
 	}
 
