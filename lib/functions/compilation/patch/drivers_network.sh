@@ -514,6 +514,15 @@ driver_rtw88_lwfinger() {
 		cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}"/{*.c,*.h} \
 			"$kerneldir/drivers/net/wireless/realtek/rtw88/"
 
+		# CRITICAL: also replace the Makefile from lwfinger.
+		# Mainline Linux 6.18 Makefile does not have rtw8822cs.c (SDIO) entries.
+		# lwfinger Makefile adds obj-$(CONFIG_RTW88_8822CS) for the SDIO variant.
+		# Without this, the module is never compiled even if CONFIG_RTW88_8822CS=y.
+		if [[ -f "${SRC}/cache/sources/rtw88/${rtw88ver#*:}/Makefile" ]]; then
+			cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}/Makefile" \
+				"$kerneldir/drivers/net/wireless/realtek/rtw88/Makefile"
+		fi
+
 		# Copy firmware files (rtw8822c_fw.bin etc.) into kernel firmware dir for installation
 		mkdir -p "$kerneldir/firmware/rtw88"
 		cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}"/firmware/*.bin \

@@ -74,7 +74,10 @@
 
 	sdio_pwrseq: sdio-pwrseq {
 		compatible = "mmc-pwrseq-simple";
-		reset-gpios = <&gpio GPIOX_8 GPIO_ACTIVE_HIGH>;
+		/* Vendor DTB: wifi.power_on_pin = GPIOX_8 (0x48, offset 72).
+		 * mmc-pwrseq-simple deasserts reset-gpios to enable the chip.
+		 * Deassert with ACTIVE_LOW drives pin HIGH = WL_REG_ON high = chip ON. */
+		reset-gpios = <&gpio GPIOX_8 GPIO_ACTIVE_LOW>;
 		clocks = <&wifi32k>;
 		clock-names = "ext_clock";
 		post-power-on-delay-ms = <200>;

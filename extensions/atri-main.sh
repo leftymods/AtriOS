@@ -55,8 +55,7 @@ Section: utils
 Priority: optional
 Architecture: ${arch}
 Maintainer: leftymods <ggalab33@gmail.com>
-        # shellcheck disable=SC2154
-Depends: ${shlibs:Depends}${shlibs:Depends:+, }systemd
+Depends: systemd
 Description: Offline userspace daemon for AtriStation
  atri-main drives the LED matrix framebuffer, RGB ring LEDs,
  input events and offline animations. It replaces the cloud

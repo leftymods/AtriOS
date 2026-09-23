@@ -11,12 +11,12 @@
 | **GPIOH_6** | JTAG TDO (панель) | in | также uart_C RX — занят |
 | **GPIOH_7** | JTAG TMS ≡ SPI1 CS0 | both | общий с экраном, raw-уровни в JTAG |
 | **GPIOH_8** | JTAG TCK (панель) | out | MMIO: `0xff634468` бит 8 |
-| **GPIOX_7** | WiFi reset (sdio-pwrseq) | out | также uart_B RX — занят |
-| **GPIOX_9** | Reset SPI-экрана | out, active-low | |
-| **GPIOX_10** | Enable 20V усилителей | out, active-high | regulator-boot-on |
+| **GPIOX_8** | WiFi reset (sdio-pwrseq WL_REG_ON) | out | vendor DTB: offset 0x48=72=GPIOX_8 |
+| **GPIOX_9** | Reset SPI-экрана | out, active-low | конфликт с WiFi OOB IRQ — OOB не используется |
+| **GPIOX_10** | Enable 20V усилителей | out, active-high | regulator-boot-on (vendor: может быть GPIOX_11, уточнить на железе) |
 | **GPIOX_11** | Zigbee boot | out | загрузчик модуля |
 | **GPIOX_17** | Zigbee reset | out | ⚠ не дублировать BT device-wake |
-| **GPIOX_18** | Bluetooth enable | out | rtl8822cs-bt |
+| **GPIOX_19** | Bluetooth enable (BT_EN) | out | vendor DTB: gpio_reset offset 0x53=83=GPIOX_19 |
 | **GPIOAO_3** | Zigbee UART RX | in | ⚠ бывший tflash_vdd — отключён |
 | **GPIOAO_8** | TDM-B SCLK (аудио) | out | ⚠ uart_AO_B вариант 8/9 недоступен |
 | **GPIOAO_9** | TDM-B MCLK (аудио) | out | |
