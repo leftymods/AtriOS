@@ -21,7 +21,7 @@
 	aliases {
 		serial0 = &uart_AO;
 		serial1 = &uart_A;
-		serial4 = &uart_C;
+		serial2 = &uart_AO_B;
 	};
 
 	chosen {
@@ -240,10 +240,10 @@
 	};
 };
 
-/* UART for Zigbee Module */
-&uart_C {
+/* Zigbee radio (Tuya TZ9213-2782 module) on UART_AO_B */
+&uart_AO_B {
 	status = "okay";
-	pinctrl-0 = <&uart_c_pins>;
+	pinctrl-0 = <&uart_ao_b_2_3_pins>;
 	pinctrl-names = "default";
 };
 
