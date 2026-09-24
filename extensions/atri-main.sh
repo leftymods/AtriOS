@@ -68,6 +68,7 @@ set -e
 systemctl daemon-reload || true
 systemctl enable atri-main.service || true
 systemctl enable atri-displayd.service || true
+systemctl enable atri-autobrightness.service || true
 EOF
 	chmod 755 "${stage}/DEBIAN/postinst"
 
@@ -93,6 +94,7 @@ EOF
 	# Start on first boot.
 	chroot_sdcard "systemctl --no-reload enable atri-main.service" || true
 	chroot_sdcard "systemctl --no-reload enable atri-displayd.service" || true
+	chroot_sdcard "systemctl --no-reload enable atri-autobrightness.service" || true
 
 	display_alert "Extension: ${EXTENSION}: ${BOARD}" "installed ${debfile}" "info"
 	return 0

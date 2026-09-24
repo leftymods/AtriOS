@@ -1,0 +1,14 @@
+[Unit]
+Description=AtriOS ALS Adaptive Auto-Brightness Daemon
+After=atriled.service
+Wants=atriled.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/atri-autobrightness --daemon
+Restart=always
+RestartSec=3
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

@@ -2,6 +2,8 @@
 
 case "$1" in
     remove|purge)
+        systemctl stop atri-autobrightness.service 2>/dev/null || true
+        systemctl disable atri-autobrightness.service 2>/dev/null || true
         systemctl disable atri-led.service 2>/dev/null || true
         ;;
     upgrade|deconfigure)
