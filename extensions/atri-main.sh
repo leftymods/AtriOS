@@ -93,3 +93,26 @@ EOF
 	display_alert "Extension: ${EXTENSION}: ${BOARD}" "installed ${debfile}" "info"
 	return 0
 }
+
+function post_family_tweaks_bsp__atri_main_add_config() {
+	# Early module loading for screen and input
+	mkdir -pv "${destination}"/etc/modules-load.d
+	cat <<- MODS > "${destination}"/etc/modules-load.d/atri-main.conf
+		gowin_led_screen
+		rotary_volume
+		rotary_encoder
+	MODS
+
+	# FPGA bitstream firmware files for Gowin LED screen
+	mkdir -pv "${destination}"/lib/firmware
+	if [[ -f "${SRC}/packages/atri-fw/vendor_led_screen_fpga.bin" ]]; then
+		cp "${SRC}/packages/atri-fw/vendor_led_screen_fpga.bin" "${destination}"/lib/firmware/yandex_led_screen_fpga.bin
+		cp "${SRC}/packages/atri-fw/vendor_led_screen_fpga.bin" "${destination}"/lib/firmware/yandex_led_panel.bin
+	fi
+	if [[ -f "${SRC}/packages/atri-fw/yandex-led-screen.bin" ]]; then
+		cp "${SRC}/packages/atri-fw/yandex-led-screen.bin" "${destination}"/lib/firmware/yandex-led-screen.bin
+	fi
+
+	display_alert "Extension: ${EXTENSION}: ${BOARD}" "installed Gowin FPGA firmware and modules-load" "info"
+	return 0
+}

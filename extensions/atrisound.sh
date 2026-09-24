@@ -145,48 +145,9 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		}
 	ASOUND_CONF
 
-	# Board modules that should be loaded early before userspace services (atri-main, audio)
+	# Audio driver module auto-load
 	mkdir -pv "${destination}"/etc/modules-load.d
-	cat <<- MODS > "${destination}"/etc/modules-load.d/atristation.conf
-		rotary_volume
-		zigbee_control
-		snd-soc-sy6045s
-		gowin_led_screen
-		rotary_encoder
-	MODS
-
-	# RTL8822CS BT: the firmware files belong to atrios-firmware pkg,
-	# so we must NOT ship them again (dpkg "trying to overwrite").
-	# We only REPLACE the config with the board-vendor one AFTER all
-	# packages are unpacked - this runs in chroot, but extension file
-	# hooks run at each build; safest is to stage replacement via a
-	# systemd-tmpfiles style drop or direct copy during image finalize.
-	# atrios-firmware owns /lib/firmware/rtl_bt/rtl8822cs_{fw,config}.bin
-
-run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
-	cp "${SRC}"/packages/atri-fw/rtl8822cs_config.bin "${destination}"/usr/share/atri-fw-vendor/
-	# Vendor RTL8822CS WiFi firmware (from Yandex 88x2es.ko, ver 9.9.15)
-	cp "${SRC}"/packages/atri-fw/wifi_vendor_fw.bin   "${destination}"/usr/share/atri-fw-vendor/
-	cp "${SRC}"/packages/atri-fw/vendor_bt_fw.bin      "${destination}"/usr/share/atri-fw-vendor/
-	cp "${SRC}"/packages/atri-fw/rtl8822cs_efuse.bin  "${destination}"/usr/share/atri-fw-vendor/
-	cp "${SRC}"/packages/atri-fw/vendor_led_screen_fpga.bin "${destination}"/usr/share/atri-fw-vendor/
-	cp "${SRC}"/packages/atri-fw/yandex-led-screen.bin       "${destination}"/usr/share/atri-fw-vendor/
-
-	# Replace at boot via tmpfiles.d (runs before bluetooth.service)
-	# Type "C+" forces overwrite even if destination already exists.
-	# Plain "C" skips copy if file exists — useless since firmware-realtek
-	# already installs rtw8822c_fw.bin / rtl8822cs_*.bin before first boot.
-	mkdir -pv "${destination}"/etc/tmpfiles.d
-	cat <<- TMPF > "${destination}"/etc/tmpfiles.d/rtl8822cs-vendor-config.conf
-		C+ /lib/firmware/rtl_bt/rtl8822cs_config.bin 0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
-		C+ /lib/firmware/rtl_bt/rtl8822cs_config     0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
-		C+ /lib/firmware/rtw88/rtw8822c_fw.bin       0644 root root - /usr/share/atri-fw-vendor/wifi_vendor_fw.bin
-		C+ /lib/firmware/rtw88/rtl8822cs_efuse.bin   0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_efuse.bin
-		C+ /lib/firmware/rtl_bt/rtl8822cs_fw.bin     0644 root root - /usr/share/atri-fw-vendor/vendor_bt_fw.bin
-		C+ /lib/firmware/yandex_led_panel.bin            0644 root root - /usr/share/atri-fw-vendor/vendor_led_screen_fpga.bin
-		C+ /lib/firmware/yandex_led_screen_fpga.bin      0644 root root - /usr/share/atri-fw-vendor/vendor_led_screen_fpga.bin
-		C+ /lib/firmware/yandex-led-screen.bin           0644 root root - /usr/share/atri-fw-vendor/yandex-led-screen.bin
-	TMPF
+	echo "snd-soc-sy6045s" > "${destination}"/etc/modules-load.d/sound.conf
 
 	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
 	run_host_command_logged mkdir -pv "${destination}"/usr/libexec
