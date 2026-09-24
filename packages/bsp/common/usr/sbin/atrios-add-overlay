@@ -29,7 +29,7 @@ else
 fi
 
 if [[ ! -f /etc/atrios-release || ! -f /boot/atriosEnv.txt ]]; then
-	echo >&2 "Armbian is not installed properly. Missing atrios-release or atriosEnv.txt"
+	echo >&2 "AtriOS is not installed properly. Missing atrios-release or atriosEnv.txt"
 	exit -1
 fi
 

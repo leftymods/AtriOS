@@ -1,5 +1,5 @@
 #!/bin/bash
-# Print WiFi Access Point info for Armbian MOTD.
+# Print WiFi Access Point info for AtriOS MOTD.
 # Detects active hostapd instances, parses SSID + interface, shows channel via `iw`.
 
 set -o pipefail

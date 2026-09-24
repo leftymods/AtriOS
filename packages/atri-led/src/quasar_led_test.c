@@ -94,7 +94,7 @@ static void pattern_text(quasar_screen_t *scr)
 	printf("text display\n");
 	screen_clear(scr);
 	screen_text(scr, 0, 0, "HELLO", 1);
-	screen_text(scr, 0, 8, "QUASAR", 1);
+	screen_text(scr, 0, 8, "ATRIOS", 1);
 	screen_flush(scr);
 	sleep(2);
 }
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 	}
 	screen_reset(&scr);
 
-	printf("Quasar 25x16 LED screen test (via atri_led_panel fb)\n\n");
+	printf("AtriOS 25x16 LED screen test (via atri_led_panel fb)\n\n");
 
 	pattern_all_on(&scr);
 	pattern_all_off(&scr);

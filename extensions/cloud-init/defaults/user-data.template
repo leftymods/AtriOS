@@ -6,14 +6,14 @@
 
 # Configure the host
 
-hostname: armbian
+hostname: atrios
 
 users:
 
   # Create an user, password disabled, sudo without password and set the SSH KEY
 
-  - name: armbian
-    gecos: Armbian Ops User
+  - name: atrios
+    gecos: AtriOS Ops User
     sudo: ALL=(ALL) NOPASSWD:ALL
     groups: users, admin
     lock_passwd: true

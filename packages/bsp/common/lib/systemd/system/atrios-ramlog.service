@@ -3,7 +3,7 @@
 # This service may block the boot process for up to 30 sec
 
 [Unit]
-Description=Armbian memory supported logging
+Description=AtriOS memory supported logging
 DefaultDependencies=no
 Before=rsyslog.service sysinit.target syslog.target
 After=atrios-zram-config.service

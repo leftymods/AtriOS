@@ -4,6 +4,5 @@ Architecture: arm64
 Maintainer: leftymods <leftymods@atrios.dev>
 Section: universe/utils
 Priority: optional
-Description: AtriStation LED ring control tools
- Provides atrild and atrildctl for controlling WS2812B LED rings
- via sysfs (leds-multicolor).
+Description: AtriOS hardware control daemons and utilities
+ Provides atri-led, atri-displayd, atrivolume, atri-zigbee, and hardware utilities for AtriOS.

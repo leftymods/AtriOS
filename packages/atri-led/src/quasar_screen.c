@@ -148,7 +148,7 @@ int screen_open(quasar_screen_t *scr, const char *ignored)
 		close(fd);
 	}
 
-	fprintf(stderr, "Quasar LED panel fbdev not found\n");
+	fprintf(stderr, "AtriOS LED panel fbdev not found\n");
 	return -1;
 }
 

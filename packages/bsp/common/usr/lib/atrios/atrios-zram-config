@@ -135,7 +135,7 @@ activate_ramlog_partition() {
 	fi
 
 	algo=$(sed 's/.*\[\([^]]*\)\].*/\1/g' </sys/block/${log_device}/comp_algorithm)
-	printf "### Activated Armbian ramlog partition with %s compression\n" "${algo}" >> ${Log}
+	printf "### Activated AtriOS ramlog partition with %s compression\n" "${algo}" >> ${Log}
 } # activate_ramlog_partition
 
 activate_compressed_tmp() {

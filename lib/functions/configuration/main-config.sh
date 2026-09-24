@@ -38,25 +38,25 @@ function do_main_configuration() {
 		exit_with_error "REVISION must begin with a digit, got '${REVISION}'"
 	fi
 
-	# AtriOS image is set as unofficial if build manually or without declaring from outside
-	[[ -z $VENDOR ]] && VENDOR="AtriOS-unofficial"
+	# AtriOS image is set as AtriOS if build manually or without declaring from outside
+	[[ -z $VENDOR ]] && VENDOR="AtriOS"
 
 	# Use framework defaults for community AtriOS images and unsupported distribution when building AtriOS distribution
 	if [[ ${VENDOR} == "AtriOS" ]] && [[ ${BOARD_TYPE} != "conf" || $(cat $SRC/config/distributions/$RELEASE/support) != "supported" ]]; then
-		VENDORURL="https://github.com/leftymods/CoreOS"
+		VENDORURL="https://github.com/leftymods/AtriOS"
 		unset VENDORSUPPORT,VENDORPRIVACY,VENDORBUGS,VENDORLOGO,ROOTPWD,MAINTAINER,MAINTAINERMAIL
 	fi
 
 	[[ -z $VENDORCOLOR ]] && VENDORCOLOR="247;16;0"                           # RGB values for MOTD logo
-	[[ -z $VENDORURL ]] && VENDORURL="https://duckduckgo.com/"
-	[[ -z $VENDORSUPPORT ]] && VENDORSUPPORT="https://github.com/leftymods/CoreOS"
+	[[ -z $VENDORURL ]] && VENDORURL="https://github.com/leftymods/AtriOS"
+	[[ -z $VENDORSUPPORT ]] && VENDORSUPPORT="https://github.com/leftymods/AtriOS"
 	[[ -z $VENDORPRIVACY ]] && VENDORPRIVACY="https://duckduckgo.com/"
-	[[ -z $VENDORBUGS ]] && VENDORBUGS="https://AtriOS.atlassian.net/"
-	[[ -z $VENDORDOCS ]] && VENDORDOCS="https://github.com/leftymods/CoreOS"
+	[[ -z $VENDORBUGS ]] && VENDORBUGS="https://github.com/leftymods/AtriOS/issues"
+	[[ -z $VENDORDOCS ]] && VENDORDOCS="https://github.com/leftymods/AtriOS"
 	[[ -z $VENDORLOGO ]] && VENDORLOGO="atrios-logo"
 	[[ -z $ROOTPWD ]] && ROOTPWD="1234"                                       # Must be changed @first login
-	[[ -z $MAINTAINER ]] && MAINTAINER="John Doe"                             # deb signature
-	[[ -z $MAINTAINERMAIL ]] && MAINTAINERMAIL="john.doe@somewhere.on.planet" # deb signature
+	[[ -z $MAINTAINER ]] && MAINTAINER="leftymods"                             # deb signature
+	[[ -z $MAINTAINERMAIL ]] && MAINTAINERMAIL="ggalab33@gmail.com"           # deb signature
 	DEST_LANG="${DEST_LANG:-"en_US.UTF-8"}"                                   # en_US.UTF-8 is default locale for target
 	display_alert "DEST_LANG..." "DEST_LANG: ${DEST_LANG}" "debug"
 

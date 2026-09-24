@@ -227,11 +227,11 @@ int main(int argc, char *argv[])
 		     strncmp(fix.id, "GowinLED", 8) == 0 ||
 		     strncmp(fix.id, "atri_led_panel", 14) == 0)) {
 			close(fd);
-			printf("Quasar LED screen: detected (%s, id: %s)\n", fb_path, fix.id);
+			printf("AtriOS LED screen: detected (%s, id: %s)\n", fb_path, fix.id);
 			return 0;
 		}
 	}
-	printf("Quasar LED screen: not found\n");
+	printf("AtriOS LED screen: not found\n");
 		return 1;
 
 	} else if (strcmp(cmd, "on") == 0) {

@@ -158,10 +158,18 @@ install: all
 	cp $(DISP_DAEMON_BIN) $(DESTDIR)/usr/bin/
 	cp $(DISP_CLI_BIN) $(DESTDIR)/usr/bin/
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless
+	ln -sf $(MAIN_BIN) $(DESTDIR)/usr/bin/atri-led
+	ln -sf $(CTL_BIN) $(DESTDIR)/usr/bin/atri-led-ctl
+	ln -sf $(QCTL_BIN) $(DESTDIR)/usr/bin/atri-matrix-ctl
+	ln -sf $(QTST_BIN) $(DESTDIR)/usr/bin/atri-matrix-test
+	ln -sf $(QDEMO_BIN) $(DESTDIR)/usr/bin/atri-matrix-demo
+	ln -sf $(QTXT_BIN) $(DESTDIR)/usr/bin/atri-matrix-text
+	ln -sf $(QINFO_BIN) $(DESTDIR)/usr/bin/atri-matrix-info
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
 else
 	cp $(VOL_BIN) $(DESTDIR)/usr/bin/
+	ln -sf $(VOL_BIN) $(DESTDIR)/usr/bin/atri-volume
 endif
 	cp include/atri_led.h $(DESTDIR)/usr/include/
 	cp include/atri_led_anim.h $(DESTDIR)/usr/include/

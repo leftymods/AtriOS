@@ -36,8 +36,8 @@ logfile="/var/log/${ORIGINAL_SCRIPT_NAME}.log"
 
 # read in board info
 [[ -f /etc/atrios-release ]] && source /etc/atrios-release
-backtitle="AtriOS for $BOARD_NAME install script, https://www.armbian.com"
-title="Armbian installer v${VERSION}"
+backtitle="AtriOS for $BOARD_NAME install script, https://github.com/leftymods/AtriOS"
+title="AtriOS installer v${VERSION}"
 
 # exceptions
 if grep -q 'sun4i' /proc/cpuinfo; then DEVICE_TYPE="a10";
@@ -528,7 +528,7 @@ create_atrios()
 		mount --bind /proc "${TempDir}"/rootfs/proc
 		mount --make-rslave --rbind /sys "${TempDir}"/rootfs/sys
 		arch_target=$([[ $(arch) == x86_64 ]] && echo "x86_64-efi" || echo "arm64-efi")
-		chroot "${TempDir}/rootfs/" /bin/bash -c "grub-install --target=$arch_target --efi-directory=/boot/efi --bootloader-id=Armbian" >> $logfile
+		chroot "${TempDir}/rootfs/" /bin/bash -c "grub-install --target=$arch_target --efi-directory=/boot/efi --bootloader-id=AtriOS" >> $logfile
 		chroot "${TempDir}/rootfs/" /bin/bash -c "grub-mkconfig -o /boot/grub/grub.cfg" >> $logfile
 		grep "${TempDir}"/rootfs/sys /proc/mounts | cut -f2 -d" " | sort -r | xargs umount -n
 		umount "${TempDir}"/rootfs/proc
@@ -1085,7 +1085,7 @@ main()
 
 				if [[ $(type -t write_uboot_platform_mtd) == function ]]; then
 					dialog --title "$title" --backtitle "$backtitle" --yesno \
-						"Do you want to write the bootloader to MTD Flash?\n\nIt is required if you have not done it before or if you have some non-Armbian bootloader in this flash." 8 60
+						"Do you want to write the bootloader to MTD Flash?\n\nIt is required if you have not done it before or if you have some non-AtriOS bootloader in this flash." 8 60
 
 					if [[ $? -eq 0 ]]; then
 						write_uboot_to_mtd_flash "$DIR" "$mtdcheck"

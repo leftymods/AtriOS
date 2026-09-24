@@ -1,5 +1,5 @@
 #!/bin/bash
-# Print LAN/WAN IPv4 and IPv6 lines for Armbian MOTD.
+# Print LAN/WAN IPv4 and IPv6 lines for AtriOS MOTD.
 # Standalone: discovers addresses itself and prints formatted output.
 
 set -o pipefail

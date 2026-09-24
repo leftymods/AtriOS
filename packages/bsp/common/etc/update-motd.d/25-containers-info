@@ -1,5 +1,5 @@
 #!/bin/bash
-# Print running container names for Armbian MOTD (Docker).
+# Print running container names for AtriOS MOTD (Docker).
 # Standalone: discovers containers itself and prints a formatted line,
 # identical to the original header behavior.
 

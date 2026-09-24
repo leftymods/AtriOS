@@ -5,7 +5,7 @@
 # Copyright (c) 2025-2026 leftymods
 #
 # This file is a part of the AtriOS Build Framework
-# https://github.com/leftymods/CoreOS/
+# https://github.com/leftymods/AtriOS/
 
 #--------------------------------------------------------------------------------------------------------------------------------
 # fingerprint_image <out_txt_file> [image_filename]
@@ -14,7 +14,7 @@
 function fingerprint_image() {
 	cat <<- EOF > "${1}"
 		---------------------------------------------------------------------------
-		Generated with AtriOS(tm) build framework https://github.com/leftymods/CoreOS
+		Generated with AtriOS(tm) build framework https://github.com/leftymods/AtriOS
 		---------------------------------------------------------------------------
 		Vendor:         ${VENDOR}
 		Revision:       $REVISION
@@ -23,7 +23,7 @@ function fingerprint_image() {
 		Build date:     $(date +'%d.%m.%Y')
 		Sources:        ${BUILD_REPOSITORY_URL}
 		Sources rev:    ${BUILD_REPOSITORY_COMMIT}
-		Authors:        https://github.com/leftymods/CoreOS
+		Authors:        https://github.com/leftymods/AtriOS
 		Maintainer:     ${MAINTAINER} <$MAINTAINERMAIL>
 		Support:        ${VENDORSUPPORT}
 	EOF

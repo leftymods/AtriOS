@@ -1,9 +1,9 @@
-# Armbian led state save and restore
+# AtriOS led state save and restore
 # Stores the current led state at shutdown and restores
 # it during bootstrap
 
 [Unit]
-Description=Armbian leds state
+Description=AtriOS leds state
 After=sysinit.target
 Conflicts=shutdown.target
 DefaultDependencies=no
