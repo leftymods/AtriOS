@@ -174,6 +174,7 @@ run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
 	mkdir -pv "${destination}"/etc/tmpfiles.d
 	cat <<- TMPF > "${destination}"/etc/tmpfiles.d/rtl8822cs-vendor-config.conf
 		C+ /lib/firmware/rtl_bt/rtl8822cs_config.bin 0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
+		C+ /lib/firmware/rtl_bt/rtl8822cs_config     0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
 		C+ /lib/firmware/rtw88/rtw8822c_fw.bin       0644 root root - /usr/share/atri-fw-vendor/wifi_vendor_fw.bin
 		C+ /lib/firmware/rtw88/rtl8822cs_efuse.bin   0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_efuse.bin
 		C+ /lib/firmware/rtl_bt/rtl8822cs_fw.bin     0644 root root - /usr/share/atri-fw-vendor/vendor_bt_fw.bin
