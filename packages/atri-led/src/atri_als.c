@@ -69,6 +69,10 @@ static long read_lux(const char *dev)
 		if (!strstr(nm, "ltrf216a") && !strstr(nm, "ltr308")) continue;
 		snprintf(p, sizeof(p), "/sys/bus/iio/devices/%s/in_illuminance_raw", e->d_name);
 		fd = open(p, O_RDONLY);
+		if (fd < 0) {
+			snprintf(p, sizeof(p), "/sys/bus/iio/devices/%s/in_illuminance_input", e->d_name);
+			fd = open(p, O_RDONLY);
+		}
 		if (fd < 0) { perror(p); continue; }
 		n = read(fd, buf, sizeof(buf) - 1); close(fd);
 		if (n <= 0) continue;

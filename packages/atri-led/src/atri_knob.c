@@ -23,16 +23,23 @@ static int find_dial_device(char *out, size_t outsz)
 	DIR *d = opendir("/dev/input");
 	struct dirent *de;
 	char path[128], name[64];
-	unsigned char bits[KEY_MAX / 8 + 1];
+	unsigned char rel_bits[REL_MAX / 8 + 1];
+	unsigned char key_bits[KEY_MAX / 8 + 1];
 
 	while ((de = readdir(d))) {
 		if (strncmp(de->d_name, "event", 5)) continue;
 		snprintf(path, sizeof(path), "/dev/input/%s", de->d_name);
 		int fd = open(path, O_RDONLY | O_NONBLOCK);
 		if (fd < 0) continue;
-		memset(bits, 0, sizeof(bits));
-		if (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(bits)), bits) >= 0 &&
-		    (bits[REL_DIAL / 8] & (1 << (REL_DIAL % 8)))) {
+		memset(rel_bits, 0, sizeof(rel_bits));
+		memset(key_bits, 0, sizeof(key_bits));
+		int has_dial = (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel_bits)), rel_bits) >= 0) &&
+			       ((rel_bits[REL_DIAL / 8] & (1 << (REL_DIAL % 8))) ||
+			        (rel_bits[REL_WHEEL / 8] & (1 << (REL_WHEEL % 8))));
+		int has_vol_keys = (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) >= 0) &&
+				   ((key_bits[KEY_VOLUMEUP / 8] & (1 << (KEY_VOLUMEUP % 8))) &&
+				    (key_bits[KEY_VOLUMEDOWN / 8] & (1 << (KEY_VOLUMEDOWN % 8))));
+		if (has_dial || has_vol_keys) {
 			if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0)
 				name[0] = '\0';
 			snprintf(out, outsz, "%s (%s)", de->d_name, name);
@@ -74,11 +81,20 @@ static int input_mode(void)
 			usleep(10000);
 			continue;
 		}
-		if (ev.type == EV_REL && ev.code == REL_DIAL) {
+		if (ev.type == EV_REL && (ev.code == REL_DIAL || ev.code == REL_WHEEL)) {
 			total += ev.value;
 			printf("\r[%c] step %+d   total %+d      ",
 			       ev.value > 0 ? '+' : '-', ev.value, total);
 			fflush(stdout);
+		} else if (ev.type == EV_KEY && ev.value == 1) {
+			int step = (ev.code == KEY_VOLUMEUP) ? 1 :
+				   (ev.code == KEY_VOLUMEDOWN) ? -1 : 0;
+			if (step) {
+				total += step;
+				printf("\r[%c] key step %+d   total %+d      ",
+				       step > 0 ? '+' : '-', step, total);
+				fflush(stdout);
+			}
 		}
 	}
 	return 0;

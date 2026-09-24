@@ -218,17 +218,24 @@ static int try_open_input(const char *path)
 {
 	int fd = open(path, O_RDONLY | O_NONBLOCK);
 	uint8_t rel_bits[REL_MAX / 8 + 1];
+	uint8_t key_bits[KEY_MAX / 8 + 1];
 
 	if (fd < 0) return -1;
 	memset(rel_bits, 0, sizeof(rel_bits));
-	if (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel_bits)), rel_bits) < 0) {
-		close(fd);
-		return -1;
+	memset(key_bits, 0, sizeof(key_bits));
+
+	if (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel_bits)), rel_bits) >= 0) {
+		if ((rel_bits[REL_DIAL / 8] & (1 << (REL_DIAL % 8))) ||
+		    (rel_bits[REL_WHEEL / 8] & (1 << (REL_WHEEL % 8))))
+			return fd;
 	}
-	/* need a relative axis; prefer devices exposing DIAL/WHEEL only */
-	if ((rel_bits[REL_DIAL / 8] & (1 << (REL_DIAL % 8))) ||
-	    (rel_bits[REL_WHEEL / 8] & (1 << (REL_WHEEL % 8))))
-		return fd;
+
+	if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) >= 0) {
+		if ((key_bits[KEY_VOLUMEUP / 8] & (1 << (KEY_VOLUMEUP % 8))) &&
+		    (key_bits[KEY_VOLUMEDOWN / 8] & (1 << (KEY_VOLUMEDOWN % 8))))
+			return fd;
+	}
+
 	close(fd);
 	return -1;
 }
@@ -334,15 +341,20 @@ int main(int argc, char **argv)
 			if (ret > 0 && (pfd.revents & POLLIN)) {
 				while (read(uinput_fd, &ev, sizeof(ev)) ==
 				       sizeof(ev)) {
-					if (ev.type != EV_REL)
+					int dir = 0;
+					int step = 1;
+					if (ev.type == EV_REL) {
+						if (ev.code == REL_DIAL || ev.code == REL_WHEEL) {
+							dir = ev.value > 0 ? 1 : -1;
+							step = abs(ev.value);
+						}
+					} else if (ev.type == EV_KEY && ev.value == 1) {
+						if (ev.code == KEY_VOLUMEUP) dir = 1;
+						else if (ev.code == KEY_VOLUMEDOWN) dir = -1;
+					}
+					if (!dir)
 						continue;
-					int dir = (ev.code == REL_DIAL ||
-						   ev.code == REL_WHEEL)
-						? (ev.value > 0 ? 1 : -1)
-						: 0;
-					if (!dir || ev.value == 0)
-						continue;
-					cur_pct += dir * VOLUME_STEP * ev.value;
+					cur_pct += dir * VOLUME_STEP * step;
 					if (cur_pct < 0) cur_pct = 0;
 					if (cur_pct > 100) cur_pct = 100;
 					set_volume(cur_pct);
