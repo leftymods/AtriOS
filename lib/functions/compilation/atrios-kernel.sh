@@ -616,7 +616,7 @@ function atrios_kernel_config__enable_ntsync() {
 # Parameters:
 #   $1 - module: The name of the kernel option to set as module
 function kernel_config_set_m() {
-	declare module="$1"
+	declare module="${1#CONFIG_}"
 	display_alert "Enabling kernel module" "${module}=m" "debug"
 	run_host_command_logged ./scripts/config --module "${module}"
 	kernel_config_modifying_hashes+=("${module}=m")
@@ -628,7 +628,7 @@ function kernel_config_set_m() {
 # Parameters:
 #   $1 - config: The name of the kernel option to enable
 function kernel_config_set_y() {
-	declare config="$1"
+	declare config="${1#CONFIG_}"
 	display_alert "Enabling kernel config/built-in" "${config}=y" "debug"
 	run_host_command_logged ./scripts/config --enable "${config}"
 	kernel_config_modifying_hashes+=("${config}=y")
@@ -639,7 +639,7 @@ function kernel_config_set_y() {
 # Parameters:
 #   $1 - config: The name of the kernel option to disable
 function kernel_config_set_n() {
-	declare config="$1"
+	declare config="${1#CONFIG_}"
 	display_alert "Disabling kernel config/module" "${config}=n" "debug"
 	run_host_command_logged ./scripts/config --disable "${config}"
 	kernel_config_modifying_hashes+=("${config}=n")
@@ -651,7 +651,7 @@ function kernel_config_set_n() {
 #   $1 - config: The name of the kernel option to set
 #   $2 - value:  The string value to assign to the option
 function kernel_config_set_string() {
-	declare config="$1"
+	declare config="${1#CONFIG_}"
 	declare value="${2}"
 	display_alert "Setting kernel config/module string" "${config}=${value}" "debug"
 	run_host_command_logged ./scripts/config --set-str "${config}" "${value}"
@@ -664,7 +664,7 @@ function kernel_config_set_string() {
 #   $1 - config: The name of the kernel option to set
 #   $2 - value:  The numeric or hexadecimal value to assign to the option
 function kernel_config_set_val() {
-	declare config="$1"
+	declare config="${1#CONFIG_}"
 	declare value="${2}"
 	display_alert "Setting kernel config/module value" "${config}=${value}" "debug"
 	run_host_command_logged ./scripts/config --set-val "${config}" "${value}"
@@ -698,19 +698,19 @@ function atrios_kernel_config_apply_opts_from_arrays() {
 
 	# First pass: Add all changes to the hashing array for version calculation
 	for opt_n in "${opts_n[@]}"; do
-		kernel_config_modifying_hashes+=("${opt_n}=n")
+		kernel_config_modifying_hashes+=("${opt_n#CONFIG_}=n")
 	done
 
 	for opt_y in "${opts_y[@]}"; do
-		kernel_config_modifying_hashes+=("${opt_y}=y")
+		kernel_config_modifying_hashes+=("${opt_y#CONFIG_}=y")
 	done
 
 	for opt_m in "${opts_m[@]}"; do
-		kernel_config_modifying_hashes+=("${opt_m}=m")
+		kernel_config_modifying_hashes+=("${opt_m#CONFIG_}=m")
 	done
 
 	for opt_val in "${!opts_val[@]}"; do
-		kernel_config_modifying_hashes+=("${opt_val}=${opts_val[$opt_val]}")
+		kernel_config_modifying_hashes+=("${opt_val#CONFIG_}=${opts_val[$opt_val]}")
 	done
 
 	# Second pass: If .config exists, apply the changes

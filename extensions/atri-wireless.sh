@@ -13,7 +13,7 @@ function extension_prepare_config__atri_wireless() {
 function post_family_tweaks_bsp__atri_wireless_add_config() {
 	# Early module loading for Zigbee
 	mkdir -pv "${destination}"/etc/modules-load.d
-	cat <<- MODS > "${destination}"/etc/modules-load.d/zigbee.conf
+	cat <<- 'MODS' > "${destination}"/etc/modules-load.d/zigbee.conf
 		zigbee_control
 	MODS
 
@@ -35,7 +35,7 @@ function post_family_tweaks_bsp__atri_wireless_add_config() {
 	# Replace at boot via tmpfiles.d (runs before bluetooth.service)
 	# Type "C+" forces overwrite even if destination already exists.
 	mkdir -pv "${destination}"/etc/tmpfiles.d
-	cat <<- TMPF > "${destination}"/etc/tmpfiles.d/rtl8822cs-vendor-config.conf
+	cat <<- 'TMPF' > "${destination}"/etc/tmpfiles.d/rtl8822cs-vendor-config.conf
 		C+ /lib/firmware/rtl_bt/rtl8822cs_config.bin 0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
 		C+ /lib/firmware/rtl_bt/rtl8822cs_config     0644 root root - /usr/share/atri-fw-vendor/rtl8822cs_config.bin
 		C+ /lib/firmware/rtw88/rtw8822c_fw.bin       0644 root root - /usr/share/atri-fw-vendor/wifi_vendor_fw.bin

@@ -74,44 +74,44 @@ function custom_kernel_config__disable_unused_arches() {
 	opts_n+=("PINCTRL_INTEL" "PINCTRL_BAYTRAIL" "PINCTRL_CHERRYVIEW"
 		 "PINCTRL_BROXTON" "PINCTRL_SUNRISEPOINT" "PINCTRL_GEMINILAKE"
 		 "PINCTRL_ICELAKE" "PINCTRL_TIGERLAKE" "PINCTRL_ALDERLAKE" "PINCTRL_SUNXI")
-	opts_n+=("CONFIG_FB_ATRI_LED_PANEL")
+	opts_n+=("FB_ATRI_LED_PANEL")
 
 	# Disable DWARF debug symbols and BTF to cut kernel compile and link time by 2-3x
 	opts_n+=("DEBUG_INFO" "DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT" "DEBUG_INFO_DWARF4" "DEBUG_INFO_DWARF5" "DEBUG_INFO_BTF" "DEBUG_INFO_BTF_MODULES")
-	opts_y+=("CONFIG_DEBUG_INFO_NONE")
+	opts_y+=("DEBUG_INFO_NONE")
 }
 
 # Enable RTL8822CS debugfs for diagnostics
 function custom_kernel_config__enable_rtw88_debugfs() {
-	opts_y+=("CONFIG_RTW88_8822CS")
-	opts_y+=("CONFIG_RTW88_DEBUGFS")
+	opts_y+=("RTW88_8822CS")
+	opts_y+=("RTW88_DEBUGFS")
 }
 
 # Enable SY6045S audio amplifiers for Station Max
 function custom_kernel_config__enable_sy6045s() {
-	opts_m+=("CONFIG_SND_SOC_SY6045S")
-	opts_y+=("CONFIG_BT_HCIUART_3WIRE")
-	opts_y+=("CONFIG_BT_HCIUART_RTL")
-	opts_m+=("CONFIG_SND_SOC_DMIC")
-	opts_m+=("CONFIG_SND_SOC_ES7210")
-	opts_m+=("CONFIG_SND_SOC_ES8156")
-	opts_m+=("CONFIG_SND_SOC_TLV320ADC3XXX")
-	opts_m+=("CONFIG_SND_ALOOP")
-	opts_y+=("CONFIG_IIO")
-	opts_m+=("CONFIG_KEYBOARD_ADC")
-	opts_m+=("CONFIG_LEDS_IS31FL32XX")
-	opts_m+=("CONFIG_LEDS_CLASS_MULTICOLOR")
-	opts_m+=("CONFIG_INPUT_GPIO_ROTARY_ENCODER")
-	opts_m+=("CONFIG_RTC_DRV_PCF8563")
-	opts_m+=("CONFIG_LTR390")
-	opts_m+=("CONFIG_LTRF216A")
-	opts_m+=("CONFIG_SERIO_AMS_DELTA")
-	opts_m+=("CONFIG_GPIO_SYSFS")
-	opts_m+=("CONFIG_ZIGBEE_CONTROL")
-	opts_m+=("CONFIG_INPUT_ROTARY_VOLUME")
-	opts_m+=("CONFIG_LTR308ALS")
-	opts_m+=("CONFIG_LEDS_GOWIN_SCREEN")
-	opts_m+=("CONFIG_ATRI_PCBA_IDS")
+	opts_m+=("SND_SOC_SY6045S")
+	opts_y+=("BT_HCIUART_3WIRE")
+	opts_y+=("BT_HCIUART_RTL")
+	opts_m+=("SND_SOC_DMIC")
+	opts_m+=("SND_SOC_ES7210")
+	opts_m+=("SND_SOC_ES8156")
+	opts_m+=("SND_SOC_TLV320ADC3XXX")
+	opts_m+=("SND_ALOOP")
+	opts_y+=("IIO")
+	opts_m+=("KEYBOARD_ADC")
+	opts_m+=("LEDS_IS31FL32XX")
+	opts_m+=("LEDS_CLASS_MULTICOLOR")
+	opts_m+=("INPUT_GPIO_ROTARY_ENCODER")
+	opts_m+=("RTC_DRV_PCF8563")
+	opts_m+=("LTR390")
+	opts_m+=("LTRF216A")
+	opts_m+=("SERIO_AMS_DELTA")
+	opts_m+=("GPIO_SYSFS")
+	opts_m+=("ZIGBEE_CONTROL")
+	opts_m+=("INPUT_ROTARY_VOLUME")
+	opts_m+=("LTR308ALS")
+	opts_m+=("LEDS_GOWIN_SCREEN")
+	opts_m+=("ATRI_PCBA_IDS")
 }
 
 # this helper function includes postprocess for s400 and its variants.

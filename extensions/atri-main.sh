@@ -97,7 +97,7 @@ EOF
 function post_family_tweaks_bsp__atri_main_add_config() {
 	# Early module loading for screen and input
 	mkdir -pv "${destination}"/etc/modules-load.d
-	cat <<- MODS > "${destination}"/etc/modules-load.d/atri-main.conf
+	cat <<- 'MODS' > "${destination}"/etc/modules-load.d/atri-main.conf
 		gowin_led_screen
 		rotary_volume
 		rotary_encoder

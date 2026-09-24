@@ -16,7 +16,7 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	run_host_command_logged mkdir -pv "${destination}"/usr/share/alsa/ucm2/ATRISTATION
 
 	# Write UCM config for ATRISTATION sound card
-	cat <<- UCM_MAIN > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/ATRISTATION.conf
+	cat <<- 'UCM_MAIN' > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/ATRISTATION.conf
 		SectionUseCase."HiFi" {
 			File "HiFi.conf"
 			Comment "HiFi playback and capture"
@@ -29,7 +29,7 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	UCM_MAIN
 
 	# Write HiFi UCM config
-	cat <<- UCM_HIFI > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/HiFi.conf
+	cat <<- 'UCM_HIFI' > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/HiFi.conf
 		SectionVerb {
 			EnableSequence [
 				cset "name='Tweeters Master Playback Volume' 200"
@@ -87,7 +87,7 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	UCM_HIFI
 
 	# Write VoiceCall UCM config
-	cat <<- UCM_VC > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/VoiceCall.conf
+	cat <<- 'UCM_VC' > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/VoiceCall.conf
 		SectionVerb {
 			EnableSequence [
 			]
@@ -134,7 +134,7 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	# ALSA default device -> ATRISTATION card (no UCM needed for
 	# plain aplay/speaker-test)
 	mkdir -pv "${destination}"/etc
-	cat <<- ASOUND_CONF > "${destination}"/etc/asound.conf
+	cat <<- 'ASOUND_CONF' > "${destination}"/etc/asound.conf
 		pcm.!default {
 		    type plug
 		    slave.pcm "hw:ATRISTATION,0"
@@ -165,7 +165,7 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	fi
 
 	# Create systemd oneshot service for sound card init
-	cat <<- SOUND_SERVICE > "${destination}"/lib/systemd/system/atrisound.service
+	cat <<- 'SOUND_SERVICE' > "${destination}"/lib/systemd/system/atrisound.service
 		[Unit]
 		Description=AtriStation sound card initialization
 		After=local-fs.target

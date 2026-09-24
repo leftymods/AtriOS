@@ -33,7 +33,7 @@ ATRALS_BIN = atri-als
 PCBA_BIN = atri-pcba
 WIFI_DIAG_BIN = atri-wifi-diag
 TEST_BIN = test_atri_led
-ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN)
+ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)

@@ -96,11 +96,11 @@ plymouth (тема atrios) → рабочий стол/даун
 микросхема формирует два сигнала A/B со сдвигом 90° → они приходят
 на **GPIOA_0 (фаза A)** и **GPIOAO_10 (фаза B)**.
 
-В DTS оба пина объявлены в узле `rotary-volume` (`gpio-keys-polled`):
-- `vol-up`: `GPIOA_0`
-- `vol-down`: `GPIOAO_10`
+В DTS оба пина объявлены в узле `rotary-volume` (compatible `rotary-volume` под драйвер ядра `CONFIG_INPUT_ROTARY_VOLUME=m`):
+- Фаза A: `GPIOA_0`
+- Фаза B: `GPIOAO_10`
 
-События клавиш транслируются стандартным input subsystem ядра в
+Квадратурный декодер таблицы состояний Грея в ядре транслирует шаги вращения в стандартные input-события:
 `KEY_VOLUMEUP` и `KEY_VOLUMEDOWN`.
 
 ## Про vendor-jtag и прошивку экрана

@@ -46,6 +46,7 @@ static const struct addr_id known_i2c[] = {
 	{ 0x40, "ES7210 four-ch ADC (mic/feedback)" },
 	{ 0x50, "EEPROM range" },
 	{ 0x51, "EEPROM range" },
+	{ 0x53, "LTR-308ALS / LTRF216A Ambient Light Sensor" },
 	{ 0x64, "RK8xx-class PMIC (not expected here)" },
 	{ 0, NULL }
 };

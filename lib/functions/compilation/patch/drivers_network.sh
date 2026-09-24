@@ -523,6 +523,12 @@ driver_rtw88_lwfinger() {
 				"$kerneldir/drivers/net/wireless/realtek/rtw88/Makefile"
 		fi
 
+		# Copy Kconfig from lwfinger if present to ensure RTW88_8822CS is recognized by olddefconfig
+		if [[ -f "${SRC}/cache/sources/rtw88/${rtw88ver#*:}/Kconfig" ]]; then
+			cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}/Kconfig" \
+				"$kerneldir/drivers/net/wireless/realtek/rtw88/Kconfig"
+		fi
+
 		# Copy firmware files (rtw8822c_fw.bin etc.) into kernel firmware dir for installation
 		mkdir -p "$kerneldir/firmware/rtw88"
 		cp "${SRC}/cache/sources/rtw88/${rtw88ver#*:}"/firmware/*.bin \
