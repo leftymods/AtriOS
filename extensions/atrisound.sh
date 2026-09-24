@@ -32,8 +32,12 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	cat <<- 'UCM_HIFI' > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/HiFi.conf
 		SectionVerb {
 			EnableSequence [
+				cset "name='Tweeters Master Playback Switch' on"
+				cset "name='Woofer Master Playback Switch' on"
+				cset "name='Playback Switch' on"
 				cset "name='Tweeters Master Playback Volume' 200"
 				cset "name='Woofer Master Playback Volume' 200"
+				cset "name='Playback Volume' 220"
 			]
 			DisableSequence [
 			]
@@ -43,11 +47,17 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 			Comment "Built-in stereo speakers (tweeters + woofer)"
 
 			EnableSequence [
+				cset "name='Tweeters Master Playback Switch' on"
+				cset "name='Woofer Master Playback Switch' on"
+				cset "name='Playback Switch' on"
 				cset "name='Tweeters Master Playback Volume' 200"
 				cset "name='Woofer Master Playback Volume' 200"
 			]
 
 			DisableSequence [
+				cset "name='Tweeters Master Playback Switch' off"
+				cset "name='Woofer Master Playback Switch' off"
+				cset "name='Playback Switch' off"
 				cset "name='Tweeters Master Playback Volume' 0"
 				cset "name='Woofer Master Playback Volume' 0"
 			]
@@ -113,11 +123,17 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 			Comment "Built-in speaker"
 
 			EnableSequence [
+				cset "name='Tweeters Master Playback Switch' on"
+				cset "name='Woofer Master Playback Switch' on"
+				cset "name='Playback Switch' on"
 				cset "name='Tweeters Master Playback Volume' 200"
 				cset "name='Woofer Master Playback Volume' 200"
 			]
 
 			DisableSequence [
+				cset "name='Tweeters Master Playback Switch' off"
+				cset "name='Woofer Master Playback Switch' off"
+				cset "name='Playback Switch' off"
 				cset "name='Tweeters Master Playback Volume' 0"
 				cset "name='Woofer Master Playback Volume' 0"
 			]
@@ -145,9 +161,13 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		}
 	ASOUND_CONF
 
-	# Audio driver module auto-load
+	# Audio driver module auto-load (amplifiers, DAC and ADC)
 	mkdir -pv "${destination}"/etc/modules-load.d
-	echo "snd-soc-sy6045s" > "${destination}"/etc/modules-load.d/sound.conf
+	cat <<- 'SOUND_MODS' > "${destination}"/etc/modules-load.d/sound.conf
+		snd-soc-sy6045s
+		snd-soc-es8156
+		snd-soc-es7210
+	SOUND_MODS
 
 	# Install SY6045S I2C init script (DSP config for tweeters + woofer amps)
 	run_host_command_logged mkdir -pv "${destination}"/usr/libexec
@@ -180,7 +200,9 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done'
 		# SY6045S: trigger firmware reload via sysfs, or run hardware init script as fallback
 		ExecStart=/bin/sh -c 'if [ -d /sys/bus/i2c/drivers/sy6045s ]; then for d in /sys/bus/i2c/drivers/sy6045s/*; do [ -f "$$d/default_settings" ] && echo 1 > "$$d/default_settings" 2>/dev/null || true; done; elif [ -x /usr/libexec/sy6045s-init.sh ]; then /usr/libexec/sy6045s-init.sh || true; fi'
-		# Restore ALSA mixer state
+		# Unmute all output channels and set initial sensible volume
+		ExecStart=/bin/sh -c 'amixer -c ATRISTATION sset "Tweeters Master" 75% unmute 2>/dev/null || true; amixer -c ATRISTATION sset "Woofer Master" 75% unmute 2>/dev/null || true; amixer -c ATRISTATION sset "Playback" 80% unmute 2>/dev/null || true'
+		# Restore ALSA mixer state if saved
 		ExecStart=/usr/sbin/alsactl restore 0 || true
 
 		[Install]

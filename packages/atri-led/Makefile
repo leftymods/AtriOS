@@ -16,6 +16,7 @@ SCR_LIB = libquasar_screen.a
 LED_DAEMON_BIN = atri-led
 LED_CTL_BIN = atri-led-ctl
 VOL_BIN = atrivolume
+SOUND_TEST_BIN = atri-sound-test
 MATRIX_BIN = atri-matrix
 HWPROBE_BIN = atri-hwprobe
 ZGBIN = atri-zigbee
@@ -33,9 +34,10 @@ ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c
 
 all: $(LED_LIB) $(SCR_LIB) $(ALL_BINS)
 ifneq ($(ASOUND_AVAIL),yes)
-	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
+	@echo "==> -lasound not available for target, skipping $(VOL_BIN) and $(SOUND_TEST_BIN)"
 else
 	@$(MAKE) $(VOL_BIN)
+	@$(MAKE) $(SOUND_TEST_BIN)
 endif
 
 # Libraries
@@ -63,6 +65,9 @@ $(LED_CTL_BIN): src/atri_led_ctl.c $(LED_LIB) include/atri_led.h
 
 $(VOL_BIN): src/atrivolume.c $(LED_LIB) include/atri_led.h
 	$(CC) $(CFLAGS) $< -L. -latri_led $(ASOUND_LIBS) $(LDFLAGS) -o $@
+
+$(SOUND_TEST_BIN): src/atri_sound_test.c
+	$(CC) $(CFLAGS) $< $(ASOUND_LIBS) $(LDFLAGS) -o $@
 
 $(MATRIX_BIN): src/atri_matrix.c $(SCR_LIB) include/quasar_screen.h
 	$(CC) $(CFLAGS) -I./include $< -L. -lquasar_screen $(LDFLAGS) -o $@
@@ -125,10 +130,12 @@ install: all
 	ln -sf $(HWPROBE_BIN) $(DESTDIR)/usr/bin/atri-buttons
 	ln -sf $(HWPROBE_BIN) $(DESTDIR)/usr/bin/atri-knob
 ifneq ($(ASOUND_AVAIL),yes)
-	@echo "==> skipping atrivolume install (not built)"
+	@echo "==> skipping audio bins install (not built)"
 else
 	cp $(VOL_BIN) $(DESTDIR)/usr/bin/
 	ln -sf $(VOL_BIN) $(DESTDIR)/usr/bin/atri-volume
+	cp $(SOUND_TEST_BIN) $(DESTDIR)/usr/bin/
+	ln -sf $(SOUND_TEST_BIN) $(DESTDIR)/usr/bin/atrisound-test
 endif
 	cp include/atri_led.h $(DESTDIR)/usr/include/
 	cp include/atri_led_anim.h $(DESTDIR)/usr/include/
@@ -145,6 +152,6 @@ ifneq ($(ASOUND_AVAIL),yes)
 endif
 
 clean:
-	rm -f *.o $(LED_LIB) $(SCR_LIB) $(ALL_BINS) $(VOL_BIN)
+	rm -f *.o $(LED_LIB) $(SCR_LIB) $(ALL_BINS) $(VOL_BIN) $(SOUND_TEST_BIN)
 
 .PHONY: all install clean
