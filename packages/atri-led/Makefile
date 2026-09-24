@@ -3,52 +3,42 @@ CFLAGS = -O2 -Wall -I./include -D_GNU_SOURCE
 LDFLAGS = -static -lm
 ASOUND_LIBS = -lasound
 
-# LED ring library
+# Libraries
 LED_LIB_SRC = src/atri_led.c src/atri_led_anim.c
 LED_LIB_OBJ = atri_led.o atri_led_anim.o
 LED_LIB = libatri_led.a
 
-# SPI screen library
 SCR_LIB_SRC = src/quasar_screen.c
 SCR_LIB_OBJ = quasar_screen.o
 SCR_LIB = libquasar_screen.a
 
-# Binaries
-CTL_BIN = atrledctl
-MAIN_BIN = atrled
+# Core Unified Binaries
+LED_DAEMON_BIN = atri-led
+LED_CTL_BIN = atri-led-ctl
 VOL_BIN = atrivolume
-SCR_BIN = atriled-screen
-QCTL_BIN = quasar_led_ctl
-QTST_BIN = quasar_led_test
-QTXT_BIN = quasar_led_text
-QDEMO_BIN = quasar_led_demo
-QINFO_BIN = quasar_led_info
-SCREEN_BINS = $(QTST_BIN) $(QTXT_BIN) $(QDEMO_BIN) $(QINFO_BIN)
-SCRTEST_BIN = atri-screen-test
+MATRIX_BIN = atri-matrix
 HWPROBE_BIN = atri-hwprobe
 ZGBIN = atri-zigbee
-BTNS_BIN = atri-buttons
-KNOB_BIN = atri-knob
-ATRALS_BIN = atri-als
-PCBA_BIN = atri-pcba
 WIFI_DIAG_BIN = atri-wifi-diag
 WIFI_INIT_BIN = atri-wireless-init
 DISP_DAEMON_BIN = atri-displayd
 DISP_CLI_BIN = atri-display
+
+ALL_BINS = $(LED_DAEMON_BIN) $(LED_CTL_BIN) $(MATRIX_BIN) $(HWPROBE_BIN) $(ZGBIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN) $(DISP_DAEMON_BIN) $(DISP_CLI_BIN)
+
 TEST_BIN = test_atri_led
-ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN) $(DISP_DAEMON_BIN) $(DISP_CLI_BIN)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN) $(DISP_DAEMON_BIN) $(DISP_CLI_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(ALL_BINS)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
 	@$(MAKE) $(VOL_BIN)
 endif
 
-# LED ring library
+# Libraries
 $(LED_LIB): $(LED_LIB_OBJ)
 	ar rcs $@ $^
 
@@ -58,62 +48,30 @@ atri_led.o: src/atri_led.c include/atri_led.h
 atri_led_anim.o: src/atri_led_anim.c include/atri_led.h include/atri_led_anim.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# SPI screen library
 $(SCR_LIB): $(SCR_LIB_OBJ)
 	ar rcs $@ $^
 
 quasar_screen.o: src/quasar_screen.c include/quasar_screen.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# LED ring binaries
-$(CTL_BIN): src/atri_led_ctl.c $(LED_LIB) include/atri_led.h
-	$(CC) $(CFLAGS) $< -L. -latri_led $(LDFLAGS) -o $@
-
-$(MAIN_BIN): src/atriled.c $(LED_LIB) include/atri_led.h include/atri_led_anim.h
+# Unified Binaries
+$(LED_DAEMON_BIN): src/atriled.c $(LED_LIB) include/atri_led.h include/atri_led_anim.h
 	$(CC) $(CFLAGS) -I./include $< -L. -latri_led $(LDFLAGS) -o $@
+
+$(LED_CTL_BIN): src/atri_led_ctl.c $(LED_LIB) include/atri_led.h
+	$(CC) $(CFLAGS) $< -L. -latri_led $(LDFLAGS) -o $@
 
 $(VOL_BIN): src/atrivolume.c $(LED_LIB) include/atri_led.h
 	$(CC) $(CFLAGS) $< -L. -latri_led $(ASOUND_LIBS) $(LDFLAGS) -o $@
 
-$(SCR_BIN): src/atriled_screen.c
-	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
-
-# SPI screen binaries
-$(QTST_BIN): src/quasar_led_test.c $(SCR_LIB)
-	$(CC) $(CFLAGS) $< -L. -lquasar_screen $(LDFLAGS) -o $@
-
-$(QTXT_BIN): src/quasar_led_text.c $(SCR_LIB)
-	$(CC) $(CFLAGS) $< -L. -lquasar_screen $(LDFLAGS) -o $@
-
-$(QDEMO_BIN): src/quasar_led_demo.c $(SCR_LIB)
-	$(CC) $(CFLAGS) $< -L. -lquasar_screen $(LDFLAGS) -o $@
-
-$(QINFO_BIN): src/quasar_led_info.c $(SCR_LIB)
-	$(CC) $(CFLAGS) $< -L. -lquasar_screen $(LDFLAGS) -o $@
-
-$(QCTL_BIN): src/quasar_led_ctl.c $(SCR_LIB) include/quasar_screen.h
+$(MATRIX_BIN): src/atri_matrix.c $(SCR_LIB) include/quasar_screen.h
 	$(CC) $(CFLAGS) -I./include $< -L. -lquasar_screen $(LDFLAGS) -o $@
-
-$(SCRTEST_BIN): src/atri_screen_test.c
-	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 $(HWPROBE_BIN): src/atri_hwprobe.c
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 $(ZGBIN): src/atri_zigbee.c
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
-
-$(BTNS_BIN): src/atri_buttons.c
-	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
-
-$(KNOB_BIN): src/atri_knob.c
-	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
-
-$(ATRALS_BIN): src/atri_als.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
-
-$(PCBA_BIN): src/atri_pcba.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 $(WIFI_DIAG_BIN): src/atri_wifi_diag.c
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
@@ -141,30 +99,31 @@ install: all
 	mkdir -p $(DESTDIR)/etc/atriled/animations
 	cp $(LED_LIB) $(DESTDIR)/usr/lib/
 	cp $(SCR_LIB) $(DESTDIR)/usr/lib/
-	cp $(CTL_BIN) $(DESTDIR)/usr/bin/
-	cp $(MAIN_BIN) $(DESTDIR)/usr/bin/
-	cp $(SCR_BIN) $(DESTDIR)/usr/bin/
-	cp $(SCREEN_BINS) $(DESTDIR)/usr/bin/
-	cp $(QCTL_BIN) $(DESTDIR)/usr/bin/
-	cp $(SCRTEST_BIN) $(DESTDIR)/usr/bin/
+	cp $(LED_DAEMON_BIN) $(DESTDIR)/usr/bin/
+	cp $(LED_CTL_BIN) $(DESTDIR)/usr/bin/
+	cp $(MATRIX_BIN) $(DESTDIR)/usr/bin/
 	cp $(HWPROBE_BIN) $(DESTDIR)/usr/bin/
 	cp $(ZGBIN) $(DESTDIR)/usr/bin/
-	cp $(BTNS_BIN) $(DESTDIR)/usr/bin/
-	cp $(KNOB_BIN) $(DESTDIR)/usr/bin/
-	cp $(ATRALS_BIN) $(DESTDIR)/usr/bin/
-	cp $(PCBA_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_INIT_BIN) $(DESTDIR)/usr/bin/
 	cp $(DISP_DAEMON_BIN) $(DESTDIR)/usr/bin/
 	cp $(DISP_CLI_BIN) $(DESTDIR)/usr/bin/
+	# Backward-compatible and canonical symlinks
+	ln -sf $(LED_DAEMON_BIN) $(DESTDIR)/usr/bin/atrled
+	ln -sf $(LED_CTL_BIN) $(DESTDIR)/usr/bin/atrledctl
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless
-	ln -sf $(MAIN_BIN) $(DESTDIR)/usr/bin/atri-led
-	ln -sf $(CTL_BIN) $(DESTDIR)/usr/bin/atri-led-ctl
-	ln -sf $(QCTL_BIN) $(DESTDIR)/usr/bin/atri-matrix-ctl
-	ln -sf $(QTST_BIN) $(DESTDIR)/usr/bin/atri-matrix-test
-	ln -sf $(QDEMO_BIN) $(DESTDIR)/usr/bin/atri-matrix-demo
-	ln -sf $(QTXT_BIN) $(DESTDIR)/usr/bin/atri-matrix-text
-	ln -sf $(QINFO_BIN) $(DESTDIR)/usr/bin/atri-matrix-info
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/atri-screen-test
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/atri-screen
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/quasar_led_ctl
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/quasar_led_test
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/quasar_led_demo
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/quasar_led_text
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/quasar_led_info
+	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/atriled-screen
+	ln -sf $(HWPROBE_BIN) $(DESTDIR)/usr/bin/atri-pcba
+	ln -sf $(HWPROBE_BIN) $(DESTDIR)/usr/bin/atri-als
+	ln -sf $(HWPROBE_BIN) $(DESTDIR)/usr/bin/atri-buttons
+	ln -sf $(HWPROBE_BIN) $(DESTDIR)/usr/bin/atri-knob
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
 else

@@ -32,11 +32,9 @@ compile_atri-led() {
 		Maintainer: $MAINTAINER <$MAINTAINERMAIL>
 		Section: universe/utils
 		Priority: optional
-		Description: AtriStation LED ring and SPI screen tools
-		 Provides atrled, atrledctl for LED ring control via I2C,
-		 and quasar_led_test/text/demo/info for 25x16 SPI LED screen.
-		 Includes systemd service for boot animation and screen
-		 test/demo utilities.
+		Description: AtriOS hardware control daemons and utilities
+		 Provides atri-led, atri-displayd, atrivolume, atri-matrix, atri-hwprobe,
+		 atri-zigbee, and hardware utilities for AtriOS.
 	END
 
 	# Compile C source for target architecture
