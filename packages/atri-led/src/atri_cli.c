@@ -60,14 +60,18 @@ static void print_usage(const char *prog)
 	printf("%sUsage:%s %s <command> [arguments...]\n\n", COLOR_BOLD, COLOR_RESET, prog);
 	printf("%sCommands:%s\n", COLOR_BOLD, COLOR_RESET);
 	printf("  %smenu%s, %ssetup%s         Launch interactive TUI configurator (Wi-Fi, audio, LEDs)\n", COLOR_GREEN, COLOR_RESET, COLOR_GREEN, COLOR_RESET);
-	printf("  %sonboard%s               Start phone onboarding Wi-Fi hotspot & web setup portal\n", COLOR_GREEN, COLOR_RESET);
+	printf("  %sonboard%s               Start phone onboarding (BLE stealth / Classic visible)\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %sstatus%s                Show comprehensive status of all hardware subsystems\n", COLOR_GREEN, COLOR_RESET);
+	printf("  %sclock%s, %seyes%s          Display digital clock or expressive eyes on front matrix\n", COLOR_GREEN, COLOR_RESET, COLOR_GREEN, COLOR_RESET);
+	printf("  %sbtaudio%s [on|off|stat] Bluetooth wireless speaker mode (A2DP sink)\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %ssound%s [subcmd...]     Audio tests, tone generator, frequency sweep, mics\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %smatrix%s [subcmd...]    25x16 LED screen: text, demo, test, on/off, brightness\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %sled%s [subcmd...]       24-RGB ring: animations, color, volume arc, off\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %sals%s [subcmd...]       Ambient light sensor (lux reading, watch mode)\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %sautobrightness%s [...]  Auto-brightness daemon control (status, on, off, auto-off)\n", COLOR_GREEN, COLOR_RESET);
-	printf("  %sdisplay%s [subcmd...]   Front screen user interface daemon CLI\n", COLOR_GREEN, COLOR_RESET);
+	printf("  %sdisplay%s [subcmd...]   Front screen user interface daemon CLI (clock/eyes/temp)\n", COLOR_GREEN, COLOR_RESET);
+	printf("  %stz%s [Europe/Moscow]    Get or set system timezone\n", COLOR_GREEN, COLOR_RESET);
+	printf("  %slang%s [ru|en]          Get or set system locale\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %szigbee%s [subcmd...]    Tuya TZ9213 radio: reset, firmware flash, listen\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %sprobe%s [subcmd...]     Board probe: PCBA EEPROM, I2C/SPI bus scan, buttons\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %swifi%s [subcmd...]      Wireless network diagnostics and status\n", COLOR_GREEN, COLOR_RESET);
@@ -267,6 +271,74 @@ int main(int argc, char **argv)
 		execvp("atri-onboard", &argv[1]);
 		perror("execvp atri-onboard");
 		return 1;
+	}
+
+	if (!strcmp(cmd, "clock") || !strcmp(cmd, "time")) {
+		char *new_argv[] = { "atri-display", "clock", NULL };
+		execvp("atri-display", new_argv);
+		perror("execvp atri-display");
+		return 1;
+	}
+	if (!strcmp(cmd, "eyes")) {
+		char *new_argv[] = { "atri-display", "eyes", NULL };
+		execvp("atri-display", new_argv);
+		perror("execvp atri-display");
+		return 1;
+	}
+	if (!strcmp(cmd, "temp")) {
+		const char *tval = (argc >= 3) ? argv[2] : "+22";
+		char *new_argv[] = { "atri-display", "temp", (char*)tval, NULL };
+		execvp("atri-display", new_argv);
+		perror("execvp atri-display");
+		return 1;
+	}
+	if (!strcmp(cmd, "msg")) {
+		argv[1] = "msg";
+		char *new_argv[32];
+		new_argv[0] = "atri-display";
+		for (int i = 1; i < argc && i < 30; i++) new_argv[i] = argv[i];
+		new_argv[argc] = NULL;
+		execvp("atri-display", new_argv);
+		perror("execvp atri-display");
+		return 1;
+	}
+	if (!strcmp(cmd, "btaudio")) {
+		if (argc >= 3 && (!strcmp(argv[2], "off") || !strcmp(argv[2], "stop") || !strcmp(argv[2], "disable"))) {
+			system("hciconfig hci0 noscan 2>/dev/null || true; bluetoothctl discoverable off >/dev/null 2>&1 &");
+			printf("Bluetooth audio discoverability disabled.\n");
+		} else if (argc >= 3 && !strcmp(argv[2], "status")) {
+			system("bluetoothctl devices Connected 2>/dev/null || bluetoothctl devices");
+		} else {
+			system("hciconfig hci0 up 2>/dev/null || true; "
+			       "hciconfig hci0 piscan 2>/dev/null || true; "
+			       "hciconfig hci0 class 0x200414 2>/dev/null || true; "
+			       "bluetoothctl discoverable on >/dev/null 2>&1 & "
+			       "bluetoothctl pairable on >/dev/null 2>&1 &");
+			printf("Bluetooth A2DP Audio Sink mode enabled. Device is discoverable as a wireless speaker.\n");
+		}
+		return 0;
+	}
+	if (!strcmp(cmd, "tz") || !strcmp(cmd, "timezone")) {
+		if (argc >= 3) {
+			char sys_cmd[128];
+			snprintf(sys_cmd, sizeof(sys_cmd), "timedatectl set-timezone '%s'", argv[2]);
+			system(sys_cmd);
+		} else {
+			system("timedatectl status | grep 'Time zone'");
+		}
+		return 0;
+	}
+	if (!strcmp(cmd, "lang") || !strcmp(cmd, "locale")) {
+		if (argc >= 3) {
+			const char *target = (!strcmp(argv[2], "ru") || strstr(argv[2], "ru")) ? "ru_RU.UTF-8" : "en_US.UTF-8";
+			char sys_cmd[128];
+			snprintf(sys_cmd, sizeof(sys_cmd), "localectl set-locale LANG='%s'", target);
+			system(sys_cmd);
+			printf("System locale set to %s\n", target);
+		} else {
+			system("localectl status");
+		}
+		return 0;
 	}
 
 	if (!strcmp(cmd, "sound")) {

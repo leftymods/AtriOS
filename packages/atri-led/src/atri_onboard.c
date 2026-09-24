@@ -248,17 +248,211 @@ static void handle_connect(int client_fd, const char *ssid, const char *password
 	write(client_fd, err_resp, strlen(err_resp));
 }
 
-static void handle_status(int client_fd)
+static void handle_get_lang(int client_fd)
+{
+	char lang[64] = "ru_RU.UTF-8";
+	FILE *fp = popen("localectl status 2>/dev/null | grep 'System Locale:' | cut -d= -f2", "r");
+	if (fp) {
+		if (fscanf(fp, "%63s", lang) != 1) {
+			FILE *fl = fopen("/etc/default/locale", "r");
+			if (fl) {
+				char lbuf[128];
+				while (fgets(lbuf, sizeof(lbuf), fl)) {
+					if (strncmp(lbuf, "LANG=", 5) == 0) {
+						sscanf(lbuf + 5, "%63s", lang);
+						break;
+					}
+				}
+				fclose(fl);
+			}
+		}
+		pclose(fp);
+	}
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"lang_result\",\"lang\":\"%s\"}\n", lang);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_set_lang(int client_fd, const char *lang)
+{
+	char target[64] = "ru_RU.UTF-8";
+	if (strstr(lang, "en") || strstr(lang, "EN")) {
+		strncpy(target, "en_US.UTF-8", sizeof(target));
+	} else {
+		strncpy(target, "ru_RU.UTF-8", sizeof(target));
+	}
+
+	char cmd[256];
+	snprintf(cmd, sizeof(cmd),
+	         "localectl set-locale LANG='%s' 2>/dev/null || "
+	         "(echo 'LANG=\"%s\"' > /etc/default/locale && echo 'LC_ALL=\"%s\"' >> /etc/default/locale)",
+	         target, target, target);
+	run_cmd(cmd);
+
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_lang_result\",\"lang\":\"%s\"}\n", target);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_get_tz(int client_fd)
+{
+	char tz[64] = "Europe/Moscow";
+	FILE *fp = popen("timedatectl show --property=Timezone --value 2>/dev/null", "r");
+	if (fp) {
+		if (fscanf(fp, "%63s", tz) != 1) {
+			FILE *ftz = fopen("/etc/timezone", "r");
+			if (ftz) {
+				if (fscanf(ftz, "%63s", tz) != 1) strcpy(tz, "Europe/Moscow");
+				fclose(ftz);
+			}
+		}
+		pclose(fp);
+	}
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"tz_result\",\"timezone\":\"%s\"}\n", tz);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_set_tz(int client_fd, const char *tz)
+{
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "timedatectl set-timezone '%s' 2>/dev/null || (echo '%s' > /etc/timezone)", tz, tz);
+	run_cmd(cmd);
+
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_tz_result\",\"timezone\":\"%s\"}\n", tz);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_get_volume(int client_fd)
+{
+	int vol = 75;
+	FILE *fp = popen("amixer sget Master 2>/dev/null | grep -m1 -o '[0-9]*%' | tr -d '%'", "r");
+	if (fp) {
+		int v;
+		if (fscanf(fp, "%d", &v) == 1) vol = v;
+		pclose(fp);
+	}
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"volume_result\",\"volume\":%d}\n", vol);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_set_volume(int client_fd, int vol)
+{
+	if (vol < 0) vol = 0;
+	if (vol > 100) vol = 100;
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "atrivolume %d 2>/dev/null || amixer sset Master %d%% 2>/dev/null || true", vol, vol);
+	run_cmd(cmd);
+
+	snprintf(cmd, sizeof(cmd), "atri-display vol %d 2>/dev/null || true", vol);
+	run_cmd(cmd);
+
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_volume_result\",\"volume\":%d}\n", vol);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_set_name(int client_fd, const char *name)
+{
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "hostnamectl set-hostname '%s' 2>/dev/null || true", name);
+	run_cmd(cmd);
+
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_name_result\",\"name\":\"%s\"}\n", name);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_set_display(int client_fd, const char *arg)
+{
+	char cmd[256];
+	snprintf(cmd, sizeof(cmd), "atri-display %s 2>/dev/null || true", arg);
+	run_cmd(cmd);
+
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"display_result\",\"applied\":\"%s\"}\n", arg);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_set_led(int client_fd, int r, int g, int b)
+{
+	char cmd[128];
+	snprintf(cmd, sizeof(cmd), "atri-led-ctl color %d %d %d 2>/dev/null || true", r, g, b);
+	run_cmd(cmd);
+
+	char resp[128];
+	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"led_result\",\"r\":%d,\"g\":%d,\"b\":%d}\n", r, g, b);
+	write(client_fd, resp, strlen(resp));
+}
+
+static void handle_btaudio(int client_fd, bool enable)
+{
+	if (enable) {
+		run_cmd("hciconfig hci0 piscan 2>/dev/null || true");
+		run_cmd("hciconfig hci0 class 0x200414 2>/dev/null || true"); /* Audio/Video Loudspeaker */
+		run_cmd("bluetoothctl discoverable on >/dev/null 2>&1 &");
+		run_cmd("bluetoothctl pairable on >/dev/null 2>&1 &");
+		write(client_fd, "{\"status\":\"ok\",\"type\":\"btaudio_result\",\"enabled\":true}\n", 57);
+	} else {
+		run_cmd("hciconfig hci0 noscan 2>/dev/null || true");
+		run_cmd("bluetoothctl discoverable off >/dev/null 2>&1 &");
+		write(client_fd, "{\"status\":\"ok\",\"type\":\"btaudio_result\",\"enabled\":false}\n", 58);
+	}
+}
+
+static void handle_telemetry(int client_fd)
 {
 	char ip[64] = "not connected";
-	FILE *f = popen("hostname -I 2>/dev/null", "r");
-	if (f) {
-		if (fscanf(f, "%63s", ip) != 1) strcpy(ip, "not connected");
-		pclose(f);
+	FILE *fip = popen("hostname -I 2>/dev/null", "r");
+	if (fip) {
+		if (fscanf(fip, "%63s", ip) != 1) strcpy(ip, "not connected");
+		pclose(fip);
 	}
-	char resp[256];
+
+	char ssid[64] = "none";
+	FILE *fssid = popen("nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2", "r");
+	if (fssid) {
+		if (fscanf(fssid, "%63s", ssid) != 1) strcpy(ssid, "none");
+		pclose(fssid);
+	}
+
+	int vol = 75;
+	FILE *fvol = popen("amixer sget Master 2>/dev/null | grep -m1 -o '[0-9]*%' | tr -d '%'", "r");
+	if (fvol) {
+		int v; if (fscanf(fvol, "%d", &v) == 1) vol = v;
+		pclose(fvol);
+	}
+
+	int lux = 0;
+	FILE *flux = popen("cat /sys/bus/iio/devices/iio:device*/in_illuminance_raw 2>/dev/null", "r");
+	if (flux) {
+		int l; if (fscanf(flux, "%d", &l) == 1) lux = l;
+		pclose(flux);
+	}
+
+	int temp = 40;
+	FILE *ftemp = popen("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null", "r");
+	if (ftemp) {
+		int t; if (fscanf(ftemp, "%d", &t) == 1) temp = t / 1000;
+		pclose(ftemp);
+	}
+
+	long uptime = 0;
+	FILE *fup = fopen("/proc/uptime", "r");
+	if (fup) {
+		double u; if (fscanf(fup, "%lf", &u) == 1) uptime = (long)u;
+		fclose(fup);
+	}
+
+	char resp[512];
 	snprintf(resp, sizeof(resp),
-	         "{\"status\":\"ok\",\"type\":\"status\",\"platform\":\"AtriStation\",\"ip\":\"%s\"}\n", ip);
+	         "{\"status\":\"ok\",\"type\":\"telemetry\","
+	         "\"platform\":\"AtriStation\",\"version\":\"AtriOS 2.1\","
+	         "\"ip\":\"%s\",\"wifi_ssid\":\"%s\","
+	         "\"volume\":%d,\"als_lux\":%d,\"cpu_temp\":%d,\"uptime\":%ld}\n",
+	         ip, ssid, vol, lux, temp, uptime);
 	write(client_fd, resp, strlen(resp));
 }
 
@@ -277,12 +471,99 @@ static void process_client_command(int client_fd, char *cmd_line)
 	if (strstr(cmd_line, "SCAN") || strstr(cmd_line, "\"cmd\":\"scan\"") || strstr(cmd_line, "\"cmd\": \"scan\"")) {
 		handle_scan(client_fd);
 	}
+	else if (strstr(cmd_line, "TELEMETRY") || strstr(cmd_line, "INFO") || strstr(cmd_line, "\"cmd\":\"info\"") || strstr(cmd_line, "\"cmd\":\"telemetry\"")) {
+		handle_telemetry(client_fd);
+	}
 	else if (strstr(cmd_line, "STATUS") || strstr(cmd_line, "\"cmd\":\"status\"") || strstr(cmd_line, "\"cmd\": \"status\"")) {
-		handle_status(client_fd);
+		handle_telemetry(client_fd);
 	}
 	else if (strstr(cmd_line, "SOUND_TEST") || strstr(cmd_line, "\"cmd\":\"sound_test\"") || strstr(cmd_line, "\"cmd\": \"sound_test\"")) {
 		run_cmd("atri sound tone all 2>/dev/null || atri-sound-test tone all 2>/dev/null || true");
 		write(client_fd, "{\"status\":\"ok\",\"type\":\"sound_test\"}\n", 35);
+	}
+	else if (strstr(cmd_line, "GET_LANG") || strstr(cmd_line, "\"cmd\":\"get_lang\"")) {
+		handle_get_lang(client_fd);
+	}
+	else if (strstr(cmd_line, "SET_LANG") || strstr(cmd_line, "\"cmd\":\"set_lang\"")) {
+		char lval[64] = "ru";
+		char *p = strstr(cmd_line, "\"lang\":");
+		if (p) {
+			sscanf(p, "\"lang\": \"%63[^\"]\"", lval);
+			if (!lval[0]) sscanf(p, "\"lang\":\"%63[^\"]\"", lval);
+		} else {
+			sscanf(cmd_line, "%*s %63s", lval);
+		}
+		handle_set_lang(client_fd, lval);
+	}
+	else if (strstr(cmd_line, "GET_TZ") || strstr(cmd_line, "GET_TIMEZONE") || strstr(cmd_line, "\"cmd\":\"get_tz\"")) {
+		handle_get_tz(client_fd);
+	}
+	else if (strstr(cmd_line, "SET_TZ") || strstr(cmd_line, "SET_TIMEZONE") || strstr(cmd_line, "\"cmd\":\"set_tz\"")) {
+		char tzval[64] = "Europe/Moscow";
+		char *p = strstr(cmd_line, "\"tz\":");
+		if (p) {
+			sscanf(p, "\"tz\": \"%63[^\"]\"", tzval);
+			if (!tzval[0]) sscanf(p, "\"tz\":\"%63[^\"]\"", tzval);
+		} else {
+			sscanf(cmd_line, "%*s %63s", tzval);
+		}
+		handle_set_tz(client_fd, tzval);
+	}
+	else if (strstr(cmd_line, "GET_VOLUME") || strstr(cmd_line, "\"cmd\":\"get_volume\"")) {
+		handle_get_volume(client_fd);
+	}
+	else if (strstr(cmd_line, "SET_VOLUME") || strstr(cmd_line, "\"cmd\":\"set_volume\"")) {
+		int v = 75;
+		char *p = strstr(cmd_line, "\"val\":");
+		if (!p) p = strstr(cmd_line, "\"volume\":");
+		if (p) {
+			sscanf(p, "%*[^0-9]%d", &v);
+		} else {
+			sscanf(cmd_line, "%*s %d", &v);
+		}
+		handle_set_volume(client_fd, v);
+	}
+	else if (strstr(cmd_line, "SET_NAME") || strstr(cmd_line, "\"cmd\":\"set_name\"")) {
+		char nval[64] = "AtriStation";
+		char *p = strstr(cmd_line, "\"name\":");
+		if (p) {
+			sscanf(p, "\"name\": \"%63[^\"]\"", nval);
+			if (!nval[0]) sscanf(p, "\"name\":\"%63[^\"]\"", nval);
+		} else {
+			sscanf(cmd_line, "%*s %63s", nval);
+		}
+		handle_set_name(client_fd, nval);
+	}
+	else if (strstr(cmd_line, "SET_DISPLAY") || strstr(cmd_line, "\"cmd\":\"set_display\"")) {
+		char dval[128] = "clock";
+		char *p = strstr(cmd_line, "\"mode\":");
+		if (p) {
+			sscanf(p, "\"mode\": \"%127[^\"]\"", dval);
+			if (!dval[0]) sscanf(p, "\"mode\":\"%127[^\"]\"", dval);
+		} else {
+			char *space = strchr(cmd_line, ' ');
+			if (space) strncpy(dval, space + 1, sizeof(dval) - 1);
+		}
+		handle_set_display(client_fd, dval);
+	}
+	else if (strstr(cmd_line, "SET_LED") || strstr(cmd_line, "\"cmd\":\"set_led\"")) {
+		int r = 0, g = 210, b = 255;
+		char *pr = strstr(cmd_line, "\"r\":");
+		if (pr) {
+			sscanf(pr, "%*[^0-9]%d", &r);
+			char *pg = strstr(cmd_line, "\"g\":");
+			if (pg) sscanf(pg, "%*[^0-9]%d", &g);
+			char *pb = strstr(cmd_line, "\"b\":");
+			if (pb) sscanf(pb, "%*[^0-9]%d", &b);
+		} else {
+			sscanf(cmd_line, "%*s %d %d %d", &r, &g, &b);
+		}
+		handle_set_led(client_fd, r, g, b);
+	}
+	else if (strstr(cmd_line, "BT_AUDIO") || strstr(cmd_line, "\"cmd\":\"bt_audio\"")) {
+		bool en = true;
+		if (strstr(cmd_line, "off") || strstr(cmd_line, "false") || strstr(cmd_line, "0")) en = false;
+		handle_btaudio(client_fd, en);
 	}
 	else if (strstr(cmd_line, "CONNECT") || strstr(cmd_line, "\"cmd\":\"connect\"") || strstr(cmd_line, "\"cmd\": \"connect\"")) {
 		/* Parse parameters */
@@ -318,12 +599,20 @@ static void process_client_command(int client_fd, char *cmd_line)
 			write(client_fd, "{\"status\":\"error\",\"message\":\"Missing SSID\"}\n", 43);
 		}
 	}
+	else if (strstr(cmd_line, "REBOOT") || strstr(cmd_line, "\"cmd\":\"reboot\"")) {
+		write(client_fd, "{\"status\":\"ok\",\"message\":\"Rebooting system...\"}\n", 47);
+		run_cmd("sync; reboot &");
+	}
+	else if (strstr(cmd_line, "POWEROFF") || strstr(cmd_line, "\"cmd\":\"poweroff\"")) {
+		write(client_fd, "{\"status\":\"ok\",\"message\":\"Powering off...\"}\n", 43);
+		run_cmd("sync; poweroff &");
+	}
 	else if (!strcmp(cmd_line, "EXIT") || strstr(cmd_line, "\"cmd\":\"exit\"")) {
 		write(client_fd, "{\"status\":\"ok\",\"message\":\"Goodbye\"}\n", 36);
 		running = false;
 	}
 	else {
-		write(client_fd, "{\"status\":\"error\",\"message\":\"Unknown command. Supported: SCAN, CONNECT, SOUND_TEST, STATUS, EXIT\"}\n", 97);
+		write(client_fd, "{\"status\":\"error\",\"message\":\"Unknown command. Supported: SCAN, CONNECT, TELEMETRY, SET_LANG, GET_LANG, SET_TZ, GET_TZ, SET_VOLUME, SET_NAME, SET_DISPLAY, SET_LED, BT_AUDIO, SOUND_TEST, REBOOT, POWEROFF, EXIT\"}\n", 220);
 	}
 }
 

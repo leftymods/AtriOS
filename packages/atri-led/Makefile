@@ -138,6 +138,7 @@ install: all
 	# Backward-compatible and canonical symlinks
 	ln -sf $(TUI_BIN) $(DESTDIR)/usr/bin/atri-setup
 	ln -sf $(TUI_BIN) $(DESTDIR)/usr/bin/atri-menu
+	ln -sf $(ONBOARD_BIN) $(DESTDIR)/usr/bin/atri-phone-setup
 	ln -sf $(LED_DAEMON_BIN) $(DESTDIR)/usr/bin/atrled
 	ln -sf $(LED_CTL_BIN) $(DESTDIR)/usr/bin/atrledctl
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless

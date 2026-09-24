@@ -272,6 +272,201 @@ static void action_als(void)
 	wait_enter();
 }
 
+static void action_btaudio(void)
+{
+	disable_raw_mode();
+	clear_screen();
+	printf("%s=== Bluetooth-колонка (A2DP Audio Sink) ===%s\n\n", COLOR_CYAN, COLOR_RESET);
+	printf("1. Включить режим беспроводной колонки (видимый для смартфона)\n");
+	printf("2. Выключить видимость Bluetooth\n");
+	printf("3. Список сопряженных и подключенных устройств\n");
+	printf("0. Назад\n\n");
+	printf("Выберите пункт [0-3]: ");
+
+	char sel[16];
+	if (fgets(sel, sizeof(sel), stdin)) {
+		switch (sel[0]) {
+			case '1':
+				system("hciconfig hci0 up 2>/dev/null || true; "
+				       "hciconfig hci0 piscan 2>/dev/null || true; "
+				       "hciconfig hci0 class 0x200414 2>/dev/null || true; "
+				       "bluetoothctl discoverable on >/dev/null 2>&1 & "
+				       "bluetoothctl pairable on >/dev/null 2>&1 &");
+				printf("\n%s[OK]%s Режим Bluetooth-колонки включен. Станция видна на смартфоне как аудиоустройство.\n", COLOR_GREEN, COLOR_RESET);
+				break;
+			case '2':
+				system("hciconfig hci0 noscan 2>/dev/null || true; "
+				       "bluetoothctl discoverable off >/dev/null 2>&1 &");
+				printf("\n%s[OK]%s Видимость Bluetooth отключена.\n", COLOR_GREEN, COLOR_RESET);
+				break;
+			case '3':
+				printf("\nПодключенные устройства:\n");
+				system("bluetoothctl devices Connected 2>/dev/null || bluetoothctl devices");
+				break;
+			default: break;
+		}
+	}
+	wait_enter();
+}
+
+static void action_locale(void)
+{
+	disable_raw_mode();
+	clear_screen();
+	printf("%s=== Язык и региональные настройки системы ===%s\n\n", COLOR_CYAN, COLOR_RESET);
+	printf("1. Русский (ru_RU.UTF-8)\n");
+	printf("2. English (en_US.UTF-8)\n");
+	printf("3. Текущий статус локали системы\n");
+	printf("0. Назад\n\n");
+	printf("Выберите пункт [0-3]: ");
+
+	char sel[16];
+	if (fgets(sel, sizeof(sel), stdin)) {
+		switch (sel[0]) {
+			case '1':
+				printf("Установка русской локали...\n");
+				system("localectl set-locale LANG=ru_RU.UTF-8 2>/dev/null || (echo 'LANG=ru_RU.UTF-8' > /etc/default/locale)");
+				printf("%s[OK]%s Установлен язык: Русский (ru_RU.UTF-8)\n", COLOR_GREEN, COLOR_RESET);
+				break;
+			case '2':
+				printf("Setting English locale...\n");
+				system("localectl set-locale LANG=en_US.UTF-8 2>/dev/null || (echo 'LANG=en_US.UTF-8' > /etc/default/locale)");
+				printf("%s[OK]%s Language set to: English (en_US.UTF-8)\n", COLOR_GREEN, COLOR_RESET);
+				break;
+			case '3':
+				system("localectl status 2>/dev/null || cat /etc/default/locale 2>/dev/null");
+				break;
+			default: break;
+		}
+	}
+	wait_enter();
+}
+
+static void action_timezone(void)
+{
+	disable_raw_mode();
+	clear_screen();
+	printf("%s=== Настройка часового пояса и синхронизации времени ===%s\n\n", COLOR_CYAN, COLOR_RESET);
+	printf("1. Москва, Санкт-Петербург (UTC+3, Europe/Moscow)\n");
+	printf("2. Калининград (UTC+2, Europe/Kaliningrad)\n");
+	printf("3. Самара (UTC+4, Europe/Samara)\n");
+	printf("4. Екатеринбург (UTC+5, Asia/Yekaterinburg)\n");
+	printf("5. Омск (UTC+6, Asia/Omsk)\n");
+	printf("6. Новосибирск, Красноярск (UTC+7, Asia/Novosibirsk)\n");
+	printf("7. Иркутск (UTC+8, Asia/Irkutsk)\n");
+	printf("8. Владивосток (UTC+10, Asia/Vladivostok)\n");
+	printf("9. Всемирное время UTC (Etc/UTC)\n");
+	printf("N. Включить синхронизацию времени по NTP (systemd-timesyncd)\n");
+	printf("0. Назад\n\n");
+	printf("Выберите пункт: ");
+
+	char sel[16];
+	if (fgets(sel, sizeof(sel), stdin)) {
+		const char *tz = NULL;
+		switch (sel[0]) {
+			case '1': tz = "Europe/Moscow"; break;
+			case '2': tz = "Europe/Kaliningrad"; break;
+			case '3': tz = "Europe/Samara"; break;
+			case '4': tz = "Asia/Yekaterinburg"; break;
+			case '5': tz = "Asia/Omsk"; break;
+			case '6': tz = "Asia/Novosibirsk"; break;
+			case '7': tz = "Asia/Irkutsk"; break;
+			case '8': tz = "Asia/Vladivostok"; break;
+			case '9': tz = "Etc/UTC"; break;
+			case 'n': case 'N':
+				system("timedatectl set-ntp true 2>/dev/null || true");
+				printf("%s[OK]%s Синхронизация времени по NTP активирована.\n", COLOR_GREEN, COLOR_RESET);
+				break;
+			default: break;
+		}
+		if (tz) {
+			char cmd[128];
+			snprintf(cmd, sizeof(cmd), "timedatectl set-timezone '%s' 2>/dev/null || (echo '%s' > /etc/timezone)", tz, tz);
+			system(cmd);
+			printf("%s[OK]%s Часовой пояс установлен: %s\n", COLOR_GREEN, COLOR_RESET, tz);
+			system("date");
+		}
+	}
+	wait_enter();
+}
+
+static void action_display_daemon(void)
+{
+	disable_raw_mode();
+	clear_screen();
+	printf("%s=== Управление дисплеем 25x16 (atri-display) ===%s\n\n", COLOR_CYAN, COLOR_RESET);
+	printf("1. Режим цифровых часов (Digital Clock HH:MM)\n");
+	printf("2. Анимация глазок (Blinking Eyes)\n");
+	printf("3. Вывод текущей температуры (+22)\n");
+	printf("4. Вывести IP-адрес станции бегущей строкой\n");
+	printf("5. Очистить экран\n");
+	printf("6. Статус службы экрана\n");
+	printf("0. Назад\n\n");
+	printf("Выберите пункт [0-6]: ");
+
+	char sel[16];
+	if (fgets(sel, sizeof(sel), stdin)) {
+		switch (sel[0]) {
+			case '1': system("atri display clock || atri-display clock"); break;
+			case '2': system("atri display eyes || atri-display eyes"); break;
+			case '3': system("atri display temp +22 || atri-display temp +22"); break;
+			case '4': system("atri display ip || atri-display ip"); break;
+			case '5': system("atri display clear || atri-display clear"); break;
+			case '6': system("atri display status || atri-display status"); break;
+			default: break;
+		}
+	}
+	wait_enter();
+}
+
+static void action_volume_control(void)
+{
+	int vol = 75;
+	FILE *fp = popen("amixer sget Master 2>/dev/null | grep -m1 -o '[0-9]*%' | tr -d '%'", "r");
+	if (fp) {
+		int v; if (fscanf(fp, "%d", &v) == 1) vol = v;
+		pclose(fp);
+	}
+
+	for (;;) {
+		clear_screen();
+		printf("%s=== Управление громкостью AtriStation ===%s\n\n", COLOR_CYAN, COLOR_RESET);
+		printf("Текущая громкость: %s%3d%%%s\n\n", COLOR_BOLD, vol, COLOR_RESET);
+
+		printf("Уровень: [");
+		int bars = vol / 5;
+		for (int b = 0; b < 20; b++) {
+			if (b < bars) printf("%s█%s", COLOR_GREEN, COLOR_RESET);
+			else printf("░");
+		}
+		printf("]\n\n");
+
+		printf("Клавиши: [%s+%s/%s→%s] +5%%, [%s-%s/%s←%s] -5%%, [%st%s] Тест-тон, [%sq/ENTER%s] Выход\n",
+		       COLOR_BOLD, COLOR_RESET, COLOR_BOLD, COLOR_RESET,
+		       COLOR_BOLD, COLOR_RESET, COLOR_BOLD, COLOR_RESET,
+		       COLOR_BOLD, COLOR_RESET, COLOR_BOLD, COLOR_RESET);
+
+		int k = read_key();
+		if (k == '+' || k == '=' || k == 1002 || k == 1000) {
+			vol += 5;
+			if (vol > 100) vol = 100;
+			char cmd[128];
+			snprintf(cmd, sizeof(cmd), "atrivolume %d 2>/dev/null || amixer sset Master %d%% >/dev/null 2>&1", vol, vol);
+			system(cmd);
+		} else if (k == '-' || k == '_' || k == 1003 || k == 1001) {
+			vol -= 5;
+			if (vol < 0) vol = 0;
+			char cmd[128];
+			snprintf(cmd, sizeof(cmd), "atrivolume %d 2>/dev/null || amixer sset Master %d%% >/dev/null 2>&1", vol, vol);
+			system(cmd);
+		} else if (k == 't' || k == 'T') {
+			system("atri sound tone tweeters >/dev/null 2>&1 &");
+		} else if (k == 'q' || k == 'Q' || k == '\r' || k == '\n' || k == 27) {
+			break;
+		}
+	}
+}
+
 static void action_zigbee(void)
 {
 	disable_raw_mode();
@@ -338,11 +533,16 @@ struct menu_item {
 };
 
 static struct menu_item menu[] = {
-	{ "📱 Настройка через Bluetooth (Bluetooth Phone Setup)", "Сопряжение по Bluetooth: передача Wi-Fi, имени и языка со смартфона", action_phone_setup },
+	{ "📱 Настройка через Bluetooth (Phone Onboarding)", "Сопряжение со смартфоном: передача Wi-Fi, языка, зоны и имени", action_phone_setup },
+	{ "🎵 Bluetooth-колонка (A2DP Audio Sink)", "Воспроизведение музыки со смартфона на динамиках станции", action_btaudio },
 	{ "📶 Настройка Wi-Fi (Wi-Fi Networks)", "Сканирование домашних сетей и подключение через NetworkManager", action_wifi },
+	{ "🔊 Громкость (Interactive Volume Slider)", "Интерактивный регулятор громкости и тест динамиков", action_volume_control },
 	{ "🔊 Тест звука (Audio Hardware & Tests)", "Тест твитеров, вуфера, частотный свип и 4-ch микрофоны", action_sound },
+	{ "🖥️ Режимы экрана 25x16 (Clock, Eyes, Temp)", "Цифровые часы, анимация глаз, температура, IP-адрес", action_display_daemon },
 	{ "💡 Экран 25x16 и световое кольцо (LEDs)", "Анимации, бегущий текст, Pong demo, цвета и подсветка", action_display_led },
 	{ "☀️ Автояркость по ALS (Auto-Brightness)", "Датчик LTR-308, плавная калибровка и автовыключение в темноте", action_als },
+	{ "🌐 Язык и локализация (System Locale)", "Выбор русского (ru_RU) или английского (en_US) языка", action_locale },
+	{ "🕒 Часовой пояс и время (Timezone & NTP)", "Выбор часового пояса и синхронизация времени по NTP", action_timezone },
 	{ "🐝 Zigbee координатор (Smart Home Radio)", "Управление радиомодулем Tuya TZ9213 умного дома", action_zigbee },
 	{ "📊 Сводный статус станции (System Health)", "Детальный аудит процессора, памяти, звука и радиомодулей", action_status },
 	{ "🔄 Питание (Reboot / Power Off)", "Перезагрузка или безопасное отключение станции", action_power },
