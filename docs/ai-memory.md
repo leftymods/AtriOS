@@ -53,17 +53,19 @@
 - TX-буфер преаллоцирован (tx_lock ≠ priv->lock)
 
 ### Аудио
-- **sy6045s**: regmap-диапазон 0x00–0xB0 (было ≤0x1f — резало 80%
-  прошивки); save/restore вокруг firmware УДАЛЁН (дамп сам ставит
-  финал: 03=5E, громкости, 22=00 unmute); sysfs amplifier/* рабочие;
-  **anti-pop секвенция** с логами `anti-pop: step N` (VDDIO→config→
-  forced mute 06=08→PVDD→150ms→unmute по trigger)
-- **PVDD-пин = GPIOAO_10** (по оригинальному DTB; X10 из старого
-  pastebin — ошибка). Регулятор 20V_AMPL не boot-on
-- **ES7210** (порт Armbian rk-6.1-rkr3) и **ES8156** (порт
-  rockchip-linux develop-5.10) — адаптированы, W=1 чисто
-- Конфликт «uart_AO_B vs TDM-B» был **ложным**: зигби на пинах 2/3
-  (uart_ao_b_2_3_pins), аудио на AO4/6/7/8+MCLK AO9
+- **sy6045s**: regmap-диапазон 0x00–0xB0; anti-pop секвенция с
+  аппаратным DRC и защитой динамиков на 20V шине; UCM2 HiFi и VoiceCall
+  профили с активными playback switches твитеров и вуфера.
+- **Строго без TAS**: Texas Instruments кодеков нет на плате физически.
+  Используются: SY6045S твитеры (@0x2a), SY6045S вуфер (@0x2b),
+  Everest ES8156 ЦАП (@0x08), Everest ES7210 4-ch АЦП (@0x40).
+- **Автозагрузка кодеков**: `snd-soc-sy6045s`, `snd-soc-es8156`,
+  `snd-soc-es7210` в `/etc/modules-load.d/sound.conf` исключают
+  блокировку ASoC DAI link (`-EPROBE_DEFER`).
+- **PipeWire 2.1 Crossover & WebRTC AEC**: виртуальный 2.1 кроссовер
+  160 Гц (Linkwitz-Riley Lowpass/Highpass) и модуль эхоподавления AEC.
+- **PVDD-пин = GPIOX_10** (board owner подтвердил; AO_10 освобождён
+  для энкодера ручки громкости). Регулятор 20V_AMPL.
 
 ### Zigbee (TZ9213-2782)
 - UART_AO_B → `/dev/ttyAML2` (ttyAML1 = **Bluetooth**! serial1=uart_A)
@@ -72,16 +74,12 @@
 
 ### Ручка громкости
 - Лазерное прерывание → квадратурная микросхема → A/B
-- A=GPIOA_0 (periphs offset 49), B=**AO10 — КОНФЛИКТ** с PVDD
-- rotary-poll (uinput REL_DIAL) → atrivolume (EMA+гистерезис, дуга
-  через сокет atrled с фолбэком)
-- **Сейчас ручка ОТКЛЮЧЕНА**: rotary-poll детектит занятый пин,
-  пишет «volume knob DISABLED», exit 1 (Restart=on-failure, без спама)
-- **Развязка**: `atri-hwprobe --watch-gpio 30` + крутить ручку →
-  реальные пины. Если B≠AO10 → одна строка ROTARY_GPIO_B в
-  `config/boards/atristation.conf`
+- A=GPIOA_0 (periphs offset 49), B=GPIOAO_10 (конфликт с PVDD исчерпан
+  переносом 20V_AMPL на GPIOX_10).
+- Энкодер: `atrivolume` (EMA+гистерезис, дуга через сокет atrled) и
+  ядерный `rotary-volume` / `atri-hwprobe knob`.
 - Арбитраж кольца: atrled держит `/run/atriled.override`, atri-main
-  передаёт NULL ring в animator_tick
+  передаёт NULL ring в animator_tick.
 
 ### Конфиг ядра (trim ~2035 символов)
 - Хуки в meson64_common.inc: `custom_kernel_config__atristation_trim`
@@ -122,17 +120,21 @@ ampl_pwr=AO10, энкодер A=X? нет — A=GPIOA_0(49), B=AO10.
 
 ## 6. Инструменты (packages/atri-led → /usr/bin)
 
-`atrled` (демон: tweening ~125Гц, перцептивный блендинг через
-гамма-LUT, кросфейд, override-флаг) · `atrledctl` (вкл. status) ·
-`atrivolume` · `atri-screen-test` · `atri-hwprobe` (+--watch-gpio,
---i2c-read) · `atri-zigbee`. Тесты библиотеки: `make test` в
-packages/atri-led.
+- `atri-led` (симлинк `atrled`) — RGB кольцо (tweening ~125Гц, перцептивный блендинг)
+- `atri-led-ctl` (симлинк `atrledctl`) — CLI кольца
+- `atri-matrix` (объединил 7 утилит: `test`, `demo`, `text`, `on`/`off`, `brightness`, `clear`/`fill`, `info`)
+- `atri-hwprobe` (объединил 4 утилиты: `pcba`, `als`, `buttons`, `knob`, сканер I2C/SPI)
+- `atri-sound-test` (симлинк `atrisound-test`) — диагностика звука, синус-тоны, sweep, 4-ch микрофоны
+- `atrivolume` (симлинк `atri-volume`) — отслеживание громкости и энкодера
+- `atri-zigbee` — прошивка и управление координатором Tuya TZ9213
+- `atri-displayd` & `atri-display` — демон и CLI экранного интерфейса
+- `atri-wireless-init` & `atri-wifi-diag` — автоинициализация MAC/eFuse и диагностика WiFi
 
 ## 7. Открытые пункты (только железо)
 
 1. Брингап по `docs/atristation-bringup.md`
-2. `--watch-gpio` → пины ручки → ROTARY_GPIO_B (или подтвердить конфликт)
-3. PVDD: мультиметр после `anti-pop: steps 4-5` (AO10 должен дать 20В)
+2. PVDD: замер мультиметром на 20V_AMPL (GPIOX_10)
+3. Проверка звука через `atri-sound-test` (sweep + 4-ch mic)
 4. BT wake-линии (X17 занят зигби), UHS WiFi по шагам с iperf3
 5. Trim-проход №2 по живому lsmod
 6. Прошивки VDEC в рутфс: `dpkg -L firmware-misc-nonfree | grep vdec`

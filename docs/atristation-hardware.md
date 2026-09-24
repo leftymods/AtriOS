@@ -16,7 +16,7 @@
 | **GPIOX_10** | Enable 20V усилителей | out, active-high | vendor DTB: 0x4b (75 dec = GPIOX_10) |
 | **GPIOX_11** | Zigbee boot | out | vendor DTB: 0x4c (76 dec = GPIOX_11) |
 | **GPIOX_17** | Zigbee reset | out | vendor DTB: 0x52 (82 dec = GPIOX_17) |
-| **GPIOX_18** | Bluetooth enable (BT_EN) | out | vendor DTB: 0x53 (83 dec = GPIOX_18) |
+| **GPIOX_19** | Bluetooth enable (BT_EN) | out | vendor DTB: 0x53 (83 dec = GPIOX_19) |
 | **GPIOAO_3** | Zigbee UART RX | in | ⚠ бывший tflash_vdd — отключён |
 | **GPIOAO_8** | TDM-B SCLK (аудио) | out | ⚠ uart_AO_B вариант 8/9 недоступен |
 | **GPIOAO_9** | TDM-B MCLK (аудио) | out | |
