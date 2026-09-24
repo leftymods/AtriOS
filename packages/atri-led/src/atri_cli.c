@@ -59,6 +59,8 @@ static void print_usage(const char *prog)
 	print_banner();
 	printf("%sUsage:%s %s <command> [arguments...]\n\n", COLOR_BOLD, COLOR_RESET, prog);
 	printf("%sCommands:%s\n", COLOR_BOLD, COLOR_RESET);
+	printf("  %smenu%s, %ssetup%s         Launch interactive TUI configurator (Wi-Fi, audio, LEDs)\n", COLOR_GREEN, COLOR_RESET, COLOR_GREEN, COLOR_RESET);
+	printf("  %sonboard%s               Start phone onboarding Wi-Fi hotspot & web setup portal\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %sstatus%s                Show comprehensive status of all hardware subsystems\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %ssound%s [subcmd...]     Audio tests, tone generator, frequency sweep, mics\n", COLOR_GREEN, COLOR_RESET);
 	printf("  %smatrix%s [subcmd...]    25x16 LED screen: text, demo, test, on/off, brightness\n", COLOR_GREEN, COLOR_RESET);
@@ -252,6 +254,19 @@ int main(int argc, char **argv)
 	if (!strcmp(cmd, "help") || !strcmp(cmd, "--help") || !strcmp(cmd, "-h")) {
 		print_usage(argv[0]);
 		return 0;
+	}
+
+	if (!strcmp(cmd, "menu") || !strcmp(cmd, "setup") || !strcmp(cmd, "tui")) {
+		argv[1] = "atri-tui";
+		execvp("atri-tui", &argv[1]);
+		perror("execvp atri-tui");
+		return 1;
+	}
+	if (!strcmp(cmd, "onboard") || !strcmp(cmd, "phone-setup")) {
+		argv[1] = "atri-onboard";
+		execvp("atri-onboard", &argv[1]);
+		perror("execvp atri-onboard");
+		return 1;
 	}
 
 	if (!strcmp(cmd, "sound")) {
