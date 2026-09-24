@@ -177,7 +177,9 @@
 		audio-routing =
 			"Headphones", "LOUT",
 			"Headphones", "ROUT",
-			"TDMOUT_B IN 0", "FRDDR_A OUT 0";
+			"TDMOUT_B IN 0", "FRDDR_A OUT 0",
+			"TDM_B Playback", "TDMOUT_B OUT",
+			"TODDR_A IN 4", "PDM Capture";
 
 		clocks = <&clkc CLKID_MPLL2>,
 			 <&clkc CLKID_MPLL0>;
@@ -188,6 +190,17 @@
 
 		dai-link-0 {
 			sound-dai = <&frddr_a>;
+		};
+
+		dai-link-1 {
+			sound-dai = <&toddr_a>;
+		};
+
+		dai-link-2 {
+			sound-dai = <&pdm>;
+			codec-0 {
+				sound-dai = <&dmics>;
+			};
 		};
 
 		dai-link-3 {

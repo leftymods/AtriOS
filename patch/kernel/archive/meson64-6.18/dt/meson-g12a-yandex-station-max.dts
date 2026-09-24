@@ -12,6 +12,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/gpio/meson-g12a-gpio.h>
 #include <dt-bindings/sound/meson-g12a-tohdmitx.h>
+#include <dt-bindings/clock/axg-audio-clkc.h>
 #include "meson-g12a.dtsi"
 
 / {
@@ -108,34 +109,101 @@
 		pwms = <&pwm_ef 0 30541 0>;
 	};
 
+	/* PDM microphone array (4 channels) */
+	dmics: dmics {
+		compatible = "dmic-codec";
+		#sound-dai-cells = <0>;
+		num-channels = <4>;
+		wakeup-delay-ms = <50>;
+		sound-name-prefix = "DMIC";
+	};
+
 	sound {
 		compatible = "amlogic,axg-sound-card";
-		model = "YANDEX-STATION-MAX";
+		model = "ATRISTATION";
+		audio-aux-devs = <&tdmout_b>;
+		audio-widgets = "Headphone", "Headphones";
+		audio-routing =
+			"Headphones", "LOUT",
+			"Headphones", "ROUT",
+			"TDMOUT_B IN 0", "FRDDR_A OUT 0",
+			"TDM_B Playback", "TDMOUT_B OUT",
+			"TODDR_A IN 4", "PDM Capture";
+
+		clocks = <&clkc CLKID_MPLL2>,
+			 <&clkc CLKID_MPLL0>;
+		assigned-clocks = <&clkc CLKID_MPLL2>,
+				  <&clkc CLKID_MPLL0>;
+		assigned-clock-rates = <294912000>,
+				       <270950400>;
 
 		dai-link-0 {
-			sound-dai = <&tdmb>;
-			codec-0 {
-				sound-dai = <&sy6045s_woofer>;
-			};
-			codec-1 {
-				sound-dai = <&sy6045s_tweeter>;
-			};
+			sound-dai = <&frddr_a>;
 		};
 
 		dai-link-1 {
-			sound-dai = <&tdmc>;
+			sound-dai = <&toddr_a>;
+		};
+
+		dai-link-2 {
+			sound-dai = <&tdmif_b>;
+			dai-format = "i2s";
+			bitclock-master = <&tdmif_b>;
+			frame-master = <&tdmif_b>;
+			dai-tdm-slot-tx-mask-0 = <1 1>;
+			mclk-fs = <256>;
+
 			codec-0 {
+				sound-dai = <&sy6045s_tweeter>;
+			};
+			codec-1 {
+				sound-dai = <&sy6045s_woofer>;
+			};
+			codec-2 {
 				sound-dai = <&es8156_dac>;
 			};
 		};
 
-		dai-link-2 {
+		dai-link-3 {
 			sound-dai = <&pdm>;
 			codec-0 {
-				sound-dai = <&es7210_adc>;
+				sound-dai = <&dmics>;
 			};
 		};
 	};
+};
+
+/* Audio Controllers */
+&clkc_audio {
+	status = "okay";
+};
+
+&frddr_a {
+	status = "okay";
+};
+
+&toddr_a {
+	status = "okay";
+};
+
+&tdmif_b {
+	status = "okay";
+	pinctrl-0 = <&tdm_ao_b_dout2_pins>, <&tdm_ao_b_din0_pins>,
+		    <&tdm_ao_b_fs_pins>, <&tdm_ao_b_sclk_pins>,
+		    <&mclk0_ao_pins>;
+	pinctrl-names = "default";
+};
+
+&tdmout_b {
+	status = "okay";
+};
+
+&pdm {
+	status = "okay";
+	pinctrl-0 = <&pdm_dclk_c_pins>, <&pdm_din0_c_pins>,
+		    <&pdm_din1_c_pins>, <&pdm_din2_c_pins>,
+		    <&pdm_din3_c_pins>;
+	pinctrl-names = "default";
 };
 
 /* SPI1 - Gowin FPGA (25x16 LED Screen & Touch) */
@@ -221,14 +289,18 @@
 		compatible = "everest,es8156";
 		reg = <0x08>;
 		#sound-dai-cells = <0>;
+		clocks = <&clkc_audio AUD_CLKID_MST_B_MCLK>;
+		clock-names = "mclk";
 		status = "okay";
 	};
 
-	/* Everest ES7210 4-Channel Microphone ADC */
+	/* Everest ES7210 2-Channel Feedback ADC */
 	es7210_adc: codec@40 {
-		compatible = "everest,es7210_4ch";
+		compatible = "everest,es7210_2ch", "everest,es7210";
 		reg = <0x40>;
 		#sound-dai-cells = <0>;
+		clocks = <&clkc_audio AUD_CLKID_MST_B_MCLK>;
+		clock-names = "mclk";
 		status = "okay";
 	};
 

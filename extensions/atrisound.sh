@@ -128,6 +128,9 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		}
 	UCM_VC
 
+	# Link YANDEX-STATION-MAX to ATRISTATION for UCM compatibility across boards
+	ln -sfn ATRISTATION "${destination}"/usr/share/alsa/ucm2/YANDEX-STATION-MAX
+
 	# ALSA default device -> ATRISTATION card (no UCM needed for
 	# plain aplay/speaker-test)
 	mkdir -pv "${destination}"/etc
@@ -187,6 +190,8 @@ run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
 	# Install SY6045S firmware settings for kernel driver (request_firmware)
 	run_host_command_logged mkdir -pv "${destination}"/lib/firmware
 	if [[ -f "${SRC}/tools/audio/sy6045s-tweeters-settings.txt" ]]; then
+		cp "${SRC}/tools/audio/sy6045s-tweeters-settings.txt" "${destination}"/lib/firmware/
+		cp "${SRC}/tools/audio/sy6045s-woofer-settings.txt" "${destination}"/lib/firmware/
 		display_alert "SY6045S" "firmware settings installed" "info"
 	else
 		display_alert "SY6045S" "firmware settings not found in tools/audio/" "wrn"
@@ -206,10 +211,8 @@ run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
 		NoNewPrivileges=yes
 		# Wait for sound card device to appear
 		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done'
-		# SY6045S DSP config is applied by the kernel driver at probe
-		# (firmware settings via request_firmware). Keep
-		# /usr/libexec/sy6045s-init.sh installed for manual rescue.
-		# ExecStart=/usr/libexec/sy6045s-init.sh
+		# SY6045S: trigger firmware reload via sysfs in case probed before rootfs /lib/firmware was mounted
+		ExecStart=/bin/sh -c 'for d in /sys/bus/i2c/drivers/sy6045s/*; do [ -f "$$d/default_settings" ] && echo 1 > "$$d/default_settings" 2>/dev/null || true; done'
 		# Restore ALSA mixer state
 		ExecStart=/usr/sbin/alsactl restore 0 || true
 
