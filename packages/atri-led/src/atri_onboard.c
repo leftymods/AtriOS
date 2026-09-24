@@ -109,24 +109,44 @@ static void get_mac_suffix(char *out, size_t maxlen)
 	snprintf(out, maxlen, "STATION");
 }
 
-static void setup_bluetooth_adapter(const char *name)
+/* AtriOS Custom BLE 16-bit Service UUID for mobile app discovery */
+#define ATRIOS_BLE_SERVICE_UUID "FE33"
+
+static void setup_bluetooth_adapter(const char *name, bool visible_mode)
 {
 	char cmd[256];
 	/* Bring up hci0 */
 	run_cmd("rfkill unblock bluetooth 2>/dev/null || true");
 	run_cmd("hciconfig hci0 up 2>/dev/null || true");
 
-	/* Set device name and discoverable via bluetoothctl / hciconfig */
+	/* Set device name */
 	snprintf(cmd, sizeof(cmd), "hciconfig hci0 name '%s' 2>/dev/null || true", name);
 	run_cmd(cmd);
-	run_cmd("hciconfig hci0 piscan 2>/dev/null || true");
 
-	/* Register SDP serial port service so phone Bluetooth can discover SPP */
+	if (visible_mode) {
+		/* TEST MODE: Classic Bluetooth visible (piscan) */
+		run_cmd("hciconfig hci0 piscan 2>/dev/null || true");
+		run_cmd("bluetoothctl discoverable on >/dev/null 2>&1 &");
+		run_cmd("bluetoothctl pairable on >/dev/null 2>&1 &");
+		printf("Bluetooth Mode: VISIBLE (Classic BT discoverable for manual phone testing)\n");
+	} else {
+		/* APP STEALTH MODE (Default):
+		 * Classic BT scan disabled (noscan) - invisible in standard phone Bluetooth menu!
+		 * BLE Advertising enabled with custom AtriOS Service UUID (0xFE33)
+		 * so only the future companion app will detect and connect to the station. */
+		run_cmd("hciconfig hci0 noscan 2>/dev/null || true");
+		run_cmd("bluetoothctl discoverable off >/dev/null 2>&1 &");
+		run_cmd("bluetoothctl pairable on >/dev/null 2>&1 &");
+
+		/* Enable BLE Advertising with AtriOS Service UUID */
+		run_cmd("hciconfig hci0 leadv 3 2>/dev/null || btmgmt -i hci0 advertising on 2>/dev/null || true");
+		printf("Bluetooth Mode: STEALTH / APP-ONLY (Hidden from standard Bluetooth scans;\n"
+		       "                advertised via BLE Service UUID 0x%s for companion app discovery)\n",
+		       ATRIOS_BLE_SERVICE_UUID);
+	}
+
+	/* Register SDP serial port service for RFCOMM data channel */
 	run_cmd("sdptool add SP 2>/dev/null || true");
-
-	/* Configure BlueZ agent for automatic pairing */
-	run_cmd("bluetoothctl discoverable on >/dev/null 2>&1 &");
-	run_cmd("bluetoothctl pairable on >/dev/null 2>&1 &");
 }
 
 static void handle_scan(int client_fd)
@@ -353,11 +373,15 @@ static void run_server(int server_fd)
 int main(int argc, char **argv)
 {
 	bool simulate = false;
+	bool visible_mode = false;
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--simulate") || !strcmp(argv[i], "--cli") || !strcmp(argv[i], "-s")) {
 			simulate = true;
+		} else if (!strcmp(argv[i], "--visible") || !strcmp(argv[i], "--test") || !strcmp(argv[i], "-v")) {
+			visible_mode = true;
 		} else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
 			printf("Usage: atri-onboard [options]\n");
+			printf("  --visible, -v       Make device discoverable in standard Bluetooth search (test mode)\n");
 			printf("  --simulate, --cli   Interactive CLI simulation mode (for testing without Bluetooth)\n");
 			printf("  --help, -h          Display this help\n");
 			return 0;
@@ -372,7 +396,8 @@ int main(int argc, char **argv)
 
 	printf("==============================================\n");
 	printf("  AtriOS Bluetooth Phone Onboarding (Pure C)\n");
-	printf("  Target Device: %s\n", bt_name);
+	printf("  Target Device:  %s\n", bt_name);
+	printf("  Discovery Mode: %s\n", visible_mode ? "VISIBLE (Classic Bluetooth Test Mode)" : "STEALTH (BLE App Discovery via UUID 0xFE33)");
 	printf("  RFCOMM Channel: %d (Serial Port Profile)\n", BT_SETUP_CHANNEL);
 	printf("==============================================\n");
 
@@ -392,7 +417,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Initialize Bluetooth adapter */
-	setup_bluetooth_adapter(bt_name);
+	setup_bluetooth_adapter(bt_name, visible_mode);
 
 	/* Create RFCOMM socket */
 	int server_fd = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);

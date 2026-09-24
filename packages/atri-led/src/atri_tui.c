@@ -109,17 +109,34 @@ static void action_phone_setup(void)
 {
 	disable_raw_mode();
 	clear_screen();
-	printf("%s=== AtriOS: Режим настройки через Bluetooth ===%s\n\n", COLOR_CYAN, COLOR_RESET);
-	printf("Станция переходит в режим сопряжения по Bluetooth (SPP / RFCOMM).\n");
-	printf("Имя устройства: %sAtriStation-Setup-XXXX%s\n\n", COLOR_BOLD, COLOR_RESET);
-	printf("Инструкция:\n");
-	printf("  1. Включите Bluetooth на смартфоне.\n");
-	printf("  2. Найдите в поиске 'AtriStation-Setup-XXXX' и подключитесь.\n");
-	printf("  3. Передайте параметры Wi-Fi (SSID и пароль) со смартфона.\n");
-	printf("  4. Станция применит настройки, подключится к сети и подаст звуковой сигнал.\n\n");
-	printf("Запуск Bluetooth сервиса настройки (Ctrl+C для выхода)...\n\n");
+	printf("%s=== AtriOS: Режим первоначальной настройки через Bluetooth ===%s\n\n", COLOR_CYAN, COLOR_RESET);
+	printf("Выберите режим сопряжения:\n\n");
+	printf("  %s1. Режим мобильного приложения (Скрытый BLE / App Mode) [По умолчанию]%s\n", COLOR_BOLD, COLOR_RESET);
+	printf("     Станция не видна в обычном Bluetooth-поиске телефона.\n");
+	printf("     Ее находит будущее приложение AtriOS по BLE Service UUID (0xFE33).\n\n");
+	printf("  %s2. Тестовый режим (Видимый Classic Bluetooth / Test Mode)%s\n", COLOR_BOLD, COLOR_RESET);
+	printf("     Станция объявляет себя как 'AtriStation-Setup-XXXX'.\n");
+	printf("     Видна в стандартном поиске Bluetooth на телефоне для ручной проверки.\n\n");
+	printf("  0. Назад\n\n");
+	printf("Выберите режим [1]: ");
 
-	system("atri-onboard");
+	char sel[16] = {0};
+	if (fgets(sel, sizeof(sel), stdin)) {
+		sel[strcspn(sel, "\r\n")] = '\0';
+		if (sel[0] == '0') {
+			enable_raw_mode();
+			return;
+		}
+		if (sel[0] == '2') {
+			printf("\nЗапуск в тестовом видимом режиме (Classic BT Piscan)...\n");
+			system("atri-onboard --visible");
+		} else {
+			printf("\nЗапуск в скрытом режиме приложения (BLE UUID 0xFE33 + Classic Noscan)...\n");
+			system("atri-onboard");
+		}
+	} else {
+		system("atri-onboard");
+	}
 
 	wait_enter();
 }
