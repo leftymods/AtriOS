@@ -184,6 +184,86 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		display_alert "SY6045S" "firmware settings not found in tools/audio/" "wrn"
 	fi
 
+	# PipeWire configuration: 2.1 Crossover and WebRTC Echo Canceller (AEC)
+	run_host_command_logged mkdir -pv "${destination}"/etc/pipewire/pipewire.conf.d
+	cat <<- 'PW_CONF' > "${destination}"/etc/pipewire/pipewire.conf.d/20-atristation-audio.conf
+		# AtriOS PipeWire audio configuration for AtriStation & Station Max
+		# - WebRTC Echo Cancellation (AEC) for 4-channel ES7210 / DMIC microphone array
+		# - 2.1 Virtual Crossover filter (160 Hz Lowpass / Highpass) for SY6045S tweeters & woofer
+
+		context.modules = [
+		    # WebRTC Echo Cancellation for Voice Assistant (Alice / Vosk / Whisper)
+		    { name = libpipewire-module-echo-cancel
+		        args = {
+		            library.name     = aec/libspa-aec-webrtc
+		            node.description = "AtriOS Voice Echo Canceller"
+		            capture.props = {
+		                node.name = "atri_mic_aec_in"
+		            }
+		            playback.props = {
+		                node.name = "atri_speaker_aec_out"
+		            }
+		            source.props = {
+		                node.name      = "echo-cancel-source"
+		                media.class    = "Audio/Source"
+		                audio.rate     = 48000
+		                audio.channels = 1
+		            }
+		            sink.props = {
+		                node.name      = "echo-cancel-sink"
+		                media.class    = "Audio/Sink"
+		                audio.rate     = 48000
+		                audio.channels = 2
+		            }
+		        }
+		    }
+
+		    # 2.1 Crossover Filter Sink (160 Hz cutoff)
+		    { name = libpipewire-module-filter-chain
+		        args = {
+		            node.description = "AtriStation 2.1 Crossover Sink"
+		            media.name       = "AtriStation 2.1 Crossover Sink"
+		            filter.graph = {
+		                nodes = [
+		                    {
+		                        type  = builtin
+		                        name  = lp_sub
+		                        label = bq_lowpass
+		                        control = { "Freq" = 160.0 "Q" = 0.707 }
+		                    }
+		                    {
+		                        type  = builtin
+		                        name  = hp_l
+		                        label = bq_highpass
+		                        control = { "Freq" = 160.0 "Q" = 0.707 }
+		                    }
+		                    {
+		                        type  = builtin
+		                        name  = hp_r
+		                        label = bq_highpass
+		                        control = { "Freq" = 160.0 "Q" = 0.707 }
+		                    }
+		                ]
+		                inputs  = [ "hp_l:In" "hp_r:In" ]
+		                outputs = [ "hp_l:Out" "hp_r:Out" ]
+		            }
+		            capture.props = {
+		                node.name      = "atri_crossover_sink"
+		                media.class    = "Audio/Sink"
+		                audio.channels = 2
+		                audio.position = [ FL FR ]
+		            }
+		            playback.props = {
+		                node.name      = "atri_crossover_out"
+		                node.passive   = true
+		                audio.channels = 2
+		                audio.position = [ FL FR ]
+		            }
+		        }
+		    }
+		]
+	PW_CONF
+
 	# Create systemd oneshot service for sound card init
 	cat <<- 'SOUND_SERVICE' > "${destination}"/lib/systemd/system/atrisound.service
 		[Unit]
@@ -198,8 +278,8 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		NoNewPrivileges=yes
 		# Wait for sound card device to appear
 		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done'
-		# SY6045S: trigger firmware reload via sysfs, or run hardware init script as fallback
-		ExecStart=/bin/sh -c 'if [ -d /sys/bus/i2c/drivers/sy6045s ]; then for d in /sys/bus/i2c/drivers/sy6045s/*; do [ -f "$$d/default_settings" ] && echo 1 > "$$d/default_settings" 2>/dev/null || true; done; elif [ -x /usr/libexec/sy6045s-init.sh ]; then /usr/libexec/sy6045s-init.sh || true; fi'
+		# SY6045S: enforce hardware DRC limiter, EQ and speaker protection registers
+		ExecStart=/bin/sh -c 'if [ -x /usr/libexec/sy6045s-init.sh ]; then /usr/libexec/sy6045s-init.sh || true; elif [ -d /sys/bus/i2c/drivers/sy6045s ]; then for d in /sys/bus/i2c/drivers/sy6045s/*; do [ -f "$$d/default_settings" ] && echo 1 > "$$d/default_settings" 2>/dev/null || true; done; fi'
 		# Unmute all output channels and set initial sensible volume
 		ExecStart=/bin/sh -c 'amixer -c ATRISTATION sset "Tweeters Master" 75% unmute 2>/dev/null || true; amixer -c ATRISTATION sset "Woofer Master" 75% unmute 2>/dev/null || true; amixer -c ATRISTATION sset "Playback" 80% unmute 2>/dev/null || true'
 		# Restore ALSA mixer state if saved
