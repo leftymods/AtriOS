@@ -32,13 +32,14 @@ KNOB_BIN = atri-knob
 ATRALS_BIN = atri-als
 PCBA_BIN = atri-pcba
 WIFI_DIAG_BIN = atri-wifi-diag
+WIFI_INIT_BIN = atri-wireless-init
 TEST_BIN = test_atri_led
-ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN)
+ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -115,6 +116,9 @@ $(PCBA_BIN): src/atri_pcba.c
 $(WIFI_DIAG_BIN): src/atri_wifi_diag.c
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
+$(WIFI_INIT_BIN): src/atri_wireless_init.c
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
@@ -142,6 +146,7 @@ install: all
 	cp $(ATRALS_BIN) $(DESTDIR)/usr/bin/
 	cp $(PCBA_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/
+	cp $(WIFI_INIT_BIN) $(DESTDIR)/usr/bin/
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
@@ -155,6 +160,8 @@ endif
 	cp etc/atriled/animations/*.anim $(DESTDIR)/etc/atriled/animations/ 2>/dev/null || true
 	mkdir -p $(DESTDIR)/lib/firmware
 	cp lib/firmware/*.manifest $(DESTDIR)/lib/firmware/
+	mkdir -p $(DESTDIR)/lib/udev/rules.d
+	cp etc/udev/rules.d/*.rules $(DESTDIR)/lib/udev/rules.d/
 	cp systemd/*.service $(DESTDIR)/lib/systemd/system/
 ifneq ($(ASOUND_AVAIL),yes)
 	rm -f $(DESTDIR)/lib/systemd/system/atrivolume.service

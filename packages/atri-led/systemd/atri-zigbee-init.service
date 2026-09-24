@@ -1,0 +1,13 @@
+[Unit]
+Description=AtriStation Zigbee Hardware Radio Initialization
+After=systemd-modules-load.service
+Before=zigbee2mqtt.service home-assistant.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/atri-zigbee reset
+
+[Install]
+WantedBy=multi-user.target

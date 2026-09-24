@@ -1,0 +1,14 @@
+[Unit]
+Description=AtriStation Wireless MAC and eFuse Provisioning
+Before=network-pre.target bluetooth.target systemd-networkd.service NetworkManager.service
+Wants=network-pre.target
+DefaultDependencies=no
+After=local-fs.target systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/atri-wireless-init
+
+[Install]
+WantedBy=multi-user.target

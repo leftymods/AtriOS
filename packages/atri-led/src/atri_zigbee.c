@@ -335,6 +335,7 @@ static void usage(void)
 	       "  atri-zigbee bootloader [dev]\n"
 	       "  atri-zigbee listen [dev] [seconds]\n"
 	       "  atri-zigbee send <file.xmodem> [dev]\n"
+	       "  atri-zigbee flash-coordinator <firmware.bin|gbl> [dev]\n"
 	       "  atri-zigbee raw [dev] [baud]\n");
 }
 
@@ -342,6 +343,8 @@ int main(int argc, char **argv)
 {
 	const char *cmd = argc > 1 ? argv[1] : NULL;
 	const char *dev = DEFAULT_DEV;
+	if (access("/dev/ttyZigbee", F_OK) == 0)
+		dev = "/dev/ttyZigbee";
 	int baud = 115200;
 
 	if (!cmd) { usage(); return 0; }
@@ -438,6 +441,57 @@ int main(int argc, char **argv)
 		int rc = xmodem_send(fd, argv[2]);
 		close(fd);
 		return rc;
+	}
+
+	if (strcmp(cmd, "flash-coordinator") == 0) {
+		if (argc < 3) { usage(); return 1; }
+		const char *fw_path = argv[2];
+		if (argc > 3) dev = argv[3];
+
+		LOG("entering bootloader mode on %s ...", dev);
+		if (zb_sysfs) {
+			zb_sysfs_write(zb_sysfs, "boot", "1");
+			usleep(10000);
+			zb_sysfs_write(zb_sysfs, "reset", "1");
+			usleep(120000);
+			zb_sysfs_write(zb_sysfs, "boot", "0");
+		} else {
+			char rn[16], bn[16];
+			snprintf(rn, sizeof(rn), "%d", reset);
+			snprintf(bn, sizeof(bn), "%d", boot);
+			gpio_write(bn, "1");
+			usleep(10000);
+			gpio_write(rn, "0"); usleep(50000);
+			gpio_write(rn, "1"); usleep(120000);
+			gpio_write(bn, "0");
+		}
+		usleep(200000);
+
+		int fd = tty_open(dev, DEFAULT_BAUD);
+		if (fd < 0) return 1;
+		LOG("flashing coordinator firmware %s ...", fw_path);
+		int rc = xmodem_send(fd, fw_path);
+		close(fd);
+		if (rc != 0) {
+			FAIL("flashing failed!");
+			return rc;
+		}
+
+		LOG("flashing succeeded! performing normal reset ...");
+		usleep(100000);
+		if (zb_sysfs) {
+			zb_sysfs_write(zb_sysfs, "boot", "0");
+			zb_sysfs_write(zb_sysfs, "reset", "1");
+		} else {
+			char rn[16], bn[16];
+			snprintf(rn, sizeof(rn), "%d", reset);
+			snprintf(bn, sizeof(bn), "%d", boot);
+			gpio_write(bn, "0");
+			gpio_write(rn, "0"); usleep(50000);
+			gpio_write(rn, "1"); usleep(120000);
+		}
+		LOG("Zigbee coordinator is now running on %s", dev);
+		return 0;
 	}
 
 	if (strcmp(cmd, "raw") == 0) {

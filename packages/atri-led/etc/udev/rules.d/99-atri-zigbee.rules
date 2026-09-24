@@ -1,0 +1,2 @@
+# AtriStation Zigbee radio module (Tuya TZ9213 on UART_AO_B / ttyAML2)
+KERNEL=="ttyAML2", SYMLINK+="ttyZigbee", GROUP="dialout", MODE="0660"
