@@ -10,6 +10,7 @@
 
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/gpio/meson-g12a-gpio.h>
 #include <dt-bindings/sound/meson-g12a-tohdmitx.h>
 #include "meson-g12a.dtsi"
 
@@ -32,9 +33,30 @@
 		reg = <0x0 0x0 0x0 0x80000000>; /* 2GB RAM */
 	};
 
+	vcc_3v3: regulator-vcc_3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "VCC_3V3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	/* SY6045S amplifier 20V supply enable (GPIOX_10) */
+	amp_20v: regulator-20v-amp {
+		compatible = "regulator-fixed";
+		regulator-name = "20V_AMPL";
+		regulator-min-microvolt = <20000000>;
+		regulator-max-microvolt = <20000000>;
+		gpio = <&gpio GPIOX_10 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
 	/* Mic Mute Push-Button */
 	gpio_keys: gpio-keys {
 		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&button_pullup_pins>;
 
 		button-micmute {
 			label = "Mic Mute";
@@ -116,31 +138,55 @@
 	};
 };
 
-/* High-speed SPI to Gowin FPGA (25x16 LED Screen & Touch) */
-&spifc {
+/* SPI1 - Gowin FPGA (25x16 LED Screen & Touch) */
+&spicc1 {
 	status = "okay";
-	pinctrl-0 = <&spifc_pins>;
 	pinctrl-names = "default";
+	num-cs = <1>;
+	cs-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_LOW>;
 
 	gowin_screen: led-panel@0 {
-		compatible = "gowin,led-screen", "yandex,station-max-led-screen";
+		compatible = "gowin,led-screen", "atri,led-panel", "ya,led-panel", "yandex,station-max-led-screen", "yandex,led-screen";
 		reg = <0>;
-		spi-max-frequency = <25000000>;
-		reconfig-gpios  = <&gpio GPIOC_0 GPIO_ACTIVE_HIGH>;
-		mode-gpios      = <&gpio GPIOC_1 GPIO_ACTIVE_HIGH>;
-		touch-irq-gpios = <&gpio GPIOC_2 GPIO_ACTIVE_LOW>;
-		jtag-tck-gpios  = <&gpio GPIOC_3 GPIO_ACTIVE_LOW>;
-		jtag-tms-gpios  = <&gpio GPIOC_4 GPIO_ACTIVE_HIGH>;
-		jtag-tdi-gpios  = <&gpio GPIOC_5 GPIO_ACTIVE_LOW>;
-		jtag-tdo-gpios  = <&gpio GPIOC_6 GPIO_ACTIVE_LOW>;
+		spi-max-frequency = <4000000>;
+		max-brightness = <200>;
+		pinctrl-names = "default", "jtag";
+		pinctrl-0 = <&spicc1_pins>;
+		pinctrl-1 = <&led_panel_jtag_pins>;
+		reset-gpios = <&gpio GPIOX_9 GPIO_ACTIVE_LOW>;
+		jtag_tck_desc = <0xff634468 0x08>;
+		jtag_reconfig-gpios = <&gpio BOOT_0 GPIO_ACTIVE_LOW>;
+		jtag_sel-gpios = <&gpio_ao GPIOE_2 GPIO_ACTIVE_HIGH>;
+		jtag_tck-gpios = <&gpio GPIOH_8 GPIO_ACTIVE_HIGH>;
+		jtag_tdi-gpios = <&gpio GPIOH_5 GPIO_ACTIVE_HIGH>;
+		jtag_tdo-gpios = <&gpio GPIOH_6 GPIO_ACTIVE_HIGH>;
+		jtag_tms-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_HIGH>;
 		status = "okay";
+	};
+};
+
+&periphs_pinctrl {
+	led_panel_jtag_pins: led-panel-jtag {
+		mux {
+			groups = "GPIOH_5", "GPIOH_6", "GPIOH_7", "GPIOH_8";
+			function = "gpio_periphs";
+			bias-disable;
+		};
+	};
+
+	button_pullup_pins: button-pullup {
+		mux {
+			groups = "GPIOA_15";
+			function = "gpio_periphs";
+			bias-pull-up;
+		};
 	};
 };
 
 /* I2C Bus 2: Audio Amplifiers and Codecs */
 &i2c2 {
 	status = "okay";
-	pinctrl-0 = <&i2c2_sda_h_pins>, <&i2c2_sck_h_pins>;
+	pinctrl-0 = <&i2c2_sda_z_pins>, <&i2c2_sck_z_pins>;
 	pinctrl-names = "default";
 
 	/* Silergy SY6045S Woofer Amplifier */
@@ -148,9 +194,12 @@
 		compatible = "silergy,sy6045s";
 		reg = <0x2b>;
 		#sound-dai-cells = <0>;
-		settings-file = "sy6045s-woofer-settings.txt";
-		reset-gpios = <&gpio GPIOH_6 GPIO_ACTIVE_LOW>;
-		fault-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_LOW>;
+		sound-name-prefix = "Woofer";
+		pbtl-mode;
+		vddio-supply = <&vcc_3v3>;
+		pvdd-supply = <&amp_20v>;
+		firmware = "sy6045s-woofer-settings.txt";
+		restore-regs = <0x06 0x08>;
 		status = "okay";
 	};
 
@@ -159,20 +208,19 @@
 		compatible = "silergy,sy6045s";
 		reg = <0x2a>;
 		#sound-dai-cells = <0>;
-		settings-file = "sy6045s-tweeters-settings.txt";
-		reset-gpios = <&gpio GPIOH_8 GPIO_ACTIVE_LOW>;
-		fault-gpios = <&gpio GPIOH_9 GPIO_ACTIVE_LOW>;
+		sound-name-prefix = "Tweeters";
+		vddio-supply = <&vcc_3v3>;
+		pvdd-supply = <&amp_20v>;
+		firmware = "sy6045s-tweeters-settings.txt";
+		restore-regs = <0x06 0x08>;
 		status = "okay";
 	};
 
 	/* Everest ES8156 Headphone DAC */
-	es8156_dac: codec@10 {
+	es8156_dac: codec@8 {
 		compatible = "everest,es8156";
-		reg = <0x10>;
+		reg = <0x08>;
 		#sound-dai-cells = <0>;
-		spk-con-gpios = <&gpio GPIOA_14 GPIO_ACTIVE_HIGH>;
-		hp-det-gpios  = <&gpio GPIOA_15 GPIO_ACTIVE_LOW>;
-		debounce-time = <200>;
 		status = "okay";
 	};
 
@@ -243,7 +291,8 @@
 		compatible = "realtek,rtl8822cs-bt";
 		/* Vendor DTB: reset=0x53 (83 decimal in meson-g12a-gpio.h is GPIOX_18) */
 		enable-gpios = <&gpio GPIOX_18 GPIO_ACTIVE_HIGH>;
-		host-wake-gpios = <&gpio GPIOX_21 GPIO_ACTIVE_HIGH>;
+		/* Vendor DTB: hostwake=0x55 (84 decimal in mainline meson-g12a-gpio.h is GPIOX_19) */
+		host-wake-gpios = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
 		max-speed = <3000000>;
 		clocks = <&wifi32k>;
 		clock-names = "lpo";
