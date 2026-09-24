@@ -1,0 +1,15 @@
+[Unit]
+Description=AtriOS 25x16 LED Screen Display Daemon
+After=systemd-modules-load.service local-fs.target
+Wants=systemd-modules-load.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/atri-displayd
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

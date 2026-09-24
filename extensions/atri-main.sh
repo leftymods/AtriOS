@@ -67,12 +67,15 @@ EOF
 set -e
 systemctl daemon-reload || true
 systemctl enable atri-main.service || true
+systemctl enable atri-displayd.service || true
 EOF
 	chmod 755 "${stage}/DEBIAN/postinst"
 
 	cat > "${stage}/DEBIAN/prerm" << 'EOF'
 #!/bin/bash
 set -e
+systemctl stop atri-displayd.service || true
+systemctl disable atri-displayd.service || true
 systemctl stop atri-main.service || true
 systemctl disable atri-main.service || true
 EOF
@@ -89,6 +92,7 @@ EOF
 
 	# Start on first boot.
 	chroot_sdcard "systemctl --no-reload enable atri-main.service" || true
+	chroot_sdcard "systemctl --no-reload enable atri-displayd.service" || true
 
 	display_alert "Extension: ${EXTENSION}: ${BOARD}" "installed ${debfile}" "info"
 	return 0

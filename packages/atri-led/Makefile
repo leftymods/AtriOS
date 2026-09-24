@@ -33,13 +33,15 @@ ATRALS_BIN = atri-als
 PCBA_BIN = atri-pcba
 WIFI_DIAG_BIN = atri-wifi-diag
 WIFI_INIT_BIN = atri-wireless-init
+DISP_DAEMON_BIN = atri-displayd
+DISP_CLI_BIN = atri-display
 TEST_BIN = test_atri_led
-ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN)
+ALL_BINS = $(CTL_BIN) $(MAIN_BIN) $(SCR_BIN) $(QCTL_BIN) $(SCREEN_BINS) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN) $(DISP_DAEMON_BIN) $(DISP_CLI_BIN)
 
 # Check if -lasound is available for target (cross-compile may lack it)
 ASOUND_AVAIL := $(shell echo 'int main(){return 0;}' | $(CC) $(ASOUND_LIBS) -x c - -o /dev/null 2>/dev/null && echo yes)
 
-all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN)
+all: $(LED_LIB) $(SCR_LIB) $(SCR_BIN) $(CTL_BIN) $(MAIN_BIN) $(SCREEN_BINS) $(QCTL_BIN) $(SCRTEST_BIN) $(HWPROBE_BIN) $(ZGBIN) $(BTNS_BIN) $(KNOB_BIN) $(ATRALS_BIN) $(PCBA_BIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN) $(DISP_DAEMON_BIN) $(DISP_CLI_BIN)
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> -lasound not available for target, skipping $(VOL_BIN)"
 else
@@ -119,6 +121,12 @@ $(WIFI_DIAG_BIN): src/atri_wifi_diag.c
 $(WIFI_INIT_BIN): src/atri_wireless_init.c
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
+$(DISP_DAEMON_BIN): src/atri_displayd.c
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
+$(DISP_CLI_BIN): src/atri_display_cli.c
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
@@ -147,6 +155,8 @@ install: all
 	cp $(PCBA_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_INIT_BIN) $(DESTDIR)/usr/bin/
+	cp $(DISP_DAEMON_BIN) $(DESTDIR)/usr/bin/
+	cp $(DISP_CLI_BIN) $(DESTDIR)/usr/bin/
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless
 ifneq ($(ASOUND_AVAIL),yes)
 	@echo "==> skipping atrivolume install (not built)"
