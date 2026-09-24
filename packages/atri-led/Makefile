@@ -27,8 +27,9 @@ DISP_CLI_BIN = atri-display
 ATRI_CLI_BIN = atri
 AUTOBRIGHTNESS_BIN = atri-autobrightness
 TUI_BIN = atri-tui
+ONBOARD_BIN = atri-onboard
 
-ALL_BINS = $(LED_DAEMON_BIN) $(LED_CTL_BIN) $(MATRIX_BIN) $(HWPROBE_BIN) $(ZGBIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN) $(DISP_DAEMON_BIN) $(DISP_CLI_BIN) $(ATRI_CLI_BIN) $(AUTOBRIGHTNESS_BIN) $(TUI_BIN)
+ALL_BINS = $(LED_DAEMON_BIN) $(LED_CTL_BIN) $(MATRIX_BIN) $(HWPROBE_BIN) $(ZGBIN) $(WIFI_DIAG_BIN) $(WIFI_INIT_BIN) $(DISP_DAEMON_BIN) $(DISP_CLI_BIN) $(ATRI_CLI_BIN) $(AUTOBRIGHTNESS_BIN) $(TUI_BIN) $(ONBOARD_BIN)
 
 TEST_BIN = test_atri_led
 
@@ -102,6 +103,9 @@ $(AUTOBRIGHTNESS_BIN): src/atri_autobrightness.c
 $(TUI_BIN): src/atri_tui.c
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
+$(ONBOARD_BIN): src/atri_onboard.c
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
@@ -128,15 +132,12 @@ install: all
 	cp $(ATRI_CLI_BIN) $(DESTDIR)/usr/bin/
 	cp $(AUTOBRIGHTNESS_BIN) $(DESTDIR)/usr/bin/
 	cp $(TUI_BIN) $(DESTDIR)/usr/bin/
-	mkdir -p $(DESTDIR)/usr/libexec
-	cp src/atri_onboard.py $(DESTDIR)/usr/libexec/atri_onboard.py
-	chmod +x $(DESTDIR)/usr/libexec/atri_onboard.py
+	cp $(ONBOARD_BIN) $(DESTDIR)/usr/bin/
 	mkdir -p $(DESTDIR)/etc/atri
 	cp etc/autobrightness.conf $(DESTDIR)/etc/atri/
 	# Backward-compatible and canonical symlinks
 	ln -sf $(TUI_BIN) $(DESTDIR)/usr/bin/atri-setup
 	ln -sf $(TUI_BIN) $(DESTDIR)/usr/bin/atri-menu
-	ln -sf /usr/libexec/atri_onboard.py $(DESTDIR)/usr/bin/atri-onboard
 	ln -sf $(LED_DAEMON_BIN) $(DESTDIR)/usr/bin/atrled
 	ln -sf $(LED_CTL_BIN) $(DESTDIR)/usr/bin/atrledctl
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless

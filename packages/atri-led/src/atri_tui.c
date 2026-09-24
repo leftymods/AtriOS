@@ -109,17 +109,17 @@ static void action_phone_setup(void)
 {
 	disable_raw_mode();
 	clear_screen();
-	printf("%s=== AtriOS: Режим настройки с телефона ===%s\n\n", COLOR_CYAN, COLOR_RESET);
-	printf("Станция запускает точку доступа Wi-Fi и веб-сервер первичной настройки...\n");
-	printf("Подключите ваш смартфон или ноутбук к созданной сети:\n");
-	printf("  %sSSID:%s      AtriOS-Setup-XXXX\n", COLOR_BOLD, COLOR_RESET);
-	printf("  %sПароль:%s   atriossetup\n", COLOR_BOLD, COLOR_RESET);
-	printf("  %sВеб-адрес:%s http://192.168.4.1:8080/ (или http://atri.local:8080/)\n\n", COLOR_GREEN, COLOR_RESET);
-	printf("Через веб-страницу можно выбрать домашнюю сеть Wi-Fi, ввести пароль,\n");
-	printf("задать имя колонки и протестировать звук.\n\n");
-	printf("Запуск сервиса настройки (Ctrl+C для завершения)...\n\n");
+	printf("%s=== AtriOS: Режим настройки через Bluetooth ===%s\n\n", COLOR_CYAN, COLOR_RESET);
+	printf("Станция переходит в режим сопряжения по Bluetooth (SPP / RFCOMM).\n");
+	printf("Имя устройства: %sAtriStation-Setup-XXXX%s\n\n", COLOR_BOLD, COLOR_RESET);
+	printf("Инструкция:\n");
+	printf("  1. Включите Bluetooth на смартфоне.\n");
+	printf("  2. Найдите в поиске 'AtriStation-Setup-XXXX' и подключитесь.\n");
+	printf("  3. Передайте параметры Wi-Fi (SSID и пароль) со смартфона.\n");
+	printf("  4. Станция применит настройки, подключится к сети и подаст звуковой сигнал.\n\n");
+	printf("Запуск Bluetooth сервиса настройки (Ctrl+C для выхода)...\n\n");
 
-	system("python3 /usr/libexec/atri_onboard.py || python3 packages/atri-led/src/atri_onboard.py");
+	system("atri-onboard");
 
 	wait_enter();
 }
@@ -321,7 +321,7 @@ struct menu_item {
 };
 
 static struct menu_item menu[] = {
-	{ "📱 Настройка с телефона (Phone Setup Mode)", "Запуск SoftAP Wi-Fi и мобильного веб-портала настройки", action_phone_setup },
+	{ "📱 Настройка через Bluetooth (Bluetooth Phone Setup)", "Сопряжение по Bluetooth: передача Wi-Fi, имени и языка со смартфона", action_phone_setup },
 	{ "📶 Настройка Wi-Fi (Wi-Fi Networks)", "Сканирование домашних сетей и подключение через NetworkManager", action_wifi },
 	{ "🔊 Тест звука (Audio Hardware & Tests)", "Тест твитеров, вуфера, частотный свип и 4-ch микрофоны", action_sound },
 	{ "💡 Экран 25x16 и световое кольцо (LEDs)", "Анимации, бегущий текст, Pong demo, цвета и подсветка", action_display_led },
