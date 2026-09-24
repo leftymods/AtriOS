@@ -139,6 +139,8 @@ install: all
 	cp $(ZGBIN) $(DESTDIR)/usr/bin/
 	cp $(BTNS_BIN) $(DESTDIR)/usr/bin/
 	cp $(KNOB_BIN) $(DESTDIR)/usr/bin/
+	cp $(ATRALS_BIN) $(DESTDIR)/usr/bin/
+	cp $(PCBA_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless
 ifneq ($(ASOUND_AVAIL),yes)

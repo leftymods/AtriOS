@@ -75,6 +75,10 @@ function custom_kernel_config__disable_unused_arches() {
 		 "PINCTRL_BROXTON" "PINCTRL_SUNRISEPOINT" "PINCTRL_GEMINILAKE"
 		 "PINCTRL_ICELAKE" "PINCTRL_TIGERLAKE" "PINCTRL_ALDERLAKE" "PINCTRL_SUNXI")
 	opts_n+=("CONFIG_FB_ATRI_LED_PANEL")
+
+	# Disable DWARF debug symbols and BTF to cut kernel compile and link time by 2-3x
+	opts_n+=("DEBUG_INFO" "DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT" "DEBUG_INFO_DWARF4" "DEBUG_INFO_DWARF5" "DEBUG_INFO_BTF" "DEBUG_INFO_BTF_MODULES")
+	opts_y+=("CONFIG_DEBUG_INFO_NONE")
 }
 
 # Enable RTL8822CS debugfs for diagnostics
