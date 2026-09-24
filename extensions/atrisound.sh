@@ -145,10 +145,15 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 		}
 	ASOUND_CONF
 
-	# rotary encoder driver has no modalias autoload path on this
-	# board; force-load it at boot
+	# Board modules that should be loaded early before userspace services (atri-main, audio)
 	mkdir -pv "${destination}"/etc/modules-load.d
-	echo "rotary_encoder" > "${destination}"/etc/modules-load.d/rotary.conf
+	cat <<- MODS > "${destination}"/etc/modules-load.d/atristation.conf
+		rotary_volume
+		zigbee_control
+		snd-soc-sy6045s
+		gowin_led_screen
+		rotary_encoder
+	MODS
 
 	# RTL8822CS BT: the firmware files belong to atrios-firmware pkg,
 	# so we must NOT ship them again (dpkg "trying to overwrite").
@@ -212,8 +217,8 @@ run_host_command_logged mkdir -pv "${destination}"/usr/share/atri-fw-vendor
 		NoNewPrivileges=yes
 		# Wait for sound card device to appear
 		ExecStart=/bin/sh -c 'i=0; while [ ! -e /dev/snd/pcmC0D0p ] && [ "$$i" -lt 20 ]; do sleep 0.2; i=$$((i+1)); done'
-		# SY6045S: trigger firmware reload via sysfs in case probed before rootfs /lib/firmware was mounted
-		ExecStart=/bin/sh -c 'for d in /sys/bus/i2c/drivers/sy6045s/*; do [ -f "$$d/default_settings" ] && echo 1 > "$$d/default_settings" 2>/dev/null || true; done'
+		# SY6045S: trigger firmware reload via sysfs, or run hardware init script as fallback
+		ExecStart=/bin/sh -c 'if [ -d /sys/bus/i2c/drivers/sy6045s ]; then for d in /sys/bus/i2c/drivers/sy6045s/*; do [ -f "$$d/default_settings" ] && echo 1 > "$$d/default_settings" 2>/dev/null || true; done; elif [ -x /usr/libexec/sy6045s-init.sh ]; then /usr/libexec/sy6045s-init.sh || true; fi'
 		# Restore ALSA mixer state
 		ExecStart=/usr/sbin/alsactl restore 0 || true
 
