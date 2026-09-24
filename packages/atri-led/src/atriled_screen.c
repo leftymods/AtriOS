@@ -72,6 +72,27 @@ static void print_usage(const char *prog)
 	printf("  rect <r> <g> <b>   Fill screen with color\n");
 }
 
+static int set_backlight(const char *val)
+{
+	const char *paths[] = {
+		"/sys/class/backlight/gowin-backlight/brightness",
+		"/sys/class/backlight/atri_led_panel/brightness",
+		"/sys/class/backlight/gowin_led/brightness",
+		"/sys/class/backlight/led_screen/brightness",
+		NULL
+	};
+	for (int i = 0; paths[i]; i++) {
+		int fd = open(paths[i], O_WRONLY);
+		if (fd >= 0) {
+			int r = write(fd, val, strlen(val));
+			(void)write(fd, "\n", 1);
+			close(fd);
+			if (r > 0) return 0;
+		}
+	}
+	return -1;
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 2) { print_usage(argv[0]); return 1; }
@@ -88,16 +109,14 @@ int main(int argc, char *argv[])
 		return 0;
 
 	} else if (strcmp(cmd, "on") == 0) {
-		return system("echo 200 > /sys/class/backlight/led_screen/brightness 2>/dev/null || echo 1");
+		return set_backlight("200") == 0 ? 0 : 1;
 
 	} else if (strcmp(cmd, "off") == 0) {
-		return system("echo 0 > /sys/class/backlight/led_screen/brightness 2>/dev/null || echo 1");
+		return set_backlight("0") == 0 ? 0 : 1;
 
 	} else if (strcmp(cmd, "brightness") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s brightness <val>\n", argv[0]); return 1; }
-		char cmd[256];
-		snprintf(cmd, sizeof(cmd), "echo %s > /sys/class/backlight/led_screen/brightness 2>/dev/null", argv[2]);
-		return system(cmd);
+		return set_backlight(argv[2]) == 0 ? 0 : 1;
 
 	} else if (strcmp(cmd, "send") == 0) {
 		if (argc < 3) { fprintf(stderr, "Usage: %s send <file>\n", argv[0]); return 1; }

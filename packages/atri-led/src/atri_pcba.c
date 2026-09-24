@@ -32,11 +32,29 @@ struct { const char *name; uint8_t addr; } eeproms[] = {
     { "mics",        0x56 },
 };
 
+#ifndef I2C_SLAVE_FORCE
+#define I2C_SLAVE_FORCE 0x0706
+#endif
+
 static int read_eeprom(uint8_t addr, unsigned char *buf, int len)
 {
-    int fd = open(I2C_DEV, O_RDWR);
-    if (fd < 0) { perror("open " I2C_DEV); return -1; }
-    if (ioctl(fd, I2C_SLAVE, addr) < 0) { perror("I2C_SLAVE"); close(fd); return -1; }
+    char devpath[32];
+    int fd = -1;
+    const char *candidates[] = { "/dev/i2c-0", "/dev/i2c-1", "/dev/i2c-2", NULL };
+    for (int i = 0; candidates[i]; i++) {
+        fd = open(candidates[i], O_RDWR);
+        if (fd >= 0) {
+            if (ioctl(fd, I2C_SLAVE_FORCE, addr) == 0 || ioctl(fd, I2C_SLAVE, addr) == 0) {
+                break;
+            }
+            close(fd);
+            fd = -1;
+        }
+    }
+    if (fd < 0) {
+        perror("I2C open/slave failed");
+        return -1;
+    }
     /* at24 seek: write one dummy byte = offset 0, then read */
     uint8_t off = 0;
     if (write(fd, &off, 1) != 1) { /* some kernels need this, ignore err */ }

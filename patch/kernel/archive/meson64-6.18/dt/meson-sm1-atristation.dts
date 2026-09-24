@@ -48,7 +48,7 @@
 	};
 
 	pcba_ids: pcba-ids {
-		compatible = "atri,pcba-ids";
+		compatible = "atri,pcba-ids", "yandex,pcba-ids", "pcba-ids";
 		eeproms = <&pcba_eeprom>;
 		eeprom-names = "mainboard";
 		status = "okay";
@@ -283,22 +283,12 @@
 		enable-active-high;
 	};
 
-	/* Volume knob per vendor: push A/B emitting KEY_VOLUMEUP/DOWN */
-	rotary-volume {
-		compatible = "gpio-keys-polled";
-		poll-interval = <20>;
-
-		vol-up {
-			label = "volume-up";
-			linux,code = <KEY_VOLUMEUP>;
-			gpios = <&gpio GPIOA_0 GPIO_ACTIVE_LOW>;
-		};
-
-		vol-down {
-			label = "volume-down";
-			linux,code = <KEY_VOLUMEDOWN>;
-			gpios = <&gpio_ao GPIOAO_10 GPIO_ACTIVE_LOW>;
-		};
+	/* Rotary Volume Encoder (A: GPIOA_0 [0x31], B: GPIOAO_10 [0x0a]) */
+	rotary_volume: rotary-volume {
+		compatible = "rotary-volume";
+		gpios = <&gpio GPIOA_0 GPIO_ACTIVE_LOW>,
+			<&gpio_ao GPIOAO_10 GPIO_ACTIVE_LOW>;
+		status = "okay";
 	};
 
 	zigbee_control: zigbee-control {
@@ -1087,7 +1077,7 @@
 	};
 
 	als@53 {
-		compatible = "liteon,ltrf216a";
+		compatible = "liteon,ltr308als01", "liteon,ltr308", "liteon,ltrf216a";
 		reg = <0x53>;
 		status = "okay";
 	};

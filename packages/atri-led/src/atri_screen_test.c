@@ -29,7 +29,14 @@
 #include <sys/mman.h>
 #include <linux/fb.h>
 
-#define FB_ID_PREFIX	"atri_led_panel_"
+static inline int is_panel_id(const char *id)
+{
+	if (!id) return 0;
+	return (strncmp(id, "gowin_led", 9) == 0 ||
+		strncmp(id, "GowinLED", 8) == 0 ||
+		strncmp(id, "atri_led_panel", 14) == 0);
+}
+
 #define EXP_W1		25
 #define EXP_H1		16
 #define EXP_W2		28
@@ -157,7 +164,7 @@ static int try_open_fb(const char *path, int verbose, int *fd_out,
 		close(fd);
 		return -1;
 	}
-	if (strncmp(fix->id, FB_ID_PREFIX, strlen(FB_ID_PREFIX)) != 0) {
+	if (!is_panel_id(fix->id)) {
 		if (verbose)
 			LOG("  %-12s : id '%s' — not ours", path, fix->id);
 		close(fd);
@@ -299,7 +306,7 @@ static void test_moving_block(int fd, int frames)
 
 static void test_backlight(void)
 {
-	const char *names[] = { "atri_led_panel", NULL };
+	const char *names[] = { "gowin-backlight", "atri_led_panel", "gowin_led", "led_screen", NULL };
 	char path[360];
 	int i, v;
 

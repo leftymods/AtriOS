@@ -8,8 +8,13 @@
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 
-/* fix.id is truncated to 15 chars because FB_FIX_SCREENINFO_ID is 16 bytes */
-#define ATRI_FB_ID "atri_led_panel_"
+static bool screen_match_id(const char *id)
+{
+    if (!id) return false;
+    return (strncmp(id, "gowin_led", 9) == 0 ||
+            strncmp(id, "GowinLED", 8) == 0 ||
+            strncmp(id, "atri_led_panel", 14) == 0);
+}
 
 static int screen_open_fd(struct screen *s, int fd, const char *bl_path)
 {
@@ -44,6 +49,22 @@ static int screen_open_fd(struct screen *s, int fd, const char *bl_path)
     }
 
     s->backlight_fd = open(bl_path, O_WRONLY);
+    if (s->backlight_fd < 0) {
+        const char *bl_fallbacks[] = {
+            "/sys/class/backlight/gowin-backlight/brightness",
+            "/sys/class/backlight/atri_led_panel/brightness",
+            "/sys/class/backlight/gowin_led/brightness",
+            "/sys/class/backlight/led_screen/brightness",
+            NULL
+        };
+        for (int i = 0; bl_fallbacks[i]; i++) {
+            s->backlight_fd = open(bl_fallbacks[i], O_WRONLY);
+            if (s->backlight_fd >= 0) {
+                xstrlcpy(s->backlight_path, bl_fallbacks[i], sizeof(s->backlight_path));
+                break;
+            }
+        }
+    }
     if (s->backlight_fd < 0)
         log_msg(LOG_WARNING, "backlight %s not available: %s", bl_path, strerror(errno));
 
@@ -53,7 +74,7 @@ static int screen_open_fd(struct screen *s, int fd, const char *bl_path)
 }
 
 static int screen_try_open(struct screen *s, const char *path,
-                           const char *bl_path, const char *want_id)
+                           const char *bl_path, bool filter_id)
 {
     struct fb_fix_screeninfo finfo;
     int fd;
@@ -67,7 +88,7 @@ static int screen_try_open(struct screen *s, const char *path,
         return -1;
     }
 
-    if (want_id && strcmp(finfo.id, want_id) != 0) {
+    if (filter_id && !screen_match_id(finfo.id)) {
         close(fd);
         return -1;
     }
@@ -83,21 +104,21 @@ int screen_init(struct screen *s, const char *fb_path, const char *bl_path)
 
     /* Try the configured path first. */
     if (fb_path && fb_path[0]) {
-        if (screen_try_open(s, fb_path, bl_path, NULL) == 0)
+        if (screen_try_open(s, fb_path, bl_path, false) == 0)
             return 0;
-        log_msg(LOG_WARNING, "%s not usable, scanning for '%s'",
-                fb_path, ATRI_FB_ID);
+        log_msg(LOG_WARNING, "%s not usable, scanning for LED panel fb",
+                fb_path);
     }
 
-    /* Scan /dev/fb* for the AtriStation LED panel fb. */
+    /* Scan /dev/fb* for the LED panel fb. */
     for (int i = 0; i < 8; i++) {
         char path[32];
         snprintf(path, sizeof(path), "/dev/fb%d", i);
-        if (screen_try_open(s, path, bl_path, ATRI_FB_ID) == 0)
+        if (screen_try_open(s, path, bl_path, true) == 0)
             return 0;
     }
 
-    log_msg(LOG_ERR, "screen framebuffer '%s' not found", ATRI_FB_ID);
+    log_msg(LOG_ERR, "screen framebuffer not found");
     return -1;
 }
 

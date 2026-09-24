@@ -132,6 +132,26 @@ static void zb_pin(int *reset, int *boot)
 	*boot  = base + 76;	/* 0x4c */
 }
 
+static const char *get_zigbee_ctrl_sysfs(void)
+{
+	if (access("/sys/devices/platform/zigbee-control/reset", W_OK) == 0)
+		return "/sys/devices/platform/zigbee-control";
+	if (access("/sys/bus/platform/devices/zigbee-control/reset", W_OK) == 0)
+		return "/sys/bus/platform/devices/zigbee-control";
+	return NULL;
+}
+
+static int zb_sysfs_write(const char *base, const char *attr, const char *val)
+{
+	char path[128];
+	snprintf(path, sizeof(path), "%s/%s", base, attr);
+	int fd = open(path, O_WRONLY);
+	if (fd < 0) return -1;
+	int r = write(fd, val, strlen(val));
+	close(fd);
+	return r > 0 ? 0 : -1;
+}
+
 static int zb_export_pins(int reset, int boot)
 {
 	char n[16];
@@ -326,10 +346,15 @@ int main(int argc, char **argv)
 
 	if (!cmd) { usage(); return 0; }
 
-	int reset, boot;
-	zb_pin(&reset, &boot);
-	zb_export_pins(reset, boot);
-	LOG("zigbee gpio: reset=%d boot=%d (global nums)", reset, boot);
+	int reset = -1, boot = -1;
+	const char *zb_sysfs = get_zigbee_ctrl_sysfs();
+	if (zb_sysfs) {
+		LOG("using zigbee-control driver sysfs: %s", zb_sysfs);
+	} else {
+		zb_pin(&reset, &boot);
+		zb_export_pins(reset, boot);
+		LOG("zigbee gpio: reset=%d boot=%d (global nums)", reset, boot);
+	}
 
 	if (strcmp(cmd, "info") == 0) {
 		int fd = tty_open(dev, DEFAULT_BAUD);
@@ -347,6 +372,13 @@ int main(int argc, char **argv)
 	}
 
 	if (strcmp(cmd, "reset") == 0) {
+		if (zb_sysfs) {
+			zb_sysfs_write(zb_sysfs, "boot", "0");
+			zb_sysfs_write(zb_sysfs, "reset", "1");
+			usleep(120000);
+			LOG("normal reset done via driver (%s)", dev);
+			return failures ? 1 : 0;
+		}
 		char rn[16], bn[16];
 		snprintf(rn, sizeof(rn), "%d", reset);
 		snprintf(bn, sizeof(bn), "%d", boot);
@@ -358,6 +390,15 @@ int main(int argc, char **argv)
 	}
 
 	if (strcmp(cmd, "bootloader") == 0) {
+		if (zb_sysfs) {
+			zb_sysfs_write(zb_sysfs, "boot", "1");
+			usleep(10000);
+			zb_sysfs_write(zb_sysfs, "reset", "1");
+			usleep(120000);
+			zb_sysfs_write(zb_sysfs, "boot", "0");
+			LOG("entered bootloader sequence via driver on %s", dev);
+			return failures ? 1 : 0;
+		}
 		char rn[16], bn[16];
 		snprintf(rn, sizeof(rn), "%d", reset);
 		snprintf(bn, sizeof(bn), "%d", boot);

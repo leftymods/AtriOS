@@ -13,10 +13,23 @@ static void sigint_handler(int sig) { (void)sig; running = 0; }
 
 static void backlight_write(int val)
 {
-	char cmd[200];
-	snprintf(cmd, sizeof(cmd),
-		"echo %d > /sys/class/backlight/atri_led_panel/brightness 2>/dev/null", val);
-	if (system(cmd) < 0) cmd[0] = '\0';
+	const char *paths[] = {
+		"/sys/class/backlight/gowin-backlight/brightness",
+		"/sys/class/backlight/atri_led_panel/brightness",
+		"/sys/class/backlight/gowin_led/brightness",
+		"/sys/class/backlight/led_screen/brightness",
+		NULL
+	};
+	for (int i = 0; paths[i]; i++) {
+		int fd = open(paths[i], O_WRONLY);
+		if (fd >= 0) {
+			char buf[16];
+			int n = snprintf(buf, sizeof(buf), "%d\n", val);
+			if (write(fd, buf, n) < 0) { /* ignore */ }
+			close(fd);
+			return;
+		}
+	}
 }
 
 static void demo_bounce(quasar_screen_t *scr)
@@ -210,9 +223,11 @@ int main(int argc, char *argv[])
 			int fd = open(fb_path, O_RDONLY);
 			if (fd < 0) continue;
 		if (ioctl(fd, FBIOGET_FSCREENINFO, &fix) == 0 &&
-		    strcmp(fix.id, "atri_led_panel_fb") == 0) {
+		    (strncmp(fix.id, "gowin_led", 9) == 0 ||
+		     strncmp(fix.id, "GowinLED", 8) == 0 ||
+		     strncmp(fix.id, "atri_led_panel", 14) == 0)) {
 			close(fd);
-			printf("Quasar LED screen: detected (%s)\n", fb_path);
+			printf("Quasar LED screen: detected (%s, id: %s)\n", fb_path, fix.id);
 			return 0;
 		}
 	}

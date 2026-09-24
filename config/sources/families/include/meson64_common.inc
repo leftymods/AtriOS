@@ -89,7 +89,7 @@ function custom_kernel_config__enable_rtw88_debugfs() {
 
 # Enable SY6045S audio amplifiers for Station Max
 function custom_kernel_config__enable_sy6045s() {
-	opts_y+=("CONFIG_SND_SOC_SY6045S")
+	opts_m+=("CONFIG_SND_SOC_SY6045S")
 	opts_y+=("CONFIG_BT_HCIUART_3WIRE")
 	opts_y+=("CONFIG_BT_HCIUART_RTL")
 	opts_m+=("CONFIG_SND_SOC_DMIC")

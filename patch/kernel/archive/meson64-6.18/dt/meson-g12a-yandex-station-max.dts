@@ -167,6 +167,8 @@
 	/* Quasar PCBA ID Parser */
 	pcba_ids: pcba-ids {
 		compatible = "yandex,pcba-ids", "pcba-ids";
+		eeproms = <&pcba_eeprom>;
+		eeprom-names = "mainboard";
 		status = "okay";
 	};
 
@@ -386,8 +388,15 @@
 
 	/* Lite-On LTR-308ALS Ambient Light Sensor */
 	ltr308: light-sensor@53 {
-		compatible = "liteon,ltr308als01", "liteon,ltr308";
+		compatible = "liteon,ltr308als01", "liteon,ltr308", "liteon,ltrf216a";
 		reg = <0x53>;
+		status = "okay";
+	};
+
+	pcba_eeprom: eeprom@50 {
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+		vcc-supply = <&vcc_3v3>;
 		status = "okay";
 	};
 };
@@ -425,6 +434,8 @@
 	disable-wp;
 	keep-power-in-suspend;
 	mmc-pwrseq = <&sdio_pwrseq>;
+	vmmc-supply = <&vcc_3v3>;
+	vqmmc-supply = <&vddio_ao1v8>;
 
 	wifi@1 {
 		reg = <1>;

@@ -6,7 +6,7 @@ void config_defaults(struct config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     xstrlcpy(cfg->screen_fb_path, "/dev/fb0", sizeof(cfg->screen_fb_path));
-    xstrlcpy(cfg->backlight_path, "/sys/class/backlight/atri_led_panel/brightness", sizeof(cfg->backlight_path));
+    xstrlcpy(cfg->backlight_path, "/sys/class/backlight/gowin-backlight/brightness", sizeof(cfg->backlight_path));
     xstrlcpy(cfg->ring_leds_path, "/sys/class/leds/ring*", sizeof(cfg->ring_leds_path));
     xstrlcpy(cfg->animations_dir, "/usr/share/atri-main/animations", sizeof(cfg->animations_dir));
     cfg->default_brightness = 200;

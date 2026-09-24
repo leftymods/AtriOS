@@ -7,8 +7,13 @@
 #include <sys/mman.h>
 #include <linux/fb.h>
 
-/* fix.id is truncated to 15 chars because FB_FIX_SCREENINFO_ID is 16 bytes */
-#define ATRI_FB_ID "atri_led_panel_"
+static inline int is_quasar_fb(const char *id)
+{
+	if (!id) return 0;
+	return (strncmp(id, "gowin_led", 9) == 0 ||
+		strncmp(id, "GowinLED", 8) == 0 ||
+		strncmp(id, "atri_led_panel", 14) == 0);
+}
 
 static const uint8_t font5x7[96][5] = {
 	{0x00,0x00,0x00,0x00,0x00},
@@ -126,7 +131,7 @@ int screen_open(quasar_screen_t *scr, const char *ignored)
 			continue;
 
 		if (ioctl(fd, FBIOGET_FSCREENINFO, &fix) == 0 &&
-		    strcmp(fix.id, ATRI_FB_ID) == 0 &&
+		    is_quasar_fb(fix.id) &&
 		    ioctl(fd, FBIOGET_VSCREENINFO, &var) == 0) {
 			scr->fb_len = fix.smem_len > 0 ? fix.smem_len : SCREEN_BYTES;
 			void *map = mmap(NULL, scr->fb_len, PROT_READ | PROT_WRITE,
@@ -143,7 +148,7 @@ int screen_open(quasar_screen_t *scr, const char *ignored)
 		close(fd);
 	}
 
-	fprintf(stderr, "atri_led_panel fbdev not found\n");
+	fprintf(stderr, "Quasar LED panel fbdev not found\n");
 	return -1;
 }
 
