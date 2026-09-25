@@ -2,8 +2,8 @@
 
 case "$1" in
     remove|purge)
-        systemctl stop atri-led.service 2>/dev/null || true
-        systemctl disable atri-led.service 2>/dev/null || true
+        systemctl stop atri-displayd.service 2>/dev/null || true
+        systemctl disable atri-displayd.service 2>/dev/null || true
         ;;
     upgrade|deconfigure)
         ;;
@@ -13,4 +13,3 @@ esac
 
 #DEBHELPER#
 exit 0
-

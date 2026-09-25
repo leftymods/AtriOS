@@ -118,17 +118,26 @@ ampl_pwr=AO10, энкодер A=X? нет — A=GPIOA_0(49), B=AO10.
 ⚠ В дампе НЕТ wifi/bt узлов (не тот ревизионный срез или legacy) —
 наши X7/X18 из других источников.
 
-## 6. Инструменты (packages/atri-led → /usr/bin)
+## 6. Инструменты (packages/atri-* → /usr/bin)
 
-- `atri-led` (симлинк `atrled`) — RGB кольцо (tweening ~125Гц, перцептивный блендинг)
-- `atri-led-ctl` (симлинк `atrledctl`) — CLI кольца
-- `atri-matrix` (объединил 7 утилит: `test`, `demo`, `text`, `on`/`off`, `brightness`, `clear`/`fill`, `info`)
-- `atri-hwprobe` (объединил 4 утилиты: `pcba`, `als`, `buttons`, `knob`, сканер I2C/SPI)
-- `atri-sound-test` (симлинк `atrisound-test`) — диагностика звука, синус-тоны, sweep, 4-ch микрофоны
-- `atrivolume` (симлинк `atri-volume`) — отслеживание громкости и энкодера
-- `atri-zigbee` — прошивка и управление координатором Tuya TZ9213
-- `atri-displayd` & `atri-display` — демон и CLI экранного интерфейса
-- `atri-wireless-init` & `atri-wifi-diag` — автоинициализация MAC/eFuse и диагностика WiFi
+- `packages/atri-led`:
+  - `atri-led` (симлинк `atrled`) — RGB кольцо (tweening ~125Гц, перцептивный блендинг)
+  - `atri-led-ctl` (симлинк `atrledctl`) — CLI кольца
+- `packages/atri-display`:
+  - `atri-displayd` & `atri-display` — демон и CLI экранного интерфейса
+  - `atri-matrix` (объединил 7 утилит: `test`, `demo`, `text`, `on`/`off`, `brightness`, `clear`/`fill`, `info`)
+- `packages/atri-audio`:
+  - `atrivolume` (симлинк `atri-volume`) — отслеживание громкости и энкодера
+  - `atri-sound-test` (симлинк `atrisound-test`) — диагностика звука, синус-тоны, sweep, 4-ch микрофоны
+- `packages/atri-wireless`:
+  - `atri-zigbee` — прошивка и управление координатором Tuya TZ9213
+  - `atri-wireless-init` & `atri-wifi-diag` — автоинициализация MAC/eFuse и диагностика WiFi
+  - `atri-onboard` (симлинк `atri-phone-setup`) — BLE онбординг через мобильное приложение
+- `packages/atri-tools`:
+  - `atri` — umbrella CLI для всех подсистем станции
+  - `atri-tui` (симлинки `atri-setup`, `atri-menu`) — консольный интерфейс настройки
+  - `atri-hwprobe` (объединил 4 утилиты: `pcba`, `als`, `buttons`, `knob`, сканер I2C/SPI)
+  - `atri-autobrightness` — авторегулировка яркости по датчику освещенности
 
 ## 7. Открытые пункты (только железо)
 

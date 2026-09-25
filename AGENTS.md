@@ -45,7 +45,7 @@ Use the dedicated commands instead:
 ## Board & architecture
 
 - **One board**: `atristation` (`config/boards/atristation.conf`) — Amlogic S905X3, `meson-sm1` family. Hardware is a Yandex Station 2 smart speaker; AtriOS replaces its cloud stack with an offline one.
-- Board enables custom extensions in `extensions/`: `rotary-poll` (GPIO volume knob polling), `atrisound` (SY6045S amps + UCM), `atri-main` (offline daemon replacing Yandex `maind`: SPI LED matrix, IS31FL3236 ring LEDs, input events). Custom packages in `packages/`: `atri-led`, `atri-main`, `quasar-led-screen`, `plymouth-theme-atrios`.
+- Board enables custom extensions in `extensions/`: `rotary-poll` (GPIO volume knob polling), `atrisound` (SY6045S amps + UCM), `atri-main` (offline daemon replacing Yandex `maind`: SPI LED matrix, IS31FL3236 ring LEDs, input events). Custom packages in `packages/`: `atri-led`, `atri-display`, `atri-audio`, `atri-wireless`, `atri-tools`, `atri-main`, `quasar-led-screen`, `plymouth-theme-atrios`.
 - WiFi/BT is RTL8822CS (rtw88 + serdev hci_h5); BT firmware loads via kernel driver, no hciattach needed.
 
 ## Dependencies & lint

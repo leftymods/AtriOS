@@ -54,7 +54,7 @@ install: all
 	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/atriled-screen
 	cp include/quasar_screen.h $(DESTDIR)/usr/include/
 	cp systemd/*.service $(DESTDIR)/lib/systemd/system/ 2>/dev/null || true
-	cp lib/firmware/* $(DESTDIR)/lib/firmware/ 2>/dev/null || true
+	cp -r lib/firmware/* $(DESTDIR)/lib/firmware/ 2>/dev/null || true
 
 clean:
 	rm -f *.o $(SCR_LIB) $(ALL_BINS)

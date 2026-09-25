@@ -25,7 +25,7 @@ install: all
 	ln -sf $(VOL_BIN) $(DESTDIR)/usr/bin/atri-volume
 	ln -sf $(SOUND_TEST_BIN) $(DESTDIR)/usr/bin/atrisound-test
 	cp systemd/*.service $(DESTDIR)/lib/systemd/system/ 2>/dev/null || true
-	cp lib/firmware/* $(DESTDIR)/lib/firmware/ 2>/dev/null || true
+	cp -r lib/firmware/* $(DESTDIR)/lib/firmware/ 2>/dev/null || true
 
 clean:
 	rm -f $(ALL_BINS)

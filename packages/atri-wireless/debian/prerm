@@ -1,0 +1,17 @@
+#!/bin/sh -e
+
+case "$1" in
+    remove|purge)
+        systemctl stop atri-wireless-init.service 2>/dev/null || true
+        systemctl stop atri-zigbee-init.service 2>/dev/null || true
+        systemctl disable atri-wireless-init.service 2>/dev/null || true
+        systemctl disable atri-zigbee-init.service 2>/dev/null || true
+        ;;
+    upgrade|deconfigure)
+        ;;
+    *)
+        ;;
+esac
+
+#DEBHELPER#
+exit 0
