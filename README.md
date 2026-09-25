@@ -38,17 +38,17 @@ All hardware features — from the Gowin FPGA LED matrix display and dual IS31FL
 
 | Subsystem | Hardware Component | Bus / Interface | Driver / Daemon | Status |
 |---|---|---|---|---|
-| **LED Matrix Display** | Gowin GW1N FPGA (25×16 LED matrix) | SPI (`spicc1`) + JTAG GPIO | `gowin_led_screen` / `atri-screen-test` | **Supported** |
-| **LED Ring** | Dual IS31FL3236 (24 multicolor RGB zones) | I2C (`i2c0` @ `0x3c`, `0x3f`) | `leds-is31fl32xx` / `atrled` daemon | **Supported** |
-| **Speaker Amplifiers** | Silergy SY6045S (PBTL Woofer + Stereo Tweeters) | I2C (`i2c2` @ `0x2a`, `0x2b`) + TDM B | `snd-soc-sy6045s` + anti-pop sequencer | **Supported** |
+| **LED Matrix Display** | Gowin GW1N FPGA (25×16 LED matrix) | SPI (`spicc1`) + JTAG GPIO | `gowin_led_screen` / `atri-matrix` / `atri-displayd` | **Supported** |
+| **LED Ring** | Dual IS31FL3236 (24 multicolor RGB zones) | I2C (`i2c0` @ `0x3c`, `0x3f`) | `leds-is31fl32xx` / `atri-led` (`atrled`) | **Supported** |
+| **Speaker Amplifiers** | Silergy SY6045S (PBTL Woofer + Stereo Tweeters) | I2C (`i2c2` @ `0x2a`, `0x2b`) + TDM B | `snd-soc-sy6045s` / `atri-sound-test` / PipeWire 2.1 | **Supported** |
 | **Headphone DAC** | Everest ES8156 (3.5mm AUX line out) | I2C (`i2c2` @ `0x08`) + TDM B | `snd-soc-es8156` (mainline ASoC) | **Supported** |
 | **Microphone ADC** | Everest ES7210 4-channel AEC reference ADC | I2C (`i2c2` @ `0x40`) + TDM B | `snd-soc-es7210` (acoustic echo ref) | **Supported** |
-| **Digital Mic Array** | 4-channel PDM microphone array | Amlogic PDM controller | `dmic-codec` / `pdm` DAI link | **Supported** |
+| **Digital Mic Array** | 4-channel PDM microphone array | Amlogic PDM controller | `dmic-codec` / `pdm` DAI link / WebRTC AEC | **Supported** |
 | **Wi-Fi** | Realtek RTL8822CS (802.11ac 2×2 Dual-Band) | SDIO (`sd_emmc_a`, SDR50 100MHz) | `rtw88_8822cs` + virtual eFuse loader | **Supported** |
-| **Bluetooth** | Realtek RTL8822CS Bluetooth 5.0 (H5) | UART_A (`/dev/ttyAML1`, 3MBaud, RTS/CTS) | `hci_h5` / `btrtl` serdev (`hci0`) | **Supported** |
+| **Bluetooth** | Realtek RTL8822CS Bluetooth 5.0 (H5) | UART_A (`/dev/ttyAML1`, 3MBaud, RTS/CTS) | `hci_h5` / `btrtl` serdev (`atri-onboard`) | **Supported** |
 | **Volume Knob** | Laser quadrature rotary encoder | Polled GPIO input (`REL_DIAL`) | `rotary_volume` / `atrivolume` | **Supported** |
 | **Zigbee 3.0** | Tuya TZ9213-2782 / Silicon Labs EFR32 | UART_AO_B (`/dev/ttyAML2`) + GPIOs | `atri-zigbee` (Z2M / ZHA coordinator) | **Supported** |
-| **Light Sensor** | Lite-On LTR-308ALS ambient light sensor | I2C (`i2c0` / `i2c2` @ `0x53`) | `ltr308als01` / `atri-als` daemon | **Supported** |
+| **Light Sensor** | Lite-On LTR-308ALS ambient light sensor | I2C (`i2c0` / `i2c2` @ `0x53`) | `ltr308als01` / `atri-autobrightness` | **Supported** |
 | **RTC (Real-Time Clock)** | NXP PCF8563 real-time clock | I2C (`i2c2` @ `0x51`) | `rtc-pcf8563` (`/dev/rtc0`) | **Supported** |
 | **GPU / Video** | ARM Mali-G31 MP2 + Amlogic VDEC | PCIe / System bus | Panfrost DRM + Meson VDEC (4K HW) | **Supported** |
 
@@ -58,20 +58,44 @@ All hardware features — from the Gowin FPGA LED matrix display and dual IS31FL
 
 ## Built-in CLI Tooling & Daemons
 
-AtriOS packages dedicated native tools and background services installed into `/usr/bin`:
+AtriOS packages high-performance, native C utilities and system services installed into `/usr/bin`:
 
-### Hardware & Peripherals
-- **`atrled` / `atrledctl`**: Daemon and CLI client for 24-zone RGB LED ring. Supports tweened animations, volume arcs, breathing, rainbow waves, and notifications.
-- **`atrivolume`**: Volume control daemon tying laser rotary encoder events (`REL_DIAL`) to ALSA mixer levels with smooth LED ring arc feedback.
-- **`atri-screen-test` / `quasar_led_*`**: Diagnostic test suite, text rendering, and animation player for the 25×16 Gowin FPGA LED screen.
-- **`atri-hwprobe`**: Comprehensive hardware audit tool. Enumerate GPIO lines, consumers, I2C addresses, SPI chips, and active input events (`--watch-gpio` tracks unknown pins).
-- **`atri-zigbee`**: Tuya/EFR32 module manager: hardware reset, bootloader activation, XMODEM-CRC coordinator firmware flashing, and raw passthrough mode.
-- **`atri-als`**: Ambient light sensor service with automatic screen & ring brightness adaptation.
-- **`atri-buttons`**: Physical button monitor (Mute / Action) decoding hardware GPIO state changes.
-- **`atri-pcba`**: On-board EEPROM PCBA revision inspector.
+### Unified Platform CLI & Interactive TUI
+- **`atri`**: Single umbrella management command uniting all system functions:
+  ```bash
+  atri status             # Comprehensive status: SoC, audio, display, sensors, wireless
+  atri menu               # Interactive TUI configurator (Wi-Fi, Bluetooth, Audio, LEDs)
+  atri clock / atri eyes  # Switch front screen to digital clock or expressive eyes
+  atri btaudio [on|off]   # Toggle Bluetooth A2DP wireless speaker mode
+  atri tz [timezone]      # Query or set system timezone
+  atri lang [ru|en]       # Query or set system locale
+  atri sound / matrix ... # Direct pass-through to subsystem tools
+  ```
+- **`atri-tui`** (alias **`atri menu`**, **`atri-setup`**): Full interactive ANSI terminal configurator with arrow-key navigation (`[↑/↓]`, `[ENTER]`, `[ESC/q]`):
+  - 📱 **Phone Onboarding**: Stealth BLE UUID `0xFE33` or visible test mode toggle
+  - 🎵 **Bluetooth Speaker**: A2DP audio sink mode for music streaming from smartphone
+  - 📶 **Wi-Fi Manager**: Scan networks and connect via NetworkManager
+  - 🔊 **Interactive Volume Slider**: Visual level bar, `[+]`/`[-]` steps, instant test tone
+  - 🔊 **Audio Diagnostics**: 440 Hz tweeters, 80 Hz sub-bass, frequency sweep, 4-mic live VU-meter
+  - 🖥️ **Screen Modes**: Digital clock (HH:MM), expressive blinking eyes, temperature, IP ticker
+  - 💡 **LED Ring & Matrix**: Color selection, Pong demo, pixel test, rainbow animations
+  - ☀️ **Auto-Brightness**: Real-time ALS lux monitoring, auto-off in darkness (< 2 lux)
+  - 🌐 **Locale & Timezone**: One-click language switch (ru_RU / en_US), NTP time sync
+  - 🐝 **Zigbee 3.0**: Radio monitor, firmware flash, hardware reset
+
+### Hardware & Peripherals (Pure C99/POSIX)
+- **`atri-onboard`** (alias **`atri-phone-setup`**): Pure C Bluetooth onboarding service using Linux kernel sockets (`AF_BLUETOOTH`, `BTPROTO_RFCOMM`). Operates in stealth BLE advertisement mode (Service UUID `0xFE33`) for companion apps by default, with toggleable visible Classic BT test mode (`--visible`).
+- **`atri-sound-test`**: Audio subsystem verification, I2C bus audit (SY6045S, ES8156, ES7210), 20V rail check, sine tones, and live 4-channel microphone array VU-meter.
+- **`atri-matrix`**: Consolidated 25×16 Gowin FPGA screen tool (pixel diagnostics, Pong demo, fire/stars animations, text rendering, backlight control).
+- **`atri-display` / `atri-displayd`**: Front screen display daemon with 4×10 digital clock font, animated expressions, volume popup overlays, and UNIX socket IPC (`/run/atri-display.sock`).
+- **`atri-autobrightness`**: Ambient light adaptation daemon for LTR-308ALS with exponential smoothing and dark-room sleep mode.
+- **`atri-led` / `atri-led-ctl`**: Daemon and CLI client for the 24-zone IS31FL3236 RGB ring (color, pulse, rainbow, notifications).
+- **`atrivolume`**: Volume control daemon linking rotary encoder (`REL_DIAL`) to ALSA mixer levels with smooth LED ring arc feedback.
+- **`atri-hwprobe`**: Consolidated hardware audit tool (PCBA EEPROM parser, ALS lux probe, button monitor, rotary knob tracer).
+- **`atri-zigbee`**: Tuya/EFR32 module manager (hardware reset, bootloader, XMODEM-CRC firmware flash, sniff mode).
 
 ### Wireless & Diagnostic Suite
-- **`atri-wifi-diag`** (alias **`atri-wireless`**): Native diagnostic utility for Realtek RTL8822CS Wi-Fi and Bluetooth.
+- **`atri-wifi-diag`** (alias **`atri-wireless`**): Native C diagnostic utility for Realtek RTL8822CS Wi-Fi and Bluetooth.
   ```bash
   atri-wifi-diag --all            # Full diagnostic suite (Wi-Fi, eFuse, BT, Scan)
   atri-wifi-diag --wifi           # Wi-Fi SDIO bus, clock, and driver status
@@ -81,23 +105,6 @@ AtriOS packages dedicated native tools and background services installed into `/
   atri-wifi-diag --inject-efuse   # Generate and write calibrated virtual eFuse file
   atri-wifi-diag --json           # Machine-readable JSON output for automated testing
   ```
-
----
-
-## Local Voice Biometrics & Neural Speaker Verification
-
-Located in `packages/atri-led/tools/`:
-- **`voice_biometrics_gui.py`**: Interactive Tkinter calibration GUI for enrolling owner voice profiles, singing adaptation, cough signature calibration, and noise rejection tuning.
-- **`realtime_voice_listener.py`**: Background real-time audio listener matching incoming speech against `owner_profile.json` using ECAPA-TDNN neural embeddings (`models/head.tflite`, `models/body.tflite`, 512-dimensional vectors).
-- **Anti-Spoofing & Artifact Rejection**: Built-in Kaldi 80-bin Mel filterbanks, F0 harmonic pitch tracking (60–650 Hz), singing voice adaptation, owner cough biometric filter, and rejection of clapping/pops/mechanical transients.
-
-```bash
-# Launch calibration GUI (Tkinter, no external GUI framework needed)
-python3 packages/atri-led/tools/voice_biometrics_gui.py
-
-# Start background speaker authentication listener
-python3 packages/atri-led/tools/realtime_voice_listener.py
-```
 
 ---
 
