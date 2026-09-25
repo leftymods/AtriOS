@@ -16,7 +16,9 @@
  * Copyright (c) 2026 leftymods / AtriOS Project
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,6 +58,13 @@ struct sockaddr_rc {
 
 static volatile bool running = true;
 static void sig_handler(int sig) { (void)sig; running = false; }
+
+static void send_resp(int client_fd, const char *resp)
+{
+	if (client_fd >= 0 && resp) {
+		(void)write(client_fd, resp, strlen(resp));
+	}
+}
 
 static void run_cmd(const char *cmd)
 {
@@ -394,11 +403,11 @@ static void handle_btaudio(int client_fd, bool enable)
 		run_cmd("hciconfig hci0 class 0x200414 2>/dev/null || true"); /* Audio/Video Loudspeaker */
 		run_cmd("bluetoothctl discoverable on >/dev/null 2>&1 &");
 		run_cmd("bluetoothctl pairable on >/dev/null 2>&1 &");
-		write(client_fd, "{\"status\":\"ok\",\"type\":\"btaudio_result\",\"enabled\":true}\n", 57);
+		send_resp(client_fd, "{\"status\":\"ok\",\"type\":\"btaudio_result\",\"enabled\":true}\n");
 	} else {
 		run_cmd("hciconfig hci0 noscan 2>/dev/null || true");
 		run_cmd("bluetoothctl discoverable off >/dev/null 2>&1 &");
-		write(client_fd, "{\"status\":\"ok\",\"type\":\"btaudio_result\",\"enabled\":false}\n", 58);
+		send_resp(client_fd, "{\"status\":\"ok\",\"type\":\"btaudio_result\",\"enabled\":false}\n");
 	}
 }
 
@@ -479,7 +488,7 @@ static void process_client_command(int client_fd, char *cmd_line)
 	}
 	else if (strstr(cmd_line, "SOUND_TEST") || strstr(cmd_line, "\"cmd\":\"sound_test\"") || strstr(cmd_line, "\"cmd\": \"sound_test\"")) {
 		run_cmd("atri sound tone all 2>/dev/null || atri-sound-test tone all 2>/dev/null || true");
-		write(client_fd, "{\"status\":\"ok\",\"type\":\"sound_test\"}\n", 35);
+		send_resp(client_fd, "{\"status\":\"ok\",\"type\":\"sound_test\"}\n");
 	}
 	else if (strstr(cmd_line, "GET_LANG") || strstr(cmd_line, "\"cmd\":\"get_lang\"")) {
 		handle_get_lang(client_fd);
@@ -596,23 +605,23 @@ static void process_client_command(int client_fd, char *cmd_line)
 		if (ssid[0]) {
 			handle_connect(client_fd, ssid, pass, name);
 		} else {
-			write(client_fd, "{\"status\":\"error\",\"message\":\"Missing SSID\"}\n", 43);
+			send_resp(client_fd, "{\"status\":\"error\",\"message\":\"Missing SSID\"}\n");
 		}
 	}
 	else if (strstr(cmd_line, "REBOOT") || strstr(cmd_line, "\"cmd\":\"reboot\"")) {
-		write(client_fd, "{\"status\":\"ok\",\"message\":\"Rebooting system...\"}\n", 47);
+		send_resp(client_fd, "{\"status\":\"ok\",\"message\":\"Rebooting system...\"}\n");
 		run_cmd("sync; reboot &");
 	}
 	else if (strstr(cmd_line, "POWEROFF") || strstr(cmd_line, "\"cmd\":\"poweroff\"")) {
-		write(client_fd, "{\"status\":\"ok\",\"message\":\"Powering off...\"}\n", 43);
+		send_resp(client_fd, "{\"status\":\"ok\",\"message\":\"Powering off...\"}\n");
 		run_cmd("sync; poweroff &");
 	}
 	else if (!strcmp(cmd_line, "EXIT") || strstr(cmd_line, "\"cmd\":\"exit\"")) {
-		write(client_fd, "{\"status\":\"ok\",\"message\":\"Goodbye\"}\n", 36);
+		send_resp(client_fd, "{\"status\":\"ok\",\"message\":\"Goodbye\"}\n");
 		running = false;
 	}
 	else {
-		write(client_fd, "{\"status\":\"error\",\"message\":\"Unknown command. Supported: SCAN, CONNECT, TELEMETRY, SET_LANG, GET_LANG, SET_TZ, GET_TZ, SET_VOLUME, SET_NAME, SET_DISPLAY, SET_LED, BT_AUDIO, SOUND_TEST, REBOOT, POWEROFF, EXIT\"}\n", 220);
+		send_resp(client_fd, "{\"status\":\"error\",\"message\":\"Unknown command. Supported: SCAN, CONNECT, TELEMETRY, SET_LANG, GET_LANG, SET_TZ, GET_TZ, SET_VOLUME, SET_NAME, SET_DISPLAY, SET_LED, BT_AUDIO, SOUND_TEST, REBOOT, POWEROFF, EXIT\"}\n");
 	}
 }
 

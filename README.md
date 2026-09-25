@@ -38,19 +38,19 @@ All hardware features — from the Gowin FPGA LED matrix display and dual IS31FL
 
 | Subsystem | Hardware Component | Bus / Interface | Driver / Daemon | Status |
 |---|---|---|---|---|
-| **LED Matrix Display** | Gowin GW1N FPGA (25×16 LED matrix) | SPI (`spicc1`) + JTAG GPIO | `gowin_led_screen` / `atri-matrix` / `atri-displayd` | **Supported** |
-| **LED Ring** | Dual IS31FL3236 (24 multicolor RGB zones) | I2C (`i2c0` @ `0x3c`, `0x3f`) | `leds-is31fl32xx` / `atri-led` (`atrled`) | **Supported** |
-| **Speaker Amplifiers** | Silergy SY6045S (PBTL Woofer + Stereo Tweeters) | I2C (`i2c2` @ `0x2a`, `0x2b`) + TDM B | `snd-soc-sy6045s` / `atri-sound-test` / PipeWire 2.1 | **Supported** |
-| **Headphone DAC** | Everest ES8156 (3.5mm AUX line out) | I2C (`i2c2` @ `0x08`) + TDM B | `snd-soc-es8156` (mainline ASoC) | **Supported** |
-| **Microphone ADC** | Everest ES7210 4-channel AEC reference ADC | I2C (`i2c2` @ `0x40`) + TDM B | `snd-soc-es7210` (acoustic echo ref) | **Supported** |
-| **Digital Mic Array** | 4-channel PDM microphone array | Amlogic PDM controller | `dmic-codec` / `pdm` DAI link / WebRTC AEC | **Supported** |
-| **Wi-Fi** | Realtek RTL8822CS (802.11ac 2×2 Dual-Band) | SDIO (`sd_emmc_a`, SDR50 100MHz) | `rtw88_8822cs` + virtual eFuse loader | **Supported** |
-| **Bluetooth** | Realtek RTL8822CS Bluetooth 5.0 (H5) | UART_A (`/dev/ttyAML1`, 3MBaud, RTS/CTS) | `hci_h5` / `btrtl` serdev (`atri-onboard`) | **Supported** |
-| **Volume Knob** | Laser quadrature rotary encoder | Polled GPIO input (`REL_DIAL`) | `rotary_volume` / `atrivolume` | **Supported** |
-| **Zigbee 3.0** | Tuya TZ9213-2782 / Silicon Labs EFR32 | UART_AO_B (`/dev/ttyAML2`) + GPIOs | `atri-zigbee` (Z2M / ZHA coordinator) | **Supported** |
-| **Light Sensor** | Lite-On LTR-308ALS ambient light sensor | I2C (`i2c0` / `i2c2` @ `0x53`) | `ltr308als01` / `atri-autobrightness` | **Supported** |
-| **RTC (Real-Time Clock)** | NXP PCF8563 real-time clock | I2C (`i2c2` @ `0x51`) | `rtc-pcf8563` (`/dev/rtc0`) | **Supported** |
-| **GPU / Video** | ARM Mali-G31 MP2 + Amlogic VDEC | PCIe / System bus | Panfrost DRM + Meson VDEC (4K HW) | **Supported** |
+| **LED Matrix Display** | Gowin GW1N FPGA (25×16 LED matrix) | SPI (`spicc1`) + JTAG GPIO | `gowin_led_screen` / `atri-matrix` / `atri-displayd` | [ ] Untested on hardware |
+| **LED Ring** | Dual IS31FL3236 (24 multicolor RGB zones) | I2C (`i2c0` @ `0x3c`, `0x3f`) | `leds-is31fl32xx` / `atri-led` (`atrled`) | [ ] Untested on hardware |
+| **Speaker Amplifiers** | Silergy SY6045S (PBTL Woofer + Stereo Tweeters) | I2C (`i2c2` @ `0x2a`, `0x2b`) + TDM B | `snd-soc-sy6045s` / `atri-sound-test` / PipeWire 2.1 | [ ] Untested on hardware |
+| **Headphone DAC** | Everest ES8156 (3.5mm AUX line out) | I2C (`i2c2` @ `0x08`) + TDM B | `snd-soc-es8156` (mainline ASoC) | [ ] Untested on hardware |
+| **Microphone ADC** | Everest ES7210 4-channel AEC reference ADC | I2C (`i2c2` @ `0x40`) + TDM B | `snd-soc-es7210` (acoustic echo ref) | [ ] Untested on hardware |
+| **Digital Mic Array** | 4-channel PDM microphone array | Amlogic PDM controller | `dmic-codec` / `pdm` DAI link / WebRTC AEC | [ ] Untested on hardware |
+| **Wi-Fi** | Realtek RTL8822CS (802.11ac 2×2 Dual-Band) | SDIO (`sd_emmc_a`, SDR50 100MHz) | `rtw88_8822cs` + virtual eFuse loader | [ ] Untested on hardware |
+| **Bluetooth** | Realtek RTL8822CS Bluetooth 5.0 (H5) | UART_A (`/dev/ttyAML1`, 3MBaud, RTS/CTS) | `hci_h5` / `btrtl` serdev (`atri-onboard`) | [ ] Untested on hardware |
+| **Volume Knob** | Laser quadrature rotary encoder | Polled GPIO input (`REL_DIAL`) | `rotary_volume` / `atrivolume` | [ ] Untested on hardware |
+| **Zigbee 3.0** | Tuya TZ9213-2782 / Silicon Labs EFR32 | UART_AO_B (`/dev/ttyAML2`) + GPIOs | `atri-zigbee` (Z2M / ZHA coordinator) | [ ] Untested on hardware |
+| **Light Sensor** | Lite-On LTR-308ALS ambient light sensor | I2C (`i2c0` / `i2c2` @ `0x53`) | `ltr308als01` / `atri-autobrightness` | [ ] Untested on hardware |
+| **RTC (Real-Time Clock)** | NXP PCF8563 real-time clock | I2C (`i2c2` @ `0x51`) | `rtc-pcf8563` (`/dev/rtc0`) | [ ] Untested on hardware |
+| **GPU / Video** | ARM Mali-G31 MP2 + Amlogic VDEC | PCIe / System bus | Panfrost DRM + Meson VDEC (4K HW) | [ ] Untested on hardware |
 
 > *Примечание: драйверы, DTS и модули интегрированы в дерево сборки, однако требуют валидации непосредственно на физическом образце устройства.*
 
@@ -72,16 +72,16 @@ AtriOS packages high-performance, native C utilities and system services install
   atri sound / matrix ... # Direct pass-through to subsystem tools
   ```
 - **`atri-tui`** (alias **`atri menu`**, **`atri-setup`**): Full interactive ANSI terminal configurator with arrow-key navigation (`[↑/↓]`, `[ENTER]`, `[ESC/q]`):
-  - 📱 **Phone Onboarding**: Stealth BLE UUID `0xFE33` or visible test mode toggle
-  - 🎵 **Bluetooth Speaker**: A2DP audio sink mode for music streaming from smartphone
-  - 📶 **Wi-Fi Manager**: Scan networks and connect via NetworkManager
-  - 🔊 **Interactive Volume Slider**: Visual level bar, `[+]`/`[-]` steps, instant test tone
-  - 🔊 **Audio Diagnostics**: 440 Hz tweeters, 80 Hz sub-bass, frequency sweep, 4-mic live VU-meter
-  - 🖥️ **Screen Modes**: Digital clock (HH:MM), expressive blinking eyes, temperature, IP ticker
-  - 💡 **LED Ring & Matrix**: Color selection, Pong demo, pixel test, rainbow animations
-  - ☀️ **Auto-Brightness**: Real-time ALS lux monitoring, auto-off in darkness (< 2 lux)
-  - 🌐 **Locale & Timezone**: One-click language switch (ru_RU / en_US), NTP time sync
-  - 🐝 **Zigbee 3.0**: Radio monitor, firmware flash, hardware reset
+  - **Phone Onboarding**: Stealth BLE UUID `0xFE33` or visible test mode toggle
+  - **Bluetooth Speaker**: A2DP audio sink mode for music streaming from smartphone
+  - **Wi-Fi Manager**: Scan networks and connect via NetworkManager
+  - **Interactive Volume Slider**: Visual level bar, `[+]`/`[-]` steps, instant test tone
+  - **Audio Diagnostics**: 440 Hz tweeters, 80 Hz sub-bass, frequency sweep, 4-mic live VU-meter
+  - **Screen Modes**: Digital clock (HH:MM), expressive blinking eyes, temperature, IP ticker
+  - **LED Ring & Matrix**: Color selection, Pong demo, pixel test, rainbow animations
+  - **Auto-Brightness**: Real-time ALS lux monitoring, auto-off in darkness (< 2 lux)
+  - **Locale & Timezone**: One-click language switch (ru_RU / en_US), NTP time sync
+  - **Zigbee 3.0**: Radio monitor, firmware flash, hardware reset
 
 ### Hardware & Peripherals (Pure C99/POSIX)
 - **`atri-onboard`** (alias **`atri-phone-setup`**): Pure C Bluetooth onboarding service using Linux kernel sockets (`AF_BLUETOOTH`, `BTPROTO_RFCOMM`). Operates in stealth BLE advertisement mode (Service UUID `0xFE33`) for companion apps by default, with toggleable visible Classic BT test mode (`--visible`).

@@ -15,7 +15,9 @@
  * and creates /etc/atri-wireless/mac.conf and marker /etc/atri-wireless/.provisioned.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +26,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>

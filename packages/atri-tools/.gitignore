@@ -1,0 +1,12 @@
+*.o
+*.a
+atri
+atri-tui
+atri-setup
+atri-menu
+atri-hwprobe
+atri-pcba
+atri-als
+atri-buttons
+atri-knob
+atri-autobrightness

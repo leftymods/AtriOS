@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS = -O2 -Wall -I./include -D_GNU_SOURCE
-LDFLAGS = -static -lm
+LDFLAGS = -lm
 ASOUND_LIBS = -lasound
 
 VOL_BIN = atrivolume

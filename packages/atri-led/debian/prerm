@@ -3,7 +3,11 @@
 case "$1" in
     remove|purge)
         systemctl stop atri-led.service 2>/dev/null || true
+        systemctl stop atri-led-boot.service 2>/dev/null || true
+        systemctl stop atri-led-stop-boot.service 2>/dev/null || true
         systemctl disable atri-led.service 2>/dev/null || true
+        systemctl disable atri-led-boot.service 2>/dev/null || true
+        systemctl disable atri-led-stop-boot.service 2>/dev/null || true
         ;;
     upgrade|deconfigure)
         ;;

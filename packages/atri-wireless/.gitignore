@@ -1,0 +1,8 @@
+*.o
+*.a
+atri-onboard
+atri-phone-setup
+atri-wifi-diag
+atri-wireless
+atri-wireless-init
+atri-zigbee

@@ -1,15 +1,7 @@
 *.o
 *.a
+atri-led
+atri-led-ctl
 atrled
 atrledctl
-atriled-screen
-atrivolume
-quasar_led_ctl
-quasar_led_demo
-quasar_led_info
-quasar_led_test
-quasar_led_text
-atri-screen-test
-atri-hwprobe
 test_atri_led
-atri-zigbee

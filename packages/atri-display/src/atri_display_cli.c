@@ -4,11 +4,14 @@
  * Copyright (c) 2026 leftymods / AtriOS Project
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 

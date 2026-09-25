@@ -160,3 +160,15 @@ ampl_pwr=AO10, энкодер A=X? нет — A=GPIOA_0(49), B=AO10.
   = git apply молча режет хвост
 - olddefconfig с timeout может не дописать auto.conf → «No rule»
 - tmp-каталоги чистятся: генераторы — сразу в репо
+- Динамические библиотеки (-lasound) требуют динамической линковки (без -static), иначе линковщик ищет отсутствующий libasound.a
+- При выводе строковых констант через write() использовать strlen() вместо жестко заданных байтов во избежание -Wstringop-overread
+
+## 9. Сессия аудита и самопроверки (/boost)
+- `packages/atri-led` очищен от аудио/DSP: файлы `vqe_spotter_pipeline.c`, `yandex_spotter.h`, `yandex_vqe.h` перенесены в `packages/atri-audio/dsp`. В `atri-led` только LED ring.
+- `README.md`: удалены все стикеры и эмодзи. В таблице статусов подсистем установлены галочки `[ ] Untested on hardware` до проверки на физическом железе.
+- `packages/atri-display`: исправлена ошибка компиляции в `src/atri_display_cli.c` (добавлен недостающий `#include <errno.h>`).
+- `packages/atri-audio`: в `Makefile` убран `-static` из `LDFLAGS` для корректной динамической линковки с `libasound.so`.
+- `packages/atri-wireless`: устранены ворнинги `-Wstringop-overread` в `src/atri_onboard.c` через `send_resp(..., strlen(...))`; добавлен `#include <time.h>` в `src/atri_wireless_init.c`.
+- `packages/atri-led/debian/prerm`: добавлены `atri-led-boot.service` и `atri-led-stop-boot.service` в секцию остановки и отключения при удалении пакета.
+- Добавлены `.gitignore` во все 5 пакетов (`atri-led`, `atri-display`, `atri-audio`, `atri-wireless`, `atri-tools`).
+- Все 5 пакетов проверены реальной сборкой в окружении WSL (`make clean all`) — успешный выход (exit code 0).
