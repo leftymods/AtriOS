@@ -44,9 +44,9 @@ static int set_backlight(int val)
 		if (fd >= 0) {
 			char buf[16];
 			int n = snprintf(buf, sizeof(buf), "%d\n", val);
-			write(fd, buf, n);
+			ssize_t ret = write(fd, buf, n);
 			close(fd);
-			return 0;
+			return (ret > 0) ? 0 : -1;
 		}
 	}
 	return -1;

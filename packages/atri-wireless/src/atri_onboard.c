@@ -203,7 +203,7 @@ static void handle_scan(int client_fd)
 	}
 
 	snprintf(resp + pos, sizeof(resp) - pos, "]}\n");
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_connect(int client_fd, const char *ssid, const char *password, const char *name)
@@ -244,7 +244,7 @@ static void handle_connect(int client_fd, const char *ssid, const char *password
 			char resp[256];
 			snprintf(resp, sizeof(resp),
 			         "{\"status\":\"ok\",\"type\":\"connect_result\",\"ip\":\"%s\"}\n", ip);
-			write(client_fd, resp, strlen(resp));
+			send_resp(client_fd, resp);
 			return;
 		}
 	}
@@ -254,7 +254,7 @@ static void handle_connect(int client_fd, const char *ssid, const char *password
 	snprintf(err_resp, sizeof(err_resp),
 	         "{\"status\":\"error\",\"type\":\"connect_result\",\"error\":\"Connection failed (%s)\"}\n",
 	         out[0] ? out : "timeout");
-	write(client_fd, err_resp, strlen(err_resp));
+	send_resp(client_fd, err_resp);
 }
 
 static void handle_get_lang(int client_fd)
@@ -279,7 +279,7 @@ static void handle_get_lang(int client_fd)
 	}
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"lang_result\",\"lang\":\"%s\"}\n", lang);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_set_lang(int client_fd, const char *lang)
@@ -300,7 +300,7 @@ static void handle_set_lang(int client_fd, const char *lang)
 
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_lang_result\",\"lang\":\"%s\"}\n", target);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_get_tz(int client_fd)
@@ -319,7 +319,7 @@ static void handle_get_tz(int client_fd)
 	}
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"tz_result\",\"timezone\":\"%s\"}\n", tz);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_set_tz(int client_fd, const char *tz)
@@ -330,7 +330,7 @@ static void handle_set_tz(int client_fd, const char *tz)
 
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_tz_result\",\"timezone\":\"%s\"}\n", tz);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_get_volume(int client_fd)
@@ -344,7 +344,7 @@ static void handle_get_volume(int client_fd)
 	}
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"volume_result\",\"volume\":%d}\n", vol);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_set_volume(int client_fd, int vol)
@@ -360,7 +360,7 @@ static void handle_set_volume(int client_fd, int vol)
 
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_volume_result\",\"volume\":%d}\n", vol);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_set_name(int client_fd, const char *name)
@@ -371,7 +371,7 @@ static void handle_set_name(int client_fd, const char *name)
 
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"set_name_result\",\"name\":\"%s\"}\n", name);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_set_display(int client_fd, const char *arg)
@@ -382,7 +382,7 @@ static void handle_set_display(int client_fd, const char *arg)
 
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"display_result\",\"applied\":\"%s\"}\n", arg);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_set_led(int client_fd, int r, int g, int b)
@@ -393,7 +393,7 @@ static void handle_set_led(int client_fd, int r, int g, int b)
 
 	char resp[128];
 	snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"type\":\"led_result\",\"r\":%d,\"g\":%d,\"b\":%d}\n", r, g, b);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void handle_btaudio(int client_fd, bool enable)
@@ -462,7 +462,7 @@ static void handle_telemetry(int client_fd)
 	         "\"ip\":\"%s\",\"wifi_ssid\":\"%s\","
 	         "\"volume\":%d,\"als_lux\":%d,\"cpu_temp\":%d,\"uptime\":%ld}\n",
 	         ip, ssid, vol, lux, temp, uptime);
-	write(client_fd, resp, strlen(resp));
+	send_resp(client_fd, resp);
 }
 
 static void process_client_command(int client_fd, char *cmd_line)
@@ -646,7 +646,7 @@ static void run_server(int server_fd)
 
 		/* Send welcome banner */
 		const char *welcome = "{\"status\":\"ready\",\"device\":\"AtriStation\",\"version\":\"AtriOS 2.1\",\"channel\":\"bluetooth\"}\n";
-		write(client_fd, welcome, strlen(welcome));
+		send_resp(client_fd, welcome);
 
 		char buf[1024];
 		while (running) {

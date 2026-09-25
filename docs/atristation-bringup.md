@@ -121,10 +121,8 @@ atri-zigbee raw                    # passthrough для z2m/bellows
 Стоковая прошивка говорит на протоколе Яндекса; для zigbee2mqtt/ZHA
 нужна координаторская прошивка соответствующего чипа.
 
-## Известные ограничения
+## Известные ограничения и статус
 
-- BT wake-линии не подключены (GPIOX_17 = zigbee-reset конфликт;
-  host-wake GPIOAO_0 не подтверждён трассировкой)
-- Zigbee отключён: uart_AO_B делит пины с tdm_ao_b_sclk (аудио TDM-B)
-- MAXIO_PHY выключен тримом: если Ethernet не поднимется — вернуть
-  CONFIG_MAXIO_PHY=y в hooks
+- BT wake-линии: BT_EN = GPIOX_18, host-wake = GPIOX_19 (сконфигурировано в serdev / uart_A).
+- Zigbee активен: uart_AO_B использует вариант выводов AO2/AO3, бесконфликтно с аудио TDM-B (AO8/AO9).
+- MAXIO_PHY выключен тримом: если Ethernet не поднимется — вернуть CONFIG_MAXIO_PHY=y в hooks.

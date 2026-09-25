@@ -296,8 +296,11 @@ int main(int argc, char **argv)
 		argv[1] = "msg";
 		char *new_argv[32];
 		new_argv[0] = "atri-display";
-		for (int i = 1; i < argc && i < 30; i++) new_argv[i] = argv[i];
-		new_argv[argc] = NULL;
+		int j = 1;
+		for (int i = 1; i < argc && j < 31; i++) {
+			new_argv[j++] = argv[i];
+		}
+		new_argv[j] = NULL;
 		execvp("atri-display", new_argv);
 		perror("execvp atri-display");
 		return 1;

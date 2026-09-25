@@ -244,7 +244,8 @@ int main(int argc, char **argv)
 	ensure_dir(EFUSE_VENDOR_PATH);
 	fd_ef = open(EFUSE_VENDOR_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd_ef >= 0) {
-		write(fd_ef, efuse_data, sizeof(efuse_data));
+		if (write(fd_ef, efuse_data, sizeof(efuse_data)) != sizeof(efuse_data))
+			fprintf(stderr, "atri-wireless-init: error writing %s\n", EFUSE_VENDOR_PATH);
 		close(fd_ef);
 	}
 

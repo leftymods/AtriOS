@@ -1210,7 +1210,7 @@
 	};
 };
 
-/* I2C3 - not used on this board (no TAS5707/AD82584F) */
+/* I2C3 - not used on this board */
 &i2c3 {
 	status = "disabled";
 };
@@ -1266,9 +1266,6 @@
 	};
 };
 
-/* Zigbee radio on UART_AO_B (GPIOAO_8 TX, GPIOAO_9 RX)
- * Disabled: GPIOAO_8 conflicts with tdm_ao_b_sclk needed for audio TDM B.
- * Enable only if Zigbee module is populated and audio TDM B moved to different pins. */
 /* Zigbee radio (Tuya TZ9213-2782 module) on UART_AO_B.
  * Stock DTB routes it to pins 2/3 (uart_ao_b_2_3_pins), which do NOT
  * conflict with audio TDM-B (AO4/6/7/8 + MCLK AO9).

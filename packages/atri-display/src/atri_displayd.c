@@ -487,11 +487,11 @@ static void handle_command(int client_fd)
 	if (strcasecmp(buf, "CLOCK") == 0) {
 		cur_mode = MODE_CLOCK;
 	} else if (strncasecmp(buf, "MSG ", 4) == 0) {
-		strncpy(msg_buffer, buf + 4, sizeof(msg_buffer) - 1);
+		snprintf(msg_buffer, sizeof(msg_buffer), "%s", buf + 4);
 		msg_scroll_pos = SCREEN_W;
 		cur_mode = MODE_MESSAGE;
 	} else if (strncasecmp(buf, "TEMP ", 5) == 0) {
-		strncpy(temp_buffer, buf + 5, sizeof(temp_buffer) - 1);
+		snprintf(temp_buffer, sizeof(temp_buffer), "%s", buf + 5);
 		cur_mode = MODE_TEMP;
 		mode_timeout = time(NULL) + 5;
 	} else if (strncasecmp(buf, "VOL ", 4) == 0) {
@@ -532,7 +532,8 @@ static void handle_command(int client_fd)
 		snprintf(resp, sizeof(resp), "ERR unknown command\n");
 	}
 
-	(void)write(client_fd, resp, strlen(resp));
+	ssize_t rw = write(client_fd, resp, strlen(resp));
+	(void)rw;
 }
 
 static int open_fb(void)
