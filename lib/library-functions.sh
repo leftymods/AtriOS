@@ -27,6 +27,18 @@ set -o errexit  ## set -e : exit the script if any statement returns a non-true 
 ### lib/functions/artifacts/artifact-atri-led.sh
 # shellcheck source=lib/functions/artifacts/artifact-atri-led.sh
 source "${SRC}"/lib/functions/artifacts/artifact-atri-led.sh
+### lib/functions/artifacts/artifact-atri-display.sh
+# shellcheck source=lib/functions/artifacts/artifact-atri-display.sh
+source "${SRC}"/lib/functions/artifacts/artifact-atri-display.sh
+### lib/functions/artifacts/artifact-atri-audio.sh
+# shellcheck source=lib/functions/artifacts/artifact-atri-audio.sh
+source "${SRC}"/lib/functions/artifacts/artifact-atri-audio.sh
+### lib/functions/artifacts/artifact-atri-wireless.sh
+# shellcheck source=lib/functions/artifacts/artifact-atri-wireless.sh
+source "${SRC}"/lib/functions/artifacts/artifact-atri-wireless.sh
+### lib/functions/artifacts/artifact-atri-tools.sh
+# shellcheck source=lib/functions/artifacts/artifact-atri-tools.sh
+source "${SRC}"/lib/functions/artifacts/artifact-atri-tools.sh
 
 # no errors tolerated. invoked before each sourced file to make sure.
 #set -o pipefail  # trace ERR through pipes - will be enabled "soon"
@@ -405,6 +417,18 @@ set -o errexit  ## set -e : exit the script if any statement returns a non-true 
 ### lib/functions/compilation/packages/atri-led-deb.sh
 # shellcheck source=lib/functions/compilation/packages/atri-led-deb.sh
 source "${SRC}"/lib/functions/compilation/packages/atri-led-deb.sh
+### lib/functions/compilation/packages/atri-display-deb.sh
+# shellcheck source=lib/functions/compilation/packages/atri-display-deb.sh
+source "${SRC}"/lib/functions/compilation/packages/atri-display-deb.sh
+### lib/functions/compilation/packages/atri-audio-deb.sh
+# shellcheck source=lib/functions/compilation/packages/atri-audio-deb.sh
+source "${SRC}"/lib/functions/compilation/packages/atri-audio-deb.sh
+### lib/functions/compilation/packages/atri-wireless-deb.sh
+# shellcheck source=lib/functions/compilation/packages/atri-wireless-deb.sh
+source "${SRC}"/lib/functions/compilation/packages/atri-wireless-deb.sh
+### lib/functions/compilation/packages/atri-tools-deb.sh
+# shellcheck source=lib/functions/compilation/packages/atri-tools-deb.sh
+source "${SRC}"/lib/functions/compilation/packages/atri-tools-deb.sh
 
 # no errors tolerated. invoked before each sourced file to make sure.
 #set -o pipefail  # trace ERR through pipes - will be enabled "soon"

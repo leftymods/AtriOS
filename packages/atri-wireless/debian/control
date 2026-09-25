@@ -1,0 +1,8 @@
+Package: atri-wireless
+Version: 1.0
+Architecture: arm64
+Maintainer: leftymods <leftymods@atrios.dev>
+Section: universe/net
+Priority: optional
+Description: AtriOS wireless, Bluetooth onboarding, and Zigbee utilities
+ Provides atri-onboard, atri-wifi-diag, atri-wireless-init, and atri-zigbee for AtriStation.

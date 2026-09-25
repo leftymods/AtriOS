@@ -28,7 +28,10 @@ function atrios_register_artifacts() {
 		["atrios-bsp-cli"]="atrios-bsp-cli"
 		["atrios-bsp-cli"]="atrios-bsp-cli"
 		["atri-led"]="atri-led"
-		["atri-led"]="atri-led"
+		["atri-display"]="atri-display"
+		["atri-audio"]="atri-audio"
+		["atri-wireless"]="atri-wireless"
+		["atri-tools"]="atri-tools"
 
 		# tar.zst
 		["rootfs"]="rootfs"

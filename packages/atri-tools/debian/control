@@ -1,0 +1,8 @@
+Package: atri-tools
+Version: 1.0
+Architecture: arm64
+Maintainer: leftymods <leftymods@atrios.dev>
+Section: universe/utils
+Priority: optional
+Description: AtriOS platform management CLI, TUI, and hardware probe tools
+ Provides atri umbrella CLI, atri-tui configurator, atri-hwprobe, and atri-autobrightness.

@@ -1,0 +1,14 @@
+#!/bin/sh -e
+
+case "$1" in
+    configure)
+        systemctl --no-reload enable atrivolume.service 2>/dev/null || true
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

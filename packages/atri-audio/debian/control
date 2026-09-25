@@ -1,0 +1,8 @@
+Package: atri-audio
+Version: 1.0
+Architecture: arm64
+Maintainer: leftymods <leftymods@atrios.dev>
+Section: universe/sound
+Priority: optional
+Description: AtriOS audio testing tools and volume knob daemon
+ Provides atri-sound-test and atrivolume for AtriStation.

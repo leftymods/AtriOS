@@ -20,11 +20,10 @@ compile_atri-led() {
 
 	run_host_command_logged mkdir -p "${destination}"/{DEBIAN,usr/bin,usr/lib,usr/include}
 	run_host_command_logged mkdir -p "${destination}"/{etc/atriled/animations,etc/udev/rules.d}
-	run_host_command_logged mkdir -p "${destination}"/{lib/systemd/system,lib/firmware}
+	run_host_command_logged mkdir -p "${destination}"/lib/systemd/system
 
 	cd "${destination}" || exit_with_error "can't change directory"
 
-	# set up control file (Depends is added by reversion function)
 	cat <<- END > DEBIAN/control
 		Package: atri-led
 		Version: ${artifact_version}
@@ -32,12 +31,10 @@ compile_atri-led() {
 		Maintainer: $MAINTAINER <$MAINTAINERMAIL>
 		Section: universe/utils
 		Priority: optional
-		Description: AtriOS hardware control daemons and utilities
-		 Provides atri-led, atri-displayd, atrivolume, atri-matrix, atri-hwprobe,
-		 atri-zigbee, and hardware utilities for AtriOS.
+		Description: AtriOS 24-zone RGB LED ring daemon and CLI
+		 Provides atri-led daemon and atri-led-ctl for AtriStation.
 	END
 
-	# Compile C source for target architecture
 	display_alert "Compiling atri-led" "CC=${KERNEL_COMPILER}gcc" "info"
 	declare -g orig_dir="${SRC}/packages/atri-led"
 
@@ -49,23 +46,13 @@ compile_atri-led() {
 		DESTDIR="${destination}" \
 		install
 
-	# Copy configuration files from source package
-	run_host_command_logged cp -rv "${orig_dir}"/etc/atriled/animations/*.anim "${destination}"/etc/atriled/animations/
-	run_host_command_logged cp -rv "${orig_dir}"/etc/udev/rules.d/99-atri-led.rules "${destination}"/etc/udev/rules.d/
-	if [[ -f "${orig_dir}"/tools/atri_wifi_diag.py ]]; then
-		run_host_command_logged cp -v "${orig_dir}"/tools/atri_wifi_diag.py "${destination}"/usr/bin/
-		run_host_command_logged chmod 755 "${destination}"/usr/bin/atri_wifi_diag.py
-	fi
-	# Copy firmware files if they exist
-	for fw in "${orig_dir}"/lib/firmware/*.bin "${orig_dir}"/lib/firmware/*.manifest; do
-		[[ -s "${fw}" ]] && run_host_command_logged cp -v "${fw}" "${destination}"/lib/firmware/
-	done
+	run_host_command_logged cp -rv "${orig_dir}"/etc/atriled/animations/*.anim "${destination}"/etc/atriled/animations/ 2>/dev/null || true
+	run_host_command_logged cp -rv "${orig_dir}"/etc/udev/rules.d/99-atri-led.rules "${destination}"/etc/udev/rules.d/ 2>/dev/null || true
 
 	# Copy maintainer scripts
-	run_host_command_logged cp "${orig_dir}"/debian/{postinst,prerm} "${destination}"/DEBIAN/
-	chmod 755 "${destination}"/DEBIAN/{postinst,prerm}
+	run_host_command_logged cp "${orig_dir}"/debian/{postinst,prerm} "${destination}"/DEBIAN/ 2>/dev/null || true
+	chmod 755 "${destination}"/DEBIAN/{postinst,prerm} 2>/dev/null || true
 
-	# fixing permissions
 	find "${destination}" -print0 2> /dev/null | xargs -0r chown --no-dereference 0:0
 	find "${destination}" ! -type l -print0 2> /dev/null | xargs -0r chmod 'go=rX,u+rw,a-s'
 

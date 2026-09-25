@@ -407,8 +407,12 @@ function install_distribution_agnostic() {
 	# install board support packages
 	install_artifact_deb_chroot "atrios-bsp-cli"
 
-	# install atri-led LED ring control tools
+	# install AtriOS dedicated hardware packages
 	install_artifact_deb_chroot "atri-led"
+	install_artifact_deb_chroot "atri-display"
+	install_artifact_deb_chroot "atri-audio"
+	install_artifact_deb_chroot "atri-wireless"
+	install_artifact_deb_chroot "atri-tools"
 
 
 	# install atrios-zsh

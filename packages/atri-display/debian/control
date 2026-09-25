@@ -1,0 +1,8 @@
+Package: atri-display
+Version: 1.0
+Architecture: arm64
+Maintainer: leftymods <leftymods@atrios.dev>
+Section: universe/utils
+Priority: optional
+Description: AtriOS 25x16 LED matrix display daemon and CLI
+ Provides atri-displayd, atri-display, and atri-matrix for AtriStation.

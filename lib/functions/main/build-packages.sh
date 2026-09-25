@@ -44,8 +44,12 @@ function determine_artifacts_to_build_for_image() {
 	# Userspace, BOARD+BRANCH specific (not RELEASE)
 	artifacts_to_build+=("atrios-bsp-cli")
 
-	# atri-led: LED ring control tools for AtriStation
+	# atri-*: AtriOS dedicated hardware packages
 	artifacts_to_build+=("atri-led")
+	artifacts_to_build+=("atri-display")
+	artifacts_to_build+=("atri-audio")
+	artifacts_to_build+=("atri-wireless")
+	artifacts_to_build+=("atri-tools")
 
 
 	# Desktop packages are now installed by atrios-config (module_desktops)

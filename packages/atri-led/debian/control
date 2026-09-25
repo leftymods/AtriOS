@@ -4,5 +4,5 @@ Architecture: arm64
 Maintainer: leftymods <leftymods@atrios.dev>
 Section: universe/utils
 Priority: optional
-Description: AtriOS hardware control daemons and utilities
- Provides atri-led, atri-displayd, atrivolume, atri-zigbee, and hardware utilities for AtriOS.
+Description: AtriOS 24-zone RGB LED ring daemon and CLI
+ Provides atri-led daemon and atri-led-ctl for AtriStation.
