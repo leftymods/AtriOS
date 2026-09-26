@@ -1,4 +1,4 @@
-﻿From cfdc3d2458338dc31d5641288e1228a8e965dc07 Mon Sep 17 00:00:00 2001
+From cfdc3d2458338dc31d5641288e1228a8e965dc07 Mon Sep 17 00:00:00 2001
 From: leftymods <ggalab33@gmail.com>
 Date: Sat, 19 Sep 2026 21:32:01 +0300
 Subject: [PATCH 1/4] arm64: dts: amlogic: add Yandex Station Max drivers and
@@ -2367,7 +2367,7 @@ index 4a65958c5..93c769608 100644
 +	};
  };
  
- /* I2C3 - not used on this board (no TAS5707/AD82584F) */
+ /* I2C3 - not used on this board */
 @@ -1298,22 +1304,20 @@ &pwm_ef {
  /* Volume potentiometer on SAR ADC channel 0
   * Handled by userspace daemon (atrivolume) via IIO */
@@ -4294,6 +4294,8 @@ index cca9f9c83..3d87cdc0c 100644
 diff --git a/drivers/leds/yandex_fpga_bitstream.h b/drivers/leds/yandex_fpga_bitstream.h
 new file mode 100644
 index 0000000000000000000000000000000000000000..261ccf496ba9399820c46de1e19aa3081dc6360c
+--- /dev/null
++++ b/drivers/leds/yandex_fpga_bitstream.h
 GIT binary patch
 literal 3277054
 zcmeF)$*v^3(k12`3(!0K51>Kz%|K5g2tu|}4I~vxC7=MkyQC9I#I<h)-F(v{VrS+#
