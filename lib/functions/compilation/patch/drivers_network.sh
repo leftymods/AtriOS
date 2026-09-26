@@ -538,14 +538,59 @@ driver_rtw88_lwfinger() {
 		fi
 
 		# Patch efuse.c: fallback to virtual efuse when physical HW efuse is unprogrammed/blank (0xFF)
-		perl -i -0777 -pe '
-			s/(ret = rtw_dump_physical_efuse_map\(rtwdev, phy_map\);\n\tif \(ret\) \{\n\t\trtw_err\(rtwdev, "failed to dump efuse physical map\\n"\);\n\t\tgoto out;\n\t\})/\1\n\n\tif \(phy_map[0] == 0xff && phy_map[1] == 0xff\) {\n\t\tconst struct firmware *efw = NULL;\n\t\trtw_info(rtwdev, "HW efuse is blank, loading virtual efuse map\\n");\n\t\tif (request_firmware_direct(&efw, "rtw88\\/rtl8822cs_efuse.bin", rtwdev->dev) == 0 && efw) {\n\t\t\tif (efw->size <= rtwdev->efuse.physical_size) {\n\t\t\t\tmemcpy(phy_map, efw->data, efw->size);\n\t\t\t\trtw_info(rtwdev, "loaded virtual efuse from file (%zu bytes)\\n", efw->size);\n\t\t\t}\n\t\t\trelease_firmware(efw);\n\t\t} else {\n\t\t\tstatic const u8 def_efuse[49] = {\n\t\t\t\t0x03, 0x29, 0x81, 0x7e, 0x7f, 0x3f, 0x80, 0x20,\n\t\t\t\t0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,\n\t\t\t\t0x8a, 0x00, 0x00, 0x00, 0x45, 0x55, 0x8c, 0x33,\n\t\t\t\t0x33, 0x00, 0x00, 0x00, 0x00, 0x8e, 0x00, 0x00,\n\t\t\t\t0x00, 0x00, 0x00, 0x00, 0x0f, 0x68, 0x02, 0x1a,\n\t\t\t\t0x2b, 0x7c, 0x45, 0x9a\n\t\t\t};\n\t\t\tmemcpy(phy_map, def_efuse, sizeof(def_efuse));\n\t\t\trtw_info(rtwdev, "applied built-in fallback efuse table for 8822C\\n");\n\t\t}\n\t}/' "$kerneldir/drivers/net/wireless/realtek/rtw88/efuse.c"
+		python3 -c '
+import sys
+path = sys.argv[1]
+with open(path, "r") as f:
+    c = f.read()
+target = """\tret = rtw_dump_physical_efuse_map(rtwdev, phy_map);
+\tif (ret) {
+\t\trtw_err(rtwdev, "failed to dump efuse physical map\\n");
+\t\tgoto out_free;
+\t}"""
+addition = target + """
+
+\tif (phy_map[0] == 0xff && phy_map[1] == 0xff) {
+\t\tconst struct firmware *efw = NULL;
+\t\trtw_info(rtwdev, "HW efuse is blank, loading virtual efuse map\\n");
+\t\tif (request_firmware_direct(&efw, "rtw88/rtl8822cs_efuse.bin", rtwdev->dev) == 0 && efw) {
+\t\t\tif (efw->size <= rtwdev->efuse.physical_size) {
+\t\t\t\tmemcpy(phy_map, efw->data, efw->size);
+\t\t\t\trtw_info(rtwdev, "loaded virtual efuse from file (%zu bytes)\\n", efw->size);
+\t\t\t}
+\t\t\trelease_firmware(efw);
+\t\t} else {
+\t\t\tstatic const u8 def_efuse[49] = {
+\t\t\t\t0x03, 0x29, 0x81, 0x7e, 0x7f, 0x3f, 0x80, 0x20,
+\t\t\t\t0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+\t\t\t\t0x8a, 0x00, 0x00, 0x00, 0x45, 0x55, 0x8c, 0x33,
+\t\t\t\t0x33, 0x00, 0x00, 0x00, 0x00, 0x8e, 0x00, 0x00,
+\t\t\t\t0x00, 0x00, 0x00, 0x00, 0x0f, 0x68, 0x02, 0x1a,
+\t\t\t\t0x2b, 0x7c, 0x45, 0x9a
+\t\t\t};
+\t\t\tmemcpy(phy_map, def_efuse, sizeof(def_efuse));
+\t\t\trtw_info(rtwdev, "applied built-in fallback efuse table for 8822C\\n");
+\t\t}
+\t}"""
+if target in c and "HW efuse is blank" not in c:
+    c = c.replace(target, addition, 1)
+    with open(path, "w") as f:
+        f.write(c)
+' "$kerneldir/drivers/net/wireless/realtek/rtw88/efuse.c"
 
 		# Add ITON RW8822-50B1 SDIO ID (0xA822) as a separate array element before the {} terminator
 		# This is needed for all kernel versions since it's a hardware ID addition
-		perl -i -0777 -pe \
-			's/\t\{\}\n};/\t{SDIO_DEVICE(0x024c, 0xA822), .driver_data = (kernel_ulong_t)\&rtw8822c_hw_spec}, \/\* ITON RW8822-50B1 \*\/\n\t{}\n};/' \
-			"$kerneldir/drivers/net/wireless/realtek/rtw88/rtw8822cs.c"
+		python3 -c '
+import sys, re
+path = sys.argv[1]
+with open(path, "r") as f:
+    c = f.read()
+needle = "{SDIO_DEVICE(0x024c, 0xA822)"
+if needle not in c:
+    c = re.sub(r"\t\{\}\s*\n\};", r"\t{SDIO_DEVICE(0x024c, 0xA822), .driver_data = (kernel_ulong_t)&rtw8822c_hw_spec}, /* ITON RW8822-50B1 */\n\t{}\n};", c)
+    with open(path, "w") as f:
+        f.write(c)
+' "$kerneldir/drivers/net/wireless/realtek/rtw88/rtw8822cs.c"
 
 		# ---- kernel 6.17+ compat fixes (struct sdio_driver API change) ----
 		if linux-version compare "${version}" ge 6.17 ; then
@@ -561,17 +606,23 @@ driver_rtw88_lwfinger() {
 				"$kerneldir/drivers/net/wireless/realtek/rtw88/sdio.c"
 
 			# Fix all SDIO chip drivers: move .shutdown from inside .drv {} to direct member
-			# Four files (rtw8822cs, rtw8822bs, rtw8821cs, rtw8723ds) use the standard format:
-			#   .drv = {\n\t\t.pm = &rtw_sdio_pm_ops,\n\t\t.shutdown = func,\n\t}\n};
-			# rtw8723cs.c differs: no trailing comma on .shutdown, \n\t}}; closure
-			for chip_file in rtw8822cs.c rtw8822bs.c rtw8821cs.c rtw8723ds.c; do
-				perl -i -0777 -pe \
-					's/\.drv = \{\n\t\t\.pm = &rtw_sdio_pm_ops,\n\t\t\.shutdown = (.*),\n\t\}/.drv = {\n\t\t.pm = \&rtw_sdio_pm_ops,\n\t},\n\t.shutdown = \1,/g' \
-					"$kerneldir/drivers/net/wireless/realtek/rtw88/$chip_file"
-			done
-			perl -i -0777 -pe \
-				's/\.drv = \{\n\t\t\.pm = &rtw_sdio_pm_ops,\n\t\t\.shutdown = (.*)\n\t\}};/.drv = {\n\t\t.pm = \&rtw_sdio_pm_ops,\n\t},\n\t.shutdown = \1,\n};/g' \
-				"$kerneldir/drivers/net/wireless/realtek/rtw88/rtw8723cs.c"
+			python3 -c '
+import sys, re, os
+dirpath = sys.argv[1]
+for fname in ["rtw8822cs.c", "rtw8822bs.c", "rtw8821cs.c", "rtw8723ds.c", "rtw8723cs.c"]:
+    fpath = os.path.join(dirpath, fname)
+    if not os.path.exists(fpath):
+        continue
+    with open(fpath, "r") as f:
+        c = f.read()
+    c = re.sub(
+        r"\.drv\s*=\s*\{\s*\.pm\s*=\s*&rtw_sdio_pm_ops,\s*\.shutdown\s*=\s*([^,}\s]+),?\s*\}",
+        r".drv = {\n\t\t.pm = &rtw_sdio_pm_ops,\n\t},\n\t.shutdown = \1,",
+        c
+    )
+    with open(fpath, "w") as f:
+        f.write(c)
+' "$kerneldir/drivers/net/wireless/realtek/rtw88"
 		fi
 	fi
 }
