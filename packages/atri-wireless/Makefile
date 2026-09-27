@@ -27,7 +27,7 @@ install: all
 	mkdir -p $(DESTDIR)/usr/bin
 	mkdir -p $(DESTDIR)/lib/systemd/system
 	mkdir -p $(DESTDIR)/etc/udev/rules.d
-	mkdir -p $(DESTDIR)/lib/firmware
+	mkdir -p $(DESTDIR)/lib/firmware/zigbee
 	cp $(ONBOARD_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/
 	cp $(WIFI_INIT_BIN) $(DESTDIR)/usr/bin/
@@ -36,7 +36,7 @@ install: all
 	ln -sf $(WIFI_DIAG_BIN) $(DESTDIR)/usr/bin/atri-wireless
 	cp systemd/*.service $(DESTDIR)/lib/systemd/system/ 2>/dev/null || true
 	cp -r etc/udev/rules.d/* $(DESTDIR)/etc/udev/rules.d/ 2>/dev/null || true
-	cp -r lib/firmware/* $(DESTDIR)/lib/firmware/ 2>/dev/null || true
+	cp -r lib/firmware/zigbee/* $(DESTDIR)/lib/firmware/zigbee/ 2>/dev/null || true
 
 clean:
 	rm -f $(ALL_BINS)

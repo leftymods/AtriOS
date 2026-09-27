@@ -38,7 +38,6 @@ install: all
 	mkdir -p $(DESTDIR)/usr/bin
 	mkdir -p $(DESTDIR)/usr/include
 	mkdir -p $(DESTDIR)/lib/systemd/system
-	mkdir -p $(DESTDIR)/lib/firmware
 	cp $(SCR_LIB) $(DESTDIR)/usr/lib/
 	cp $(MATRIX_BIN) $(DESTDIR)/usr/bin/
 	cp $(DISP_DAEMON_BIN) $(DESTDIR)/usr/bin/
@@ -54,7 +53,6 @@ install: all
 	ln -sf $(MATRIX_BIN) $(DESTDIR)/usr/bin/atriled-screen
 	cp include/quasar_screen.h $(DESTDIR)/usr/include/
 	cp systemd/*.service $(DESTDIR)/lib/systemd/system/ 2>/dev/null || true
-	cp -r lib/firmware/* $(DESTDIR)/lib/firmware/ 2>/dev/null || true
 
 clean:
 	rm -f *.o $(SCR_LIB) $(ALL_BINS)
