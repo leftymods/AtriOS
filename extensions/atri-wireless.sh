@@ -43,53 +43,12 @@ function post_family_tweaks_bsp__atri_wireless_add_config() {
 		C+ /lib/firmware/rtl_bt/rtl8822cs_fw.bin     0644 root root - /usr/share/atri-fw-vendor/vendor_bt_fw.bin
 	TMPF
 
-	# udev rule for Zigbee coordinator symlink /dev/ttyZigbee
-	mkdir -pv "${destination}"/lib/udev/rules.d
-	cat <<- 'UDEV' > "${destination}"/lib/udev/rules.d/99-atri-zigbee.rules
-		# AtriStation Zigbee radio module (Tuya TZ9213 on UART_AO_B / ttyAML2)
-		KERNEL=="ttyAML2", SYMLINK+="ttyZigbee", GROUP="dialout", MODE="0660"
-	UDEV
-
-	# First-boot wireless MAC & eFuse provisioning service
-	mkdir -pv "${destination}"/lib/systemd/system
-	cat <<- 'WIFI_SVC' > "${destination}"/lib/systemd/system/atri-wireless-init.service
-		[Unit]
-		Description=AtriStation Wireless MAC and eFuse Provisioning
-		Before=network-pre.target bluetooth.target systemd-networkd.service NetworkManager.service
-		Wants=network-pre.target
-		DefaultDependencies=no
-		After=local-fs.target systemd-modules-load.service
-
-		[Service]
-		Type=oneshot
-		RemainAfterExit=yes
-		ExecStart=/usr/bin/atri-wireless-init
-
-		[Install]
-		WantedBy=multi-user.target
-	WIFI_SVC
-
-	# Boot-time Zigbee hardware radio initialization service
-	cat <<- 'ZB_SVC' > "${destination}"/lib/systemd/system/atri-zigbee-init.service
-		[Unit]
-		Description=AtriStation Zigbee Hardware Radio Initialization
-		After=systemd-modules-load.service
-		Before=zigbee2mqtt.service home-assistant.service
-		DefaultDependencies=no
-
-		[Service]
-		Type=oneshot
-		RemainAfterExit=yes
-		ExecStart=/usr/bin/atri-zigbee reset
-
-		[Install]
-		WantedBy=multi-user.target
-	ZB_SVC
-
 	# Ensure configuration directory exists
 	mkdir -pv "${destination}"/etc/atri-wireless
 
-	display_alert "Extension: ${EXTENSION}: ${BOARD}" "staged RTL8822CS vendor firmware, Zigbee udev and services" "info"
+	# Note: atri-wireless-init.service, atri-zigbee-init.service and 99-atri-zigbee.rules
+	# are provided by atri-wireless package (packages/atri-wireless); not duplicated in BSP.
+	display_alert "Extension: ${EXTENSION}: ${BOARD}" "staged RTL8822CS vendor firmware and configs" "info"
 	return 0
 }
 
