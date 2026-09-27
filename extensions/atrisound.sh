@@ -174,15 +174,9 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	cp "${SRC}/tools/audio/sy6045s-init.sh" "${destination}/usr/libexec/sy6045s-init.sh"
 	run_host_command_logged chmod +x "${destination}"/usr/libexec/sy6045s-init.sh
 
-	# Install SY6045S firmware settings for kernel driver (request_firmware)
-	run_host_command_logged mkdir -pv "${destination}"/lib/firmware
-	if [[ -f "${SRC}/tools/audio/sy6045s-tweeters-settings.txt" ]]; then
-		cp "${SRC}/tools/audio/sy6045s-tweeters-settings.txt" "${destination}"/lib/firmware/
-		cp "${SRC}/tools/audio/sy6045s-woofer-settings.txt" "${destination}"/lib/firmware/
-		display_alert "SY6045S" "firmware settings installed" "info"
-	else
-		display_alert "SY6045S" "firmware settings not found in tools/audio/" "wrn"
-	fi
+	# SY6045S firmware settings (sy6045s-tweeters-settings.txt, sy6045s-woofer-settings.txt)
+	# are already provided by atrios-firmware package; do not duplicate in BSP package to avoid dpkg overwrite errors.
+	display_alert "SY6045S" "firmware settings provided by atrios-firmware" "info"
 
 	# PipeWire configuration: 2.1 Crossover and WebRTC Echo Canceller (AEC)
 	run_host_command_logged mkdir -pv "${destination}"/etc/pipewire/pipewire.conf.d
