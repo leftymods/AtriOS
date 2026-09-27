@@ -110,15 +110,13 @@ function post_family_tweaks_bsp__atri_main_add_config() {
 	MODS
 
 	# FPGA bitstream firmware files for Gowin LED screen
-	mkdir -pv "${destination}"/lib/firmware
-	if [[ -f "${SRC}/packages/atri-fw/vendor_led_screen_fpga.bin" ]]; then
-		cp "${SRC}/packages/atri-fw/vendor_led_screen_fpga.bin" "${destination}"/lib/firmware/yandex_led_screen_fpga.bin
-		cp "${SRC}/packages/atri-fw/vendor_led_screen_fpga.bin" "${destination}"/lib/firmware/yandex_led_panel.bin
-	fi
-	if [[ -f "${SRC}/packages/atri-fw/yandex-led-screen.bin" ]]; then
-		cp "${SRC}/packages/atri-fw/yandex-led-screen.bin" "${destination}"/lib/firmware/yandex-led-screen.bin
-	fi
+	# yandex_led_screen_fpga.bin and yandex-led-screen.bin are already provided by atrios-firmware.
+	# Create tmpfiles.d symlink for yandex_led_panel.bin to avoid dpkg file conflicts.
+	mkdir -pv "${destination}"/usr/lib/tmpfiles.d
+	cat <<- 'TMPFILES' > "${destination}"/usr/lib/tmpfiles.d/atri-main.conf
+		L+ /lib/firmware/yandex_led_panel.bin - - - - /lib/firmware/yandex_led_screen_fpga.bin
+	TMPFILES
 
-	display_alert "Extension: ${EXTENSION}: ${BOARD}" "installed Gowin FPGA firmware and modules-load" "info"
+	display_alert "Extension: ${EXTENSION}: ${BOARD}" "installed Gowin FPGA firmware configuration and modules-load" "info"
 	return 0
 }
