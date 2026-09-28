@@ -1,0 +1,388 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#2a2b30" />
+      <stop offset="100%" stop-color="#141518" />
+    </radialGradient>
+
+    <!-- Floor Shadow Gradient -->
+    <radialGradient id="floorShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.75)" />
+      <stop offset="60%" stop-color="rgba(0,0,0,0.35)" />
+      <stop offset="100%" stop-color="rgba(0,0,0,0)" />
+    </radialGradient>
+
+    <!-- Fabric Left Face (Lit) -->
+    <linearGradient id="fabricLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9a1343" />
+      <stop offset="45%" stop-color="#800c35" />
+      <stop offset="100%" stop-color="#5a0523" />
+    </linearGradient>
+
+    <!-- Fabric Right Face (Shadowed) -->
+    <linearGradient id="fabricRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#640728" />
+      <stop offset="50%" stop-color="#48031c" />
+      <stop offset="100%" stop-color="#300112" />
+    </linearGradient>
+
+    <!-- Fabric Bevel Corner Highlight -->
+    <linearGradient id="cornerBevel" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ad184d" />
+      <stop offset="50%" stop-color="#c4235e" />
+      <stop offset="100%" stop-color="#7a0a32" />
+    </linearGradient>
+
+    <!-- Bottom Baseplate Recess -->
+    <linearGradient id="baseplateGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2c2d33" />
+      <stop offset="50%" stop-color="#1e1f23" />
+      <stop offset="100%" stop-color="#141517" />
+    </linearGradient>
+
+    <!-- Rubber Foot Gradient -->
+    <linearGradient id="rubberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#82838c" />
+      <stop offset="40%" stop-color="#676870" />
+      <stop offset="100%" stop-color="#4d4e56" />
+    </linearGradient>
+
+    <!-- Rubber Foot Inner/Depth -->
+    <linearGradient id="rubberDepth" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#36373d" />
+      <stop offset="100%" stop-color="#222327" />
+    </linearGradient>
+
+    <!-- Port Bay Recess -->
+    <linearGradient id="portBayGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#161719" />
+      <stop offset="30%" stop-color="#232428" />
+      <stop offset="100%" stop-color="#111214" />
+    </linearGradient>
+
+    <!-- Gold Connectors -->
+    <linearGradient id="goldPin" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f" />
+      <stop offset="100%" stop-color="#b88d2a" />
+    </linearGradient>
+
+    <!-- Subtle Drop Shadow Filter -->
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.55" />
+    </filter>
+
+    <filter id="rubberShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1" dy="4" stdDeviation="3" flood-color="#08080a" flood-opacity="0.8" />
+    </filter>
+  </defs>
+
+  <!-- Background Environment -->
+  <rect width="1000" height="1000" fill="url(#bgGrad)" />
+
+  <!-- Floor Ambient Occlusion / Shadow -->
+  <ellipse cx="500" cy="850" rx="360" ry="110" fill="url(#floorShadow)" />
+  <ellipse cx="500" cy="830" rx="280" ry="75" fill="rgba(0,0,0,0.5)" filter="blur(14px)" />
+
+  <!-- ========================================== -->
+  <!-- MAIN ISOMETRIC BODY (Burgundy Acoustic Fabric) -->
+  <!-- Center top: (500, 240)                      -->
+  <!-- Left corner: (180, 420)                     -->
+  <!-- Right corner: (820, 420)                    -->
+  <!-- Front/Bottom center: (500, 600)             -->
+  <!-- Bottom floor offset: +280 Y                -->
+  <!-- ========================================== -->
+
+  <!-- Left Side Face (Lit) -->
+  <path d="M 180,420 
+           L 500,600 
+           L 500,860 
+           Q 490,875 470,870
+           L 195,715 
+           Q 180,705 180,690 
+           Z" 
+        fill="url(#fabricLeft)" />
+
+  <!-- Right Side Face (Shadowed) -->
+  <path d="M 500,600 
+           L 820,420 
+           L 820,690 
+           Q 820,705 805,715 
+           L 530,870 
+           Q 510,875 500,860 
+           Z" 
+        fill="url(#fabricRight)" />
+
+  <!-- Vertical Front Rounded Bevel (Center Seam Highlight) -->
+  <path d="M 495,600 
+           L 505,600 
+           L 505,862 
+           L 495,862 
+           Z" 
+        fill="url(#cornerBevel)" 
+        opacity="0.6" />
+
+  <!-- ========================================== -->
+  <!-- REAR I/O PORT RECESS (Cutout on Right Flank) -->
+  <!-- ========================================== -->
+  <!-- Recess Cavity Outer Frame -->
+  <g transform="translate(635, 495) skewY(30) scale(0.9, 1)">
+    <!-- Cutout Border in Fabric -->
+    <rect x="-3" y="-3" width="76" height="236" rx="12" fill="#2d0211" />
+    <!-- Deep Cavity Interior -->
+    <rect x="0" y="0" width="70" height="230" rx="10" fill="url(#portBayGrad)" />
+
+    <!-- Heatsink / Vent Slits Top Section -->
+    <g opacity="0.4" fill="#000000">
+      <rect x="14" y="12" width="6" height="50" rx="3" />
+      <rect x="25" y="12" width="6" height="50" rx="3" />
+      <rect x="36" y="12" width="6" height="50" rx="3" />
+      <rect x="47" y="12" width="6" height="50" rx="3" />
+    </g>
+
+    <!-- Gigabit Ethernet (RJ45) Port -->
+    <rect x="15" y="70" width="40" height="34" rx="4" fill="#151618" stroke="#38393f" stroke-width="1.5" />
+    <path d="M 23,78 L 47,78 L 47,94 L 43,94 L 43,98 L 27,98 L 27,94 L 23,94 Z" fill="#090a0b" />
+    <!-- 8 Gold Pins inside RJ45 -->
+    <g fill="url(#goldPin)">
+      <line x1="28" y1="80" x2="28" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+      <line x1="30" y1="80" x2="30" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+      <line x1="32" y1="80" x2="32" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+      <line x1="34" y1="80" x2="34" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+      <line x1="36" y1="80" x2="36" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+      <line x1="38" y1="80" x2="38" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+      <line x1="40" y1="80" x2="40" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+      <line x1="42" y1="80" x2="42" y2="86" stroke="url(#goldPin)" stroke-width="1" />
+    </g>
+
+    <!-- HDMI OUT Port -->
+    <rect x="16" y="116" width="38" height="20" rx="3" fill="#151618" stroke="#38393f" stroke-width="1.5" />
+    <!-- Trapezoidal HDMI aperture -->
+    <polygon points="21,121 49,121 46,131 24,131" fill="#070809" />
+    <rect x="25" y="125" width="20" height="2.5" rx="1" fill="#44464d" />
+
+    <!-- 3.5mm AUX Audio Jack -->
+    <circle cx="35" cy="154" r="8" fill="#151618" stroke="#38393f" stroke-width="1.5" />
+    <circle cx="35" cy="154" r="5" fill="#070809" />
+    <circle cx="35" cy="154" r="2.5" fill="#202125" />
+
+    <!-- DC Power IN Barrel Jack (20V) -->
+    <circle cx="35" cy="184" r="9.5" fill="#151618" stroke="#38393f" stroke-width="1.5" />
+    <circle cx="35" cy="184" r="6.5" fill="#070809" />
+    <!-- Center positive pin -->
+    <circle cx="35" cy="184" r="2" fill="#c7c8d0" />
+
+    <!-- Hardware Reset Pinhole -->
+    <circle cx="35" cy="208" r="2" fill="#000000" stroke="#2b2c30" stroke-width="0.8" />
+  </g>
+
+  <!-- ========================================== -->
+  <!-- TOP CAP / BOTTOM BASE PLATE                -->
+  <!-- Isometric Rhombus with Smooth Rounded Tips -->
+  <!-- ========================================== -->
+
+  <!-- Outer Fabric Lip / Bezel -->
+  <path d="M 500,230 
+           Q 525,232 545,244
+           L 810,400 
+           Q 828,411 824,424 
+           Q 820,436 802,447 
+           L 540,593 
+           Q 520,605 500,605 
+           Q 480,605 460,593 
+           L 198,447 
+           Q 180,436 176,424 
+           Q 172,411 190,400 
+           L 455,244 
+           Q 475,232 500,230 Z" 
+        fill="#720b2f" />
+
+  <!-- Inner Chamfer Ring -->
+  <path d="M 500,242 
+           L 790,412 
+           L 500,582 
+           L 210,412 Z" 
+        fill="#3c0417" />
+
+  <!-- Recessed Matte Dark Baseplate Surface -->
+  <path d="M 500,248 
+           Q 520,250 538,260 
+           L 775,400 
+           Q 790,410 788,418 
+           Q 785,426 770,435 
+           L 535,568 
+           Q 518,578 500,578 
+           Q 482,578 465,568 
+           L 230,435 
+           Q 215,426 212,418 
+           Q 210,410 225,400 
+           L 462,260 
+           Q 480,250 500,248 Z" 
+        fill="url(#baseplateGrad)" 
+        stroke="#111214" 
+        stroke-width="2" />
+
+  <!-- Baseplate Texture / Subtle Inner Border -->
+  <path d="M 500,260 
+           L 760,413 
+           L 500,560 
+           L 240,413 Z" 
+        fill="none" 
+        stroke="#27282e" 
+        stroke-width="1.5" 
+        opacity="0.6" />
+
+  <!-- ========================================== -->
+  <!-- SILICONE / RUBBER ANTI-SLIP FOOT RING      -->
+  <!-- Thick U-gasket running along perimeter     -->
+  <!-- ========================================== -->
+
+  <!-- Rubber Foot Outer Bevel / 3D Extrusion Shadow -->
+  <path d="M 500,272
+           L 745,414 
+           L 500,554 
+           L 255,414 Z" 
+        fill="none" 
+        stroke="url(#rubberDepth)" 
+        stroke-width="32" 
+        stroke-linejoin="round" 
+        stroke-linecap="round" 
+        filter="url(#rubberShadow)" />
+
+  <!-- Rubber Foot Main Profile (Matte Industrial Gray) -->
+  <path d="M 500,270 
+           L 745,412 
+           L 500,552 
+           L 255,412 Z" 
+        fill="none" 
+        stroke="url(#rubberGrad)" 
+        stroke-width="26" 
+        stroke-linejoin="round" 
+        stroke-linecap="round" />
+
+  <!-- Rubber Foot Top Highlight Reflection -->
+  <path d="M 500,268 
+           L 743,410 
+           L 500,550 
+           L 257,410 Z" 
+        fill="none" 
+        stroke="#9697a2" 
+        stroke-width="3" 
+        stroke-linejoin="round" 
+        stroke-linecap="round" 
+        opacity="0.45" />
+
+  <!-- Rubber Foot Front Gap / Cutouts (As in original hardware) -->
+  <!-- Left Foot Terminal End -->
+  <circle cx="585" cy="502" r="11" fill="url(#rubberGrad)" />
+  <circle cx="585" cy="502" r="6" fill="#323338" />
+
+  <!-- Right Foot Terminal End -->
+  <circle cx="675" cy="452" r="11" fill="url(#rubberGrad)" />
+  <circle cx="675" cy="452" r="6" fill="#323338" />
+
+  <!-- Rubber Alignment Feet / Bumpers -->
+  <ellipse cx="612" cy="486" rx="8" ry="5" fill="#505159" />
+  <ellipse cx="648" cy="466" rx="8" ry="5" fill="#505159" />
+
+  <!-- ========================================== -->
+  <!-- TECHNICAL SILKSCREEN LABEL & MARKINGS      -->
+  <!-- Isometric Center Plate                     -->
+  <!-- ========================================== -->
+  <g transform="translate(470, 395) rotate(-30) skewX(30) scale(0.85)">
+    <!-- Label Background Sticker -->
+    <rect x="-75" y="-55" width="150" height="105" rx="5" fill="#1b1c20" stroke="#33353c" stroke-width="1" />
+
+    <!-- Outer Specification Box -->
+    <rect x="-70" y="-50" width="140" height="95" rx="3" fill="none" stroke="#50535e" stroke-width="0.8" opacity="0.8" />
+
+    <!-- Schematic Table Dividers -->
+    <line x1="-70" y1="-28" x2="70" y2="-28" stroke="#50535e" stroke-width="0.6" opacity="0.6" />
+    <line x1="-70" y1="12" x2="70" y2="12" stroke="#50535e" stroke-width="0.6" opacity="0.6" />
+    <line x1="10" y1="-28" x2="10" y2="12" stroke="#50535e" stroke-width="0.6" opacity="0.6" />
+
+    <!-- QR Code / Barcode Matrix Simulation -->
+    <g fill="#9aa0ad" opacity="0.85">
+      <!-- 2D DataMatrix Glyphs -->
+      <rect x="-62" y="-22" width="6" height="6" />
+      <rect x="-53" y="-22" width="6" height="6" />
+      <rect x="-44" y="-22" width="6" height="6" />
+      <rect x="-62" y="-13" width="6" height="6" />
+      <rect x="-44" y="-13" width="6" height="6" />
+      <rect x="-62" y="-4" width="6" height="6" />
+      <rect x="-53" y="-4" width="6" height="6" />
+      <rect x="-44" y="-4" width="6" height="6" />
+
+      <!-- Barcode Stripes -->
+      <rect x="-32" y="-22" width="2" height="26" />
+      <rect x="-27" y="-22" width="3.5" height="26" />
+      <rect x="-21" y="-22" width="1.5" height="26" />
+      <rect x="-16" y="-22" width="3" height="26" />
+      <rect x="-10" y="-22" width="1" height="26" />
+      <rect x="-6" y="-22" width="4" height="26" />
+      <rect x="1" y="-22" width="2" height="26" />
+    </g>
+
+    <!-- Technical Text Lines -->
+    <g fill="#9aa0ad" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6" opacity="0.85">
+      <text x="-64" y="-38" font-weight="700" font-size="7.5" fill="#e0e3ea" letter-spacing="0.5">YANDEX STATION MAX</text>
+      <text x="-64" y="-31" font-size="5" fill="#7d8290">MODEL: YNDX-0008 • 20V 3.25A</text>
+
+      <!-- Right block text -->
+      <text x="16" y="-18" font-size="4.5">S/N: 2026MAX9820</text>
+      <text x="16" y="-10" font-size="4.5">MAC: 20:32:33:4A:1B:66</text>
+      <text x="16" y="-2" font-size="4.5">DEV: ATRIOS-EDITION</text>
+      <text x="16" y="6" font-size="4.5">MADE IN PRC</text>
+
+      <!-- Regulatory EAC Mark -->
+      <text x="50" y="-36" font-weight="900" font-size="9" fill="#c0c5d2">EAC</text>
+
+      <!-- Waste Bin / CE Icons -->
+      <rect x="52" y="22" width="10" height="12" rx="1" fill="none" stroke="#7d8290" stroke-width="0.8" />
+      <line x1="50" y1="20" x2="64" y2="20" stroke="#7d8290" stroke-width="0.8" />
+      <line x1="54" y1="24" x2="54" y2="31" stroke="#7d8290" stroke-width="0.6" />
+      <line x1="57" y1="24" x2="57" y2="31" stroke="#7d8290" stroke-width="0.6" />
+      <line x1="60" y1="24" x2="60" y2="31" stroke="#7d8290" stroke-width="0.6" />
+    </g>
+
+    <!-- DOLBY AUDIO Logo -->
+    <g transform="translate(-62, 22)">
+      <!-- Double D Symbol -->
+      <path d="M 0,0 L 7,0 C 11,0 13,2.5 13,6.5 C 13,10.5 11,13 7,13 L 0,13 Z M 3.5,3 L 6.5,3 C 8.5,3 9.5,4.2 9.5,6.5 C 9.5,8.8 8.5,10 6.5,10 L 3.5,10 Z" fill="#c8cbd6" />
+      <path d="M 27,0 L 20,0 C 16,0 14,2.5 14,6.5 C 14,10.5 16,13 20,13 L 27,13 Z M 23.5,3 L 20.5,3 C 18.5,3 17.5,4.2 17.5,6.5 C 17.5,8.8 18.5,10 20.5,10 L 23.5,10 Z" fill="#c8cbd6" />
+      <!-- Text -->
+      <text x="32" y="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="8.5" fill="#c8cbd6" letter-spacing="1">Dolby Audio</text>
+    </g>
+  </g>
+
+  <!-- Baseplate Heat Radiator / Molded Slit Grille (Rear Ribs) -->
+  <g stroke="#0f1012" stroke-width="2.5" stroke-linecap="round" opacity="0.75">
+    <line x1="440" y1="365" x2="575" y2="442" />
+    <line x1="446" y1="375" x2="569" y2="445" />
+    <line x1="452" y1="385" x2="563" y2="448" />
+    <line x1="458" y1="395" x2="557" y2="451" />
+  </g>
+
+  <!-- Interactive Pinout Annotations (Clean Technical HUD) -->
+  <g opacity="0.9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace" font-size="11">
+    <!-- GND Annotation -->
+    <circle cx="585" cy="502" r="4" fill="#3b82f6" />
+    <line x1="585" y1="502" x2="540" y2="520" stroke="#3b82f6" stroke-width="1.5" />
+    <text x="495" y="534" fill="#93c5fd" font-weight="600">GND (Black)</text>
+
+    <!-- Testpoint / Screw Annotation -->
+    <circle cx="675" cy="452" r="4" fill="#10b981" />
+    <line x1="675" y1="452" x2="720" y2="440" stroke="#10b981" stroke-width="1.5" />
+    <text x="730" y="444" fill="#6ee7b7" font-weight="600">Gasket Clip</text>
+
+    <!-- I/O Bay Annotation -->
+    <line x1="710" y1="620" x2="780" y2="600" stroke="#f59e0b" stroke-width="1.5" />
+    <circle cx="710" cy="620" r="4" fill="#f59e0b" />
+    <text x="790" y="604" fill="#fcd34d" font-weight="600">I/O Bay (DC/HDMI/GbE/AUX)</text>
+
+    <!-- Top Badge -->
+    <rect x="40" y="40" width="230" height="42" rx="8" fill="rgba(24, 25, 29, 0.75)" stroke="#3e414b" stroke-width="1" />
+    <text x="54" y="65" fill="#f3f4f6" font-size="13" font-weight="700" letter-spacing="0.5">YANDEX STATION MAX</text>
+    <text x="54" y="76" fill="#ec4899" font-size="9" font-weight="600">BURGUNDY EDITION • ISOMETRIC BASE</text>
+  </g>
+</svg>
