@@ -256,8 +256,8 @@
 		compatible = "pwm-clock";
 		#clock-cells = <0>;
 		clock-frequency = <32768>;
-		/* Android DTB: pwm@19000 ch0, period 30541 (~32.756 kHz), duty ~48% */
-		pwms = <&pwm_ef 0 30541 0>;
+		/* 10^9 ns / 32768 Hz = 30518 ns */
+		pwms = <&pwm_ef 0 30518 0>;
 	};
 
 	/* VDDAO 1.8V for SDIO/BT I/O */

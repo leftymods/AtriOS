@@ -188,7 +188,8 @@
 		compatible = "pwm-clock";
 		#clock-cells = <0>;
 		clock-frequency = <32768>;
-		pwms = <&pwm_ef 0 30541 0>;
+		/* 10^9 ns / 32768 Hz = 30518 ns */
+		pwms = <&pwm_ef 0 30518 0>;
 	};
 
 	/* PDM microphone array (4 channels) */
