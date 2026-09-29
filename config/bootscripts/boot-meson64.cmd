@@ -74,28 +74,27 @@ setenv maxcpus "4"
 # Show what uboot default fdtfile is
 echo "U-boot default fdtfile: ${fdtfile}"
 echo "Current variant: ${variant}"
-# there is a mismatch between u-boot and kernel in the n2-plus/n2_plus DTB filename.
-# Also u-boot can't seem to decide between having, or not, 'amlogic/' in there.
-if test "${variant}" = "n2_plus"; then
+
+if test "x${variant}" = "xn2_plus"; then
 	setenv fdtfile "amlogic/meson-g12b-odroid-n2-plus.dtb"
 	echo "For variant ${variant}, set default fdtfile: ${fdtfile}"
 fi
 
-if test "${variant}" = "n2-plus"; then
+if test "x${variant}" = "xn2-plus"; then
 	setenv fdtfile "amlogic/meson-g12b-odroid-n2-plus.dtb"
 	echo "For variant ${variant} (dash version, 2021.07 or up), set default fdtfile: ${fdtfile}"
 fi
 
 # AtriStation / Station Max fallback if U-Boot autodetection failed or was defaulted to Odroid
-if test "${fdtfile}" = "amlogic/meson-sm1-odroid-.dtb"; then
+if test "x${fdtfile}" = "xamlogic/meson-sm1-odroid-.dtb"; then
 	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
 	echo "AtriStation fallback: setting default fdtfile to ${fdtfile}"
 fi
-if test "${fdtfile}" = "meson-sm1-odroid-.dtb"; then
+if test "x${fdtfile}" = "xmeson-sm1-odroid-.dtb"; then
 	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
 	echo "AtriStation fallback: setting default fdtfile to ${fdtfile}"
 fi
-if test "${fdtfile}" = ""; then
+if test "x${fdtfile}" = "x"; then
 	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
 	echo "AtriStation fallback: setting default fdtfile to ${fdtfile}"
 fi
@@ -113,17 +112,17 @@ fi
 
 # get PARTUUID of first partition on SD/eMMC it was loaded from
 # mmc 0 is always mapped to device u-boot (2016.09+) was loaded from
-if test "${devtype}" = "mmc"; then part uuid mmc ${devnum}:1 partuuid; fi
-if test "${console}" = "display"; then setenv consoleargs "console=tty1"; fi
+if test "x${devtype}" = "xmmc"; then part uuid mmc ${devnum}:1 partuuid; fi
+if test "x${console}" = "xdisplay"; then setenv consoleargs "console=tty1"; fi
 
 # Ensure fdtfile is never the broken odroid dummy
-if test "${fdtfile}" = "amlogic/meson-sm1-odroid-.dtb"; then
+if test "x${fdtfile}" = "xamlogic/meson-sm1-odroid-.dtb"; then
 	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
 fi
-if test "${fdtfile}" = "meson-sm1-odroid-.dtb"; then
+if test "x${fdtfile}" = "xmeson-sm1-odroid-.dtb"; then
 	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
 fi
-if test "${fdtfile}" = ""; then
+if test "x${fdtfile}" = "x"; then
 	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
 fi
 
@@ -132,10 +131,10 @@ echo "Current fdtfile after atriosEnv: ${fdtfile}"
 if test -e ${devtype} ${devnum} ${prefix}zImage; then
 	# legacy kernel boot
 
-	if test "${console}" = "serial"; then setenv consoleargs "console=ttyS0,115200"; fi
-	if test "${console}" = "display" || test "${console}" = "both"; then setenv consoleargs "console=ttyS0,115200 console=tty1"; fi
-	if test "${console}" = "serial"; then setenv consoleargs "console=ttyS0,115200"; fi
-	if test "${bootlogo}" = "true"; then
+	if test "x${console}" = "xserial"; then setenv consoleargs "console=ttyS0,115200"; fi
+	if test "x${console}" = "xdisplay"; then setenv consoleargs "console=ttyS0,115200 console=tty1"; fi
+	if test "x${console}" = "xboth"; then setenv consoleargs "console=ttyS0,115200 console=tty1"; fi
+	if test "x${bootlogo}" = "xtrue"; then
 		setenv consoleargs "splash plymouth.ignore-serial-consoles ${consoleargs}"
 	else
 		setenv consoleargs "splash=verbose ${consoleargs}"
@@ -153,24 +152,24 @@ if test -e ${devtype} ${devnum} ${prefix}zImage; then
 else
 	# modern kernel boot
 
-	if test "${console}" = "serial"; then setenv consoleargs "console=ttyAML0,115200"; fi
-	if test "${console}" = "display" || test "${console}" = "both"; then setenv consoleargs "console=ttyAML0,115200 console=tty1"; fi
-	if test "${console}" = "serial"; then setenv consoleargs "console=ttyAML0,115200"; fi
-	if test "${bootlogo}" = "true"; then
+	if test "x${console}" = "xserial"; then setenv consoleargs "console=ttyAML0,115200"; fi
+	if test "x${console}" = "xdisplay"; then setenv consoleargs "console=ttyAML0,115200 console=tty1"; fi
+	if test "x${console}" = "xboth"; then setenv consoleargs "console=ttyAML0,115200 console=tty1"; fi
+	if test "x${bootlogo}" = "xtrue"; then
 		setenv consoleargs "splash plymouth.ignore-serial-consoles quiet ${consoleargs}"
 	else
 		setenv consoleargs "splash=verbose ${consoleargs}"
 	fi
-	if test "${disable_vu7}" = "false"; then setenv usbhidquirks "usbhid.quirks=0x0eef:0x0005:0x0004"; fi
+	if test "x${disable_vu7}" = "xfalse"; then setenv usbhidquirks "usbhid.quirks=0x0eef:0x0005:0x0004"; fi
 
 	setenv bootargs "root=${rootdev} rootwait rootfstype=${rootfstype} ${consoleargs} consoleblank=0 coherent_pool=2M loglevel=${verbosity} ubootpart=${partuuid} libata.force=noncq usb-storage.quirks=${usbstoragequirks} ${usbhidquirks} ${extraargs} ${extraboardargs}"
-	if test "${docker_optimizations}" = "on"; then setenv bootargs "${bootargs} cgroup_enable=memory"; fi
+	if test "x${docker_optimizations}" = "xon"; then setenv bootargs "${bootargs} cgroup_enable=memory"; fi
 	echo "Mainline bootargs: ${bootargs}"
 
 	# Boot splash: show logo on the active video output; with
 	# CONFIG_VIDEO_DT_SIMPLEFB the same scanout is handed to Linux
 	# through /chosen/simple-framebuffer (no flicker until DRM loads)
-	if test "${bootlogo}" = "true"; then
+	if test "x${bootlogo}" = "xtrue"; then
 		if load ${devtype} ${devnum} ${kernel_addr_r} ${prefix}boot.bmp; then
 			bmp display ${kernel_addr_r}
 		fi
@@ -195,7 +194,7 @@ else
 		fi
 	done
 
-	if test "${overlay_error}" = "true"; then
+	if test "x${overlay_error}" = "xtrue"; then
 		echo "Error applying DT overlays, restoring original DT"
 		load ${devtype} ${devnum} ${fdt_addr_r} ${prefix}dtb/${fdtfile}
 	else
