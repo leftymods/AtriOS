@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.cmd text eol=lf
+*.sh text eol=lf
+*.txt text eol=lf
+*.scr binary
