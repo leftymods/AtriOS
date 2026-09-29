@@ -71,6 +71,7 @@ static int volume_level = 50;
 static bool auto_brightness = true;
 static int manual_brightness = 150;
 static char backlight_path[256] = {0};
+static bool need_render = true;
 
 /* 4x10 Digital Font for Digits 0-9 and Colon */
 static const uint16_t digits_4x10[10][10] = {
@@ -244,25 +245,44 @@ static void update_auto_brightness(void)
 	set_backlight_level(br);
 }
 
-/* Check network and hardware states */
+/* Check network and hardware states (cached for 3s to prevent sysfs thrashing) */
 static bool is_wifi_connected(void)
 {
+	static time_t last_check = 0;
+	static bool cached = false;
+	time_t now = time(NULL);
+	if (now - last_check < 3) return cached;
+	last_check = now;
+
 	int fd = open("/sys/class/net/wlan0/operstate", O_RDONLY);
-	if (fd < 0) return false;
+	if (fd < 0) { cached = false; return false; }
 	char buf[16] = {0};
 	ssize_t n = read(fd, buf, sizeof(buf) - 1);
 	close(fd);
-	return (n > 0 && strstr(buf, "up") != NULL);
+	cached = (n > 0 && strstr(buf, "up") != NULL);
+	return cached;
 }
 
 static bool is_bt_active(void)
 {
-	return (access("/sys/class/bluetooth/hci0", F_OK) == 0);
+	static time_t last_check = 0;
+	static bool cached = false;
+	time_t now = time(NULL);
+	if (now - last_check < 3) return cached;
+	last_check = now;
+	cached = (access("/sys/class/bluetooth/hci0", F_OK) == 0);
+	return cached;
 }
 
 static bool is_zigbee_active(void)
 {
-	return (access("/dev/ttyZigbee", F_OK) == 0);
+	static time_t last_check = 0;
+	static bool cached = false;
+	time_t now = time(NULL);
+	if (now - last_check < 3) return cached;
+	last_check = now;
+	cached = (access("/dev/ttyZigbee", F_OK) == 0);
+	return cached;
 }
 
 /* Render 4x10 digit */
@@ -486,19 +506,23 @@ static void handle_command(int client_fd)
 
 	if (strcasecmp(buf, "CLOCK") == 0) {
 		cur_mode = MODE_CLOCK;
+		need_render = true;
 	} else if (strncasecmp(buf, "MSG ", 4) == 0) {
 		snprintf(msg_buffer, sizeof(msg_buffer), "%s", buf + 4);
 		msg_scroll_pos = SCREEN_W;
 		cur_mode = MODE_MESSAGE;
+		need_render = true;
 	} else if (strncasecmp(buf, "TEMP ", 5) == 0) {
-		snprintf(temp_buffer, sizeof(temp_buffer), "%s", buf + 5);
+		snprintf(temp_buffer, sizeof(temp_buffer), "%.15s", buf + 5);
 		cur_mode = MODE_TEMP;
 		mode_timeout = time(NULL) + 5;
+		need_render = true;
 	} else if (strncasecmp(buf, "VOL ", 4) == 0) {
 		volume_level = atoi(buf + 4);
 		prev_mode = cur_mode;
 		cur_mode = MODE_VOLUME;
 		mode_timeout = time(NULL) + 3;
+		need_render = true;
 	} else if (strcasecmp(buf, "IP") == 0) {
 		char ip[64] = {0};
 		get_primary_ip(ip, sizeof(ip));
@@ -509,12 +533,15 @@ static void handle_command(int client_fd)
 		}
 		msg_scroll_pos = SCREEN_W;
 		cur_mode = MODE_MESSAGE;
+		need_render = true;
 	} else if (strcasecmp(buf, "EYES") == 0) {
 		cur_mode = MODE_EYES;
 		mode_timeout = time(NULL) + 4;
+		need_render = true;
 	} else if (strcasecmp(buf, "CLEAR") == 0) {
 		clear_screen();
 		flush_screen();
+		need_render = false;
 	} else if (strncasecmp(buf, "BRIGHTNESS ", 11) == 0) {
 		const char *arg = buf + 11;
 		if (strcasecmp(arg, "auto") == 0) {
@@ -623,6 +650,7 @@ int main(int argc, char *argv[])
 		if (mode_timeout > 0 && now >= mode_timeout) {
 			mode_timeout = 0;
 			cur_mode = prev_mode;
+			need_render = true;
 		}
 
 		/* Poll socket with 100ms timeout for smooth scrolling/animations */
@@ -642,19 +670,26 @@ int main(int argc, char *argv[])
 		/* Rendering cycle */
 		switch (cur_mode) {
 		case MODE_CLOCK:
-			if (now != last_sec) {
+			if (now != last_sec || need_render) {
 				colon_state = !colon_state;
 				last_sec = now;
+				render_clock(colon_state);
+				need_render = false;
 			}
-			render_clock(colon_state);
 			break;
 
 		case MODE_VOLUME:
-			render_volume(volume_level);
+			if (need_render) {
+				render_volume(volume_level);
+				need_render = false;
+			}
 			break;
 
 		case MODE_TEMP:
-			render_temp(temp_buffer);
+			if (need_render) {
+				render_temp(temp_buffer);
+				need_render = false;
+			}
 			break;
 
 		case MODE_MESSAGE:

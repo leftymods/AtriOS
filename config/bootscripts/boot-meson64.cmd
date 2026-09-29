@@ -92,10 +92,20 @@ if test "${variant}" = "n2-plus"; then
 	echo "For variant ${variant} (dash version, 2021.07 or up), set default fdtfile: ${fdtfile}"
 fi
 
+# AtriStation / Station Max fallback if U-Boot autodetection failed or was defaulted to Odroid
+if test "${fdtfile}" = "amlogic/meson-sm1-odroid-.dtb" || test "${fdtfile}" = "meson-sm1-odroid-.dtb" || test -z "${fdtfile}"; then
+	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
+	echo "AtriStation fallback: setting default fdtfile to ${fdtfile}"
+fi
+
 # legacy kernel values from boot.ini
 
 if test -e ${devtype} ${devnum} ${prefix}atriosEnv.txt; then
 	load ${devtype} ${devnum} ${scriptaddr} ${prefix}atriosEnv.txt
+	env import -t ${scriptaddr} ${filesize}
+fi
+if test -e ${devtype} ${devnum} ${prefix}armbianEnv.txt; then
+	load ${devtype} ${devnum} ${scriptaddr} ${prefix}armbianEnv.txt
 	env import -t ${scriptaddr} ${filesize}
 fi
 
@@ -104,7 +114,12 @@ fi
 if test "${devtype}" = "mmc"; then part uuid mmc ${devnum}:1 partuuid; fi
 if test "${console}" = "display"; then setenv consoleargs "console=tty1"; fi
 
-echo "Current fdtfile after armbianEnv: ${fdtfile}"
+# Ensure fdtfile is never the broken odroid dummy
+if test "${fdtfile}" = "amlogic/meson-sm1-odroid-.dtb" || test "${fdtfile}" = "meson-sm1-odroid-.dtb" || test -z "${fdtfile}"; then
+	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
+fi
+
+echo "Current fdtfile after atriosEnv: ${fdtfile}"
 
 if test -e ${devtype} ${devnum} ${prefix}zImage; then
 	# legacy kernel boot
