@@ -9,6 +9,7 @@ setenv console "both"
 setenv bootlogo "true"
 setenv rootfstype "ext4"
 setenv docker_optimizations "on"
+setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
 
 # odroid c4 legacy kernel values from boot.ini
 

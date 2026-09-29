@@ -18,7 +18,7 @@ Board defconfig based on odroid-n2 with:
 diff -urN a/configs/atristation_defconfig b/configs/atristation_defconfig
 --- a/configs/atristation_defconfig	1970-01-01 00:00:00.000000000 +0000
 +++ b/configs/atristation_defconfig	2026-01-01 00:00:00.000000000 +0000
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,87 @@
 +CONFIG_ARM=y
 +CONFIG_SYS_BOARD="odroid-n2"
 +CONFIG_ARCH_MESON=y
@@ -37,6 +37,8 @@ diff -urN a/configs/atristation_defconfig b/configs/atristation_defconfig
 +CONFIG_DEBUG_UART_CLOCK=24000000
 +CONFIG_IDENT_STRING=" atristation"
 +CONFIG_DEBUG_UART=y
++CONFIG_USE_PREBOOT=y
++CONFIG_PREBOOT="setenv fdtfile amlogic/meson-sm1-atristation.dtb"
 +CONFIG_REMAKE_ELF=y
 +CONFIG_FIT=y
 +CONFIG_FIT_SIGNATURE=y
