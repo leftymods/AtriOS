@@ -205,9 +205,7 @@
 		compatible = "amlogic,axg-sound-card";
 		model = "ATRISTATION";
 		audio-aux-devs = <&tdmout_b>;
-		audio-widgets = "Headphone", "Headphones",
-				"Speaker", "Tweeter Speakers",
-				"Speaker", "Woofer Speaker";
+		audio-widgets = "Headphone", "Headphones";
 		audio-routing =
 			"Headphones", "LOUT",
 			"Headphones", "ROUT",
@@ -215,8 +213,6 @@
 			"TDM_B Playback", "TDMOUT_B OUT",
 			"Tweeters Playback", "TDM_B Playback",
 			"Woofer Playback", "TDM_B Playback",
-			"Tweeter Speakers", "Tweeters Playback",
-			"Woofer Speaker", "Woofer Playback",
 			"TODDR_A IN 4", "PDM Capture";
 
 		clocks = <&clkc CLKID_MPLL2>,
