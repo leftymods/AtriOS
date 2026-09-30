@@ -537,7 +537,7 @@ driver_rtw88_lwfinger() {
 			cp "${SRC}/packages/atri-fw/rtl8822cs_efuse.bin" "$kerneldir/firmware/rtw88/"
 		fi
 
-		# Patch efuse.c: fallback to virtual efuse when physical HW efuse is unprogrammed/blank (0xFF)
+		# Patch efuse.c: fallback to virtual efuse when physical HW efuse fails or is unprogrammed/blank (0xFF)
 		python3 -c '
 import sys
 path = sys.argv[1]
@@ -548,11 +548,11 @@ target = """\tret = rtw_dump_physical_efuse_map(rtwdev, phy_map);
 \t\trtw_err(rtwdev, "failed to dump efuse physical map\\n");
 \t\tgoto out_free;
 \t}"""
-addition = target + """
-
-\tif (phy_map[0] == 0xff && phy_map[1] == 0xff) {
+replacement = """\tret = rtw_dump_physical_efuse_map(rtwdev, phy_map);
+\tif (ret || (phy_map[0] == 0xff && phy_map[1] == 0xff)) {
 \t\tconst struct firmware *efw = NULL;
-\t\trtw_info(rtwdev, "HW efuse is blank, loading virtual efuse map\\n");
+\t\trtw_info(rtwdev, "HW efuse failed (%d) or blank, loading virtual efuse map\\n", ret);
+\t\tret = 0;
 \t\tif (request_firmware_direct(&efw, "rtw88/rtl8822cs_efuse.bin", rtwdev->dev) == 0 && efw) {
 \t\t\tif (efw->size <= rtwdev->efuse.physical_size) {
 \t\t\t\tmemcpy(phy_map, efw->data, efw->size);
@@ -572,8 +572,8 @@ addition = target + """
 \t\t\trtw_info(rtwdev, "applied built-in fallback efuse table for 8822C\\n");
 \t\t}
 \t}"""
-if target in c and "HW efuse is blank" not in c:
-    c = c.replace(target, addition, 1)
+if target in c and "HW efuse failed" not in c:
+    c = c.replace(target, replacement, 1)
     with open(path, "w") as f:
         f.write(c)
 ' "$kerneldir/drivers/net/wireless/realtek/rtw88/efuse.c"
