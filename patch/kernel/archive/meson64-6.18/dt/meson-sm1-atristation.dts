@@ -253,12 +253,15 @@
 		regulator-always-on;
 	};
 
-	/* 32.768kHz clock for WiFi */
+	/* 32.768kHz clock for WiFi/BT.
+	 * No clock-frequency: pwm-clock driver validates it against the real
+	 * hardware period from pwm_get_period(). PWM_EF runs off 24 MHz XTAL
+	 * (resolution ~41.67 ns), so the actual period differs from the
+	 * requested 30518 ns, causing -EINVAL. Without clock-frequency the
+	 * driver derives the rate from the PWM period with no validation. */
 	wifi32k: wifi32k {
 		compatible = "pwm-clock";
 		#clock-cells = <0>;
-		clock-frequency = <32768>;
-		/* 10^9 ns / 32768 Hz = 30518 ns */
 		pwms = <&pwm_ef 0 30518 0>;
 	};
 

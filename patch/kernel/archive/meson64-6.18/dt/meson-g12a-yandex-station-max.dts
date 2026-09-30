@@ -184,11 +184,10 @@
 		post-power-on-delay-ms = <200>;
 	};
 
+	/* 32.768kHz clock for WiFi/BT — no clock-frequency, see atristation.dts */
 	wifi32k: wifi32k {
 		compatible = "pwm-clock";
 		#clock-cells = <0>;
-		clock-frequency = <32768>;
-		/* 10^9 ns / 32768 Hz = 30518 ns */
 		pwms = <&pwm_ef 0 30518 0>;
 	};
 
