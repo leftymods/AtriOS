@@ -39,7 +39,7 @@ All hardware features — from the Gowin FPGA LED matrix display and dual IS31FL
 | Subsystem | Hardware Component | Bus / Interface | Driver / Daemon | Status |
 |---|---|---|---|---|
 | **LED Matrix Display** | Gowin GW1N FPGA (25×16 LED matrix) | SPI (`spicc1`) + JTAG GPIO | `gowin_led_screen` / `atri-matrix` / `atri-displayd` | [ ] Untested on hardware |
-| **LED Ring** | Dual IS31FL3236 (24 multicolor RGB zones) | I2C (`i2c0` @ `0x3c`, `0x3f`) | `leds-is31fl32xx` / `atri-led` (`atrled`) | [ ] Untested on hardware |
+| **LED Ring** | Dual IS31FL3236 (24 multicolor RGB zones) | I2C (`i2c0` @ `0x3c`, `0x3f`) | `leds-is31fl32xx` / `atri-led` (`atrled`) | [x] Verified on hardware |
 | **Speaker Amplifiers** | Silergy SY6045S (PBTL Woofer + Stereo Tweeters) | I2C (`i2c2` @ `0x2a`, `0x2b`) + TDM B | `snd-soc-sy6045s` / `atri-sound-test` / PipeWire 2.1 | [ ] Untested on hardware |
 | **Headphone DAC** | Everest ES8156 (3.5mm AUX line out) | I2C (`i2c2` @ `0x08`) + TDM B | `snd-soc-es8156` (mainline ASoC) | [ ] Untested on hardware |
 | **Microphone ADC** | Everest ES7210 4-channel AEC reference ADC | I2C (`i2c2` @ `0x40`) + TDM B | `snd-soc-es7210` (acoustic echo ref) | [ ] Untested on hardware |
