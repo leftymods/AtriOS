@@ -54,7 +54,14 @@ if test -e ${devtype} ${devnum} ${prefix}armbianEnv.txt; then
 	load ${devtype} ${devnum} ${scriptaddr} ${prefix}armbianEnv.txt
 	env import -t ${scriptaddr} ${filesize}
 fi
-if test "x${devtype}" = "xmmc"; then part uuid mmc ${devnum}:1 partuuid; fi
+if test "x${devtype}" = "xmmc"; then
+	part uuid mmc ${devnum}:1 partuuid
+	if test "x${partuuid}" != "x"; then
+		setenv rootdev "PARTUUID=${partuuid}"
+	else
+		setenv rootdev "/dev/mmcblk2p1"
+	fi
+fi
 if test "x${console}" = "xdisplay"; then setenv consoleargs "console=tty1"; fi
 if test "x${fdtfile}" = "xamlogic/meson-sm1-odroid-.dtb"; then
 	setenv fdtfile "amlogic/meson-sm1-atristation.dtb"
