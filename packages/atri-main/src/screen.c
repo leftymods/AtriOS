@@ -1,9 +1,10 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #include "screen.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
@@ -156,8 +157,10 @@ void screen_render(struct screen *s, const uint8_t *rgb)
         }
     }
     if (s->is_shadow && s->fd >= 0 && s->mmap_len > 0) {
-        pwrite(s->fd, s->fb, s->mmap_len, 0);
-        fdatasync(s->fd);
+        if (pwrite(s->fd, s->fb, s->mmap_len, 0) < 0)
+            log_msg(LOG_ERR, "screen_render: pwrite failed: %s", strerror(errno));
+        if (fdatasync(s->fd) < 0)
+            log_msg(LOG_ERR, "screen_render: fdatasync failed: %s", strerror(errno));
     }
 }
 

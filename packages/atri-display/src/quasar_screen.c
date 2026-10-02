@@ -1,5 +1,6 @@
 #include "quasar_screen.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -240,8 +241,10 @@ void screen_flush(quasar_screen_t *scr)
 {
 	if (scr->fb_fd < 0)
 		return;
-	if (scr->is_shadow && scr->fb_mmap && scr->fb_len > 0)
-		pwrite(scr->fb_fd, scr->fb_mmap, scr->fb_len, 0);
+	if (scr->is_shadow && scr->fb_mmap && scr->fb_len > 0) {
+		if (pwrite(scr->fb_fd, scr->fb_mmap, scr->fb_len, 0) < 0)
+			perror("screen_flush: pwrite");
+	}
 	/* gowin_led_device pushes the frame in .fb_sync == fsync();
 	 * FBIOBLANK does not transfer anything. */
 	if (fsync(scr->fb_fd))
