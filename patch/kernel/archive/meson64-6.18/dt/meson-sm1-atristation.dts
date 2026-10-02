@@ -1101,8 +1101,6 @@
  * never binds. */
 &spicc1 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&spicc1_pins>;
 	num-cs = <1>;
 	cs-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_LOW>;
 
@@ -1111,8 +1109,9 @@
 		reg = <0>;
 		spi-max-frequency = <4000000>;
 		max-brightness = <200>;
-		pinctrl-names = "jtag";
-		pinctrl-0 = <&led_panel_jtag_pins>;
+		pinctrl-names = "default", "jtag";
+		pinctrl-0 = <&spicc1_pins>;
+		pinctrl-1 = <&led_panel_jtag_pins>;
 		reset-gpios = <&gpio GPIOX_9 GPIO_ACTIVE_LOW>;
 		/* GPIOH output register, bit 8 = GPIOH_8 (JTAG TCK) */
 		jtag_tck_desc = <0xff634468 0x08>;
