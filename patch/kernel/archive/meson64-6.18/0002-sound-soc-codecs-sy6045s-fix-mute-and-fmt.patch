@@ -1,4 +1,6 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: AtriOS Maintainer <maintainer@atrios.org>
+Date: Fri, 2 Oct 2026 21:00:00 +0300
 Subject: [PATCH] ASoC: sy6045s: fix mute register address, volume registers, and PLL clocking
 
 Register 0x19 is the Fault Status and Clear register, while register 0x06

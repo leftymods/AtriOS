@@ -584,18 +584,15 @@ import sys, re
 path = sys.argv[1]
 with open(path, "r") as f:
     c = f.read()
+q = chr(34)
 # Replace DACK ready error with warning so RF calibration loop does not hang
-c = re.sub(
-    r"rtw_err\s*\(\s*rtwdev\s*,\s*\"failed to wait for dack ready\\n\"\s*\);",
-    r"rtw_dbg(rtwdev, RTW_DBG_RFK, \"dack timeout bypassed\\n\");",
-    c
-)
+m1 = re.search(r"rtw_err\s*\(\s*rtwdev\s*,\s*" + q + r"failed to wait for dack ready\\n" + q + r"\s*\);", c)
+if m1:
+    c = c.replace(m1.group(0), "rtw_dbg(rtwdev, RTW_DBG_RFK, " + q + "dack timeout bypassed\\n" + q + ");")
 # Replace IQ vector write error with debug message to prevent locking the radio
-c = re.sub(
-    r"rtw_err\s*\(\s*rtwdev\s*,\s*\"failed to write IQ vector to hardware\\n\"\s*\);",
-    r"rtw_dbg(rtwdev, RTW_DBG_RFK, \"IQ vector write bypassed\\n\");",
-    c
-)
+m2 = re.search(r"rtw_err\s*\(\s*rtwdev\s*,\s*" + q + r"failed to write IQ vector to hardware\\n" + q + r"\s*\);", c)
+if m2:
+    c = c.replace(m2.group(0), "rtw_dbg(rtwdev, RTW_DBG_RFK, " + q + "IQ vector write bypassed\\n" + q + ");")
 with open(path, "w") as f:
     f.write(c)
 ' "$kerneldir/drivers/net/wireless/realtek/rtw88/rtw8822c.c"
