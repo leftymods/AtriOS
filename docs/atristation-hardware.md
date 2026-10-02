@@ -47,8 +47,20 @@
 Прошивки SY6045S: `/lib/firmware/sy6045s-{tweeters,woofer}-settings.txt`
 (117 записей `w <addr7<<1> <reg> <val...>`, применяются драйвером при probe).
 
+## Аудиосистема и независимость от FPGA
+
+- **Аудиотракт (TDM-B)**: Звук формируется напрямую аудиоконтроллером SoC Amlogic SM1 (`tdmif_b` / `tdmout_b`) и подаётся **напрямую** на усилители Silergy SY6045S и ЦАП ES8156 без участия FPGA.
+- Шина TDM-B использует физические пины:
+  - `GPIOAO_8` — BCLK (`tdm_ao_b_sclk`)
+  - `GPIOAO_7` — LRCLK / Frame Sync (`tdm_ao_b_fs`)
+  - `GPIOAO_6` — Data Out (`tdm_ao_b_dout2`)
+  - `GPIOAO_4` — Data In (`tdm_ao_b_din0` от ES7210)
+  - `GPIOAO_9` — Master Clock (`mclk0_ao`)
+- Усилители SY6045S питаются силовой линией 20V (`GPIOX_10`) и настраиваются через шину `I2C2` (`GPIOZ_14/15`). Регистр ошибки `0x19 = 0x15` означает срыв PLL/отсутствие тактов BCLK/LRCK на входах усилителей от SoC.
+
 ## Экран (FPGA Gowin GW1N-4B)
 
+- ПЛИС Gowin GW1N-4B предназначена **исключительно для обслуживания лицевой светодиодной матрицы 25x16** (и сенсорных зон экрана). К аудиотракту FPGA отношения не имеет.
 - SPI1 @4МГц, CS=GPIOH_7, compatible `atri,led-panel`
 - Кадр: `WRITE len + W*H байт` + `SHOW_PIC`; push = **fsync(fb_fd)**
 - Прошивка: встроена в драйвер (`yandex_fpga_bitstream.h`), шьётся
