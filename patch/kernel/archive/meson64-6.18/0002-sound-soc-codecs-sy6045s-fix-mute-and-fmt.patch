@@ -1,0 +1,89 @@
+From: AtriOS Maintainer <maintainer@atrios.org>
+Subject: [PATCH] ASoC: sy6045s: fix mute register address, volume registers, and PLL clocking
+
+Register 0x19 is the Fault Status and Clear register, while register 0x06
+is the actual hardware MUTE control register (bit 3). Registers 0x11..0x14
+are TDM slot routing registers, whereas volume is controlled by 0x07..0x09.
+Furthermore, preserve 0x9E in register 0x04 for standard I2S 64fs mode
+so the amplifier internal PLL does not lose lock during playback.
+
+---
+--- a/sound/soc/codecs/sy6045s.c
++++ b/sound/soc/codecs/sy6045s.c
+@@ -30,12 +30,15 @@
+ #define SY6045S_REG_REV_ID          0x01
+ #define SY6045S_REG_INPUT_FMT       0x04
+ #define SY6045S_REG_STANDBY_CTRL    0x05
+-#define SY6045S_REG_CH1_VOL         0x11
+-#define SY6045S_REG_CH2_VOL         0x12
+-#define SY6045S_REG_CH3_VOL         0x13
+-#define SY6045S_REG_CH4_VOL         0x14
+-#define SY6045S_REG_MUTE_CTRL       0x19
++#define SY6045S_REG_MUTE_CTRL       0x06
++#define SY6045S_REG_MASTER_VOL      0x07
++#define SY6045S_REG_CH1_VOL         0x08
++#define SY6045S_REG_CH2_VOL         0x09
++#define SY6045S_REG_CH3_VOL         0x0a
++#define SY6045S_REG_CH4_VOL         0x0b
+ #define SY6045S_REG_SYS_RESET       0x0f
++#define SY6045S_REG_FAULT_STATUS    0x19
++#define SY6045S_REG_MUTE_EQ         0x22
+ 
+ #define SY6045S_NUM_SUPPLIES        2
+ 
+@@ -279,6 +282,7 @@
+ {
+ 	struct sy6045s_priv *priv = container_of(work, struct sy6045s_priv, spk_on_work.work);
+ 	regmap_update_bits(priv->regmap, SY6045S_REG_STANDBY_CTRL, 0x03, 0x00);
++	regmap_write(priv->regmap, SY6045S_REG_FAULT_STATUS, 0x00);
+ }
+ 
+ static void sy6045s_spk_off_work(struct work_struct *work)
+@@ -290,9 +294,11 @@
+ static const DECLARE_TLV_DB_SCALE(sy6045s_vol_tlv, -12600, 50, 0);
+ 
+ static const struct snd_kcontrol_new sy6045s_snd_controls[] = {
+-	SOC_DOUBLE_R_TLV("Master Playback Volume", SY6045S_REG_CH1_VOL,
+-			 SY6045S_REG_CH2_VOL, 0, 0xff, 1, sy6045s_vol_tlv),
+-	SOC_SINGLE("Master Playback Switch", SY6045S_REG_MUTE_CTRL, 0, 1, 1),
++	SOC_SINGLE_TLV("Master Playback Volume", SY6045S_REG_MASTER_VOL,
++		       0, 0xff, 0, sy6045s_vol_tlv),
++	SOC_DOUBLE_R_TLV("Channel Playback Volume", SY6045S_REG_CH1_VOL,
++			 SY6045S_REG_CH2_VOL, 0, 0xff, 0, sy6045s_vol_tlv),
++	SOC_SINGLE("Master Playback Switch", SY6045S_REG_MUTE_CTRL, 3, 1, 1),
+ };
+ 
+ static int sy6045s_mute(struct snd_soc_dai *dai, int mute, int direction)
+@@ -304,11 +310,14 @@
+ 	cancel_delayed_work_sync(&priv->spk_off_work);
+ 
+ 	if (mute) {
+-		regmap_update_bits(priv->regmap, SY6045S_REG_MUTE_CTRL, 0x01, 0x01);
++		regmap_update_bits(priv->regmap, SY6045S_REG_MUTE_CTRL, 0x08, 0x08);
++		regmap_write(priv->regmap, SY6045S_REG_MUTE_EQ, 0x30);
+ 		queue_delayed_work(system_power_efficient_wq, &priv->spk_off_work, msecs_to_jiffies(10));
+ 	} else {
+ 		queue_delayed_work(system_power_efficient_wq, &priv->spk_on_work, 0);
+-		regmap_update_bits(priv->regmap, SY6045S_REG_MUTE_CTRL, 0x01, 0x00);
++		regmap_write(priv->regmap, SY6045S_REG_FAULT_STATUS, 0x00);
++		regmap_write(priv->regmap, SY6045S_REG_MUTE_EQ, 0x00);
++		regmap_update_bits(priv->regmap, SY6045S_REG_MUTE_CTRL, 0x08, 0x00);
+ 	}
+ 	return 0;
+ }
+@@ -321,8 +330,13 @@
+ 
+ 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+ 	case SND_SOC_DAIFMT_I2S:
+-		sfmt = 0x00;
+-		break;
++		/*
++		 * Firmware initialization sets reg 0x04 to 0x9E (standard 64fs
++		 * I2S mode with internal PLL). Preserving 0x9E is required for
++		 * the PLL to lock to 3.072MHz BCLK.
++		 */
++		priv->format = fmt;
++		return 0;
+ 	case SND_SOC_DAIFMT_LEFT_J:
+ 		sfmt = 0x01;
+ 		break;

@@ -177,7 +177,7 @@
 		audio-routing =
 			"Headphones", "LOUT",
 			"Headphones", "ROUT",
-			"TDMOUT_B IN 0", "FRDDR_A OUT 1",
+			"TDMOUT_B IN 0", "FRDDR_A OUT 0",
 			"TDM_B Playback", "TDMOUT_B OUT",
 			"Tweeters Playback", "TDM_B Playback",
 			"Woofer Playback", "TDM_B Playback",
@@ -211,9 +211,6 @@
 			bitclock-master = <&tdmif_b>;
 			frame-master = <&tdmif_b>;
 			dai-tdm-slot-tx-mask-0 = <1 1>;
-			dai-tdm-slot-tx-mask-1 = <1 1>;
-			dai-tdm-slot-tx-mask-2 = <1 1>;
-			dai-tdm-slot-tx-mask-3 = <1 1>;
 			mclk-fs = <256>;
 
 			codec-0 { sound-dai = <&tweeter_amp>; };
