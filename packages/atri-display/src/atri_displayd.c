@@ -57,6 +57,7 @@ static volatile bool running = true;
 static int fb_fd = -1;
 static uint8_t *fb_mem = NULL;
 static size_t fb_size = 0;
+static bool is_shadow = false;
 static int sock_fd = -1;
 
 static display_mode_t cur_mode = MODE_CLOCK;
@@ -172,6 +173,9 @@ static void set_pixel(int x, int y, uint8_t val)
 static void flush_screen(void)
 {
 	if (fb_fd >= 0) {
+		if (is_shadow && fb_mem && fb_size > 0) {
+			pwrite(fb_fd, fb_mem, fb_size, 0);
+		}
 		fsync(fb_fd);
 	}
 }
@@ -582,10 +586,16 @@ static int open_fb(void)
 			    (var.xres == SCREEN_W && var.yres == SCREEN_H)) {
 				fb_size = SCREEN_PIXELS;
 				fb_mem = mmap(NULL, fb_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-				if (fb_mem != MAP_FAILED) {
+				if (fb_mem == MAP_FAILED) {
+					/* Driver does not support mmap (e.g. atri_led_panel with kzalloc); use shadow buffer */
+					fb_mem = calloc(1, fb_size);
+					is_shadow = true;
+				}
+				if (fb_mem != NULL) {
 					fb_fd = fd;
-					printf("atri-displayd: bound to %s (%s, %dx%d)\n",
-					       fb_devs[i], fix.id, var.xres, var.yres);
+					printf("atri-displayd: bound to %s (%s, %dx%d, %s)\n",
+					       fb_devs[i], fix.id, var.xres, var.yres,
+					       is_shadow ? "shadow buffer" : "mmap");
 					return 0;
 				}
 			}
@@ -713,7 +723,11 @@ int main(int argc, char *argv[])
 		unlink(SOCK_PATH);
 	}
 	if (fb_fd >= 0) {
-		munmap(fb_mem, fb_size);
+		if (is_shadow && fb_mem) {
+			free(fb_mem);
+		} else if (fb_mem && fb_mem != MAP_FAILED) {
+			munmap(fb_mem, fb_size);
+		}
 		close(fb_fd);
 	}
 

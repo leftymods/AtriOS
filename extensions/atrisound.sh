@@ -32,12 +32,20 @@ function post_family_tweaks_bsp__atrisound_add_config() {
 	cat <<- 'UCM_HIFI' > "${destination}"/usr/share/alsa/ucm2/ATRISTATION/HiFi.conf
 		SectionVerb {
 			EnableSequence [
+				cset "name='FRDDR_A SINK 1 SEL' 1"
+				cset "name='FRDDR_A SRC 1 EN Switch' on"
+				cset "name='TDMOUT_B SRC SEL' 0"
+				cset "name='TDMOUT_B Gain Enable Switch' on"
+				cset "name='TDMOUT_B Lane 0 Volume' 255,255"
+				cset "name='TDMOUT_B Lane 1 Volume' 255,255"
+				cset "name='TDMOUT_B Lane 2 Volume' 255,255"
+				cset "name='TDMOUT_B Lane 3 Volume' 255,255"
 				cset "name='Tweeters Master Playback Switch' on"
 				cset "name='Woofer Master Playback Switch' on"
 				cset "name='Playback Switch' on"
-				cset "name='Tweeters Master Playback Volume' 200"
-				cset "name='Woofer Master Playback Volume' 200"
-				cset "name='Playback Volume' 220"
+				cset "name='Tweeters Master Playback Volume' 255"
+				cset "name='Woofer Master Playback Volume' 255"
+				cset "name='Playback Volume' 255"
 			]
 			DisableSequence [
 			]

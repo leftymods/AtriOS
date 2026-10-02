@@ -13,6 +13,7 @@ struct screen {
     int bpp;
     int line_length;
     int backlight_fd;
+    bool is_shadow;
     char backlight_path[256];
 };
 

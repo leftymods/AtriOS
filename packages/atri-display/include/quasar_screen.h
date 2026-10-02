@@ -13,6 +13,7 @@ typedef struct {
 	int fb_fd;
 	uint8_t *fb_mmap;
 	int fb_len;
+	int is_shadow;
 } quasar_screen_t;
 
 int  screen_open(quasar_screen_t *scr, const char *ignored);

@@ -44,8 +44,12 @@ static int screen_open_fd(struct screen *s, int fd, const char *bl_path)
 
     s->fb = mmap(NULL, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (s->fb == MAP_FAILED) {
-        log_msg(LOG_ERR, "fb mmap failed: %s", strerror(errno));
-        return -1;
+        s->fb = calloc(1, s->mmap_len > 0 ? s->mmap_len : SCREEN_WIDTH * SCREEN_HEIGHT * s->bpp);
+        if (!s->fb) {
+            log_msg(LOG_ERR, "fb shadow calloc failed: %s", strerror(errno));
+            return -1;
+        }
+        s->is_shadow = true;
     }
 
     s->backlight_fd = open(bl_path, O_WRONLY);
@@ -124,8 +128,11 @@ int screen_init(struct screen *s, const char *fb_path, const char *bl_path)
 
 void screen_close(struct screen *s)
 {
-    if (s->fb && s->fb != MAP_FAILED)
+    if (s->is_shadow && s->fb)
+        free(s->fb);
+    else if (s->fb && s->fb != MAP_FAILED)
         munmap(s->fb, s->mmap_len);
+    s->fb = NULL;
     if (s->fd >= 0)
         close(s->fd);
     if (s->backlight_fd >= 0)
@@ -147,6 +154,10 @@ void screen_render(struct screen *s, const uint8_t *rgb)
                 s->fb[dst] = (rgb[src] | rgb[src + 1] | rgb[src + 2]) > 128 ? 0xFF : 0;
             }
         }
+    }
+    if (s->is_shadow && s->fd >= 0 && s->mmap_len > 0) {
+        pwrite(s->fd, s->fb, s->mmap_len, 0);
+        fdatasync(s->fd);
     }
 }
 

@@ -137,9 +137,13 @@ int screen_open(quasar_screen_t *scr, const char *ignored)
 			void *map = mmap(NULL, scr->fb_len, PROT_READ | PROT_WRITE,
 					 MAP_SHARED, fd, 0);
 			if (map == MAP_FAILED) {
-				perror("mmap fb");
-				close(fd);
-				return -1;
+				map = calloc(1, scr->fb_len);
+				if (!map) {
+					perror("calloc shadow fb");
+					close(fd);
+					return -1;
+				}
+				scr->is_shadow = 1;
 			}
 			scr->fb_fd = fd;
 			scr->fb_mmap = map;
@@ -155,13 +159,17 @@ int screen_open(quasar_screen_t *scr, const char *ignored)
 void screen_close(quasar_screen_t *scr)
 {
 	if (scr->fb_mmap) {
-		munmap(scr->fb_mmap, scr->fb_len);
+		if (scr->is_shadow)
+			free(scr->fb_mmap);
+		else
+			munmap(scr->fb_mmap, scr->fb_len);
 		scr->fb_mmap = NULL;
 	}
 	if (scr->fb_fd >= 0) {
 		close(scr->fb_fd);
 		scr->fb_fd = -1;
 	}
+	scr->is_shadow = 0;
 }
 
 void screen_reset(quasar_screen_t *scr)
@@ -232,6 +240,8 @@ void screen_flush(quasar_screen_t *scr)
 {
 	if (scr->fb_fd < 0)
 		return;
+	if (scr->is_shadow && scr->fb_mmap && scr->fb_len > 0)
+		pwrite(scr->fb_fd, scr->fb_mmap, scr->fb_len, 0);
 	/* gowin_led_device pushes the frame in .fb_sync == fsync();
 	 * FBIOBLANK does not transfer anything. */
 	if (fsync(scr->fb_fd))

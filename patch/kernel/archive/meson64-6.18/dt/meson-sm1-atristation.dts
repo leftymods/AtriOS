@@ -177,7 +177,7 @@
 		audio-routing =
 			"Headphones", "LOUT",
 			"Headphones", "ROUT",
-			"TDMOUT_B IN 0", "FRDDR_A OUT 0",
+			"TDMOUT_B IN 0", "FRDDR_A OUT 1",
 			"TDM_B Playback", "TDMOUT_B OUT",
 			"Tweeters Playback", "TDM_B Playback",
 			"Woofer Playback", "TDM_B Playback",
@@ -211,6 +211,9 @@
 			bitclock-master = <&tdmif_b>;
 			frame-master = <&tdmif_b>;
 			dai-tdm-slot-tx-mask-0 = <1 1>;
+			dai-tdm-slot-tx-mask-1 = <1 1>;
+			dai-tdm-slot-tx-mask-2 = <1 1>;
+			dai-tdm-slot-tx-mask-3 = <1 1>;
 			mclk-fs = <256>;
 
 			codec-0 { sound-dai = <&tweeter_amp>; };
@@ -286,6 +289,8 @@
 		regulator-max-microvolt = <20000000>;
 		gpio = <&gpio GPIOX_10 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
+		regulator-boot-on;
+		regulator-always-on;
 	};
 
 	/* Rotary Volume Encoder (A: GPIOA_0 [0x31], B: GPIOAO_10 [0x0a]) */
@@ -622,7 +627,7 @@
 };
 
 &tdmif_a {
-	status = "okay";
+	status = "disabled";
 	pinctrl-0 = <&tdm_a_dout0_pins>, <&tdm_a_din0_pins>,
 		    <&tdm_a_fs_pins>, <&tdm_a_sclk_pins>;
 	pinctrl-names = "default";
@@ -1096,6 +1101,8 @@
  * never binds. */
 &spicc1 {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&spicc1_pins>;
 	num-cs = <1>;
 	cs-gpios = <&gpio GPIOH_7 GPIO_ACTIVE_LOW>;
 
@@ -1104,9 +1111,8 @@
 		reg = <0>;
 		spi-max-frequency = <4000000>;
 		max-brightness = <200>;
-		pinctrl-names = "default", "jtag";
-		pinctrl-0 = <&spicc1_pins>;
-		pinctrl-1 = <&led_panel_jtag_pins>;
+		pinctrl-names = "jtag";
+		pinctrl-0 = <&led_panel_jtag_pins>;
 		reset-gpios = <&gpio GPIOX_9 GPIO_ACTIVE_LOW>;
 		/* GPIOH output register, bit 8 = GPIOH_8 (JTAG TCK) */
 		jtag_tck_desc = <0xff634468 0x08>;
@@ -1172,7 +1178,7 @@
 		/* reg must be <= SY6045S_MAX_REGISTER (0xb0): the old
 		 * <0xff 0x06> pair came from a misread vendor dump (ff was
 		 * its EOF marker, not a register) and NAKed the whole probe */
-		restore-regs = <0x06 0x08>;
+		restore-regs = <0x06 0x00>;
 		status = "okay";
 	};
 
@@ -1188,7 +1194,7 @@
 		/* reg must be <= SY6045S_MAX_REGISTER (0xb0): the old
 		 * <0xff 0x06> pair came from a misread vendor dump (ff was
 		 * its EOF marker, not a register) and NAKed the whole probe */
-		restore-regs = <0x06 0x08>;
+		restore-regs = <0x06 0x00>;
 		status = "okay";
 	};
 
