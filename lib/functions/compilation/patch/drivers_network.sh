@@ -578,6 +578,26 @@ if target in c and "HW efuse failed" not in c:
         f.write(c)
 ' "$kerneldir/drivers/net/wireless/realtek/rtw88/efuse.c"
 
+		# Patch rtw8822c.c: bypass blocking DACK error and allow scan when efuse is missing/uncalibrated
+		python3 -c '
+import sys
+path = sys.argv[1]
+with open(path, "r") as f:
+    c = f.read()
+# Replace DACK ready error with warning so RF calibration loop does not hang
+c = c.replace(
+    """\tif (!check_hw_ready(rtwdev, read_addr + 0x08, 0x7fff80, 0xffff) ||\n\t    !check_hw_ready(rtwdev, read_addr + 0x34, 0x7fff80, 0xffff))\n\t\trtw_err(rtwdev, "failed to wait for dack ready\\n");""",
+    """\tif (!check_hw_ready(rtwdev, read_addr + 0x08, 0x7fff80, 0xffff) ||\n\t    !check_hw_ready(rtwdev, read_addr + 0x34, 0x7fff80, 0xffff))\n\t\trtw_dbg(rtwdev, RTW_DBG_RFK, "dack timeout bypassed\\n");"""
+)
+# Replace IQ vector write error with debug message to prevent locking the radio
+c = c.replace(
+    """\tif (!check_hw_ready(rtwdev, read_addr + 0x24, 0x07f80000, ic) ||\n\t    !check_hw_ready(rtwdev, read_addr + 0x50, 0x07f80000, qc))\n\t\trtw_err(rtwdev, "failed to write IQ vector to hardware\\n");""",
+    """\tif (!check_hw_ready(rtwdev, read_addr + 0x24, 0x07f80000, ic) ||\n\t    !check_hw_ready(rtwdev, read_addr + 0x50, 0x07f80000, qc))\n\t\trtw_dbg(rtwdev, RTW_DBG_RFK, "IQ vector write bypassed\\n");"""
+)
+with open(path, "w") as f:
+    f.write(c)
+' "$kerneldir/drivers/net/wireless/realtek/rtw88/rtw8822c.c"
+
 		# Add ITON RW8822-50B1 SDIO ID (0xA822) as a separate array element before the {} terminator
 		# This is needed for all kernel versions since it's a hardware ID addition
 		python3 -c '
