@@ -8,361 +8,242 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.leftymods.atrios.AppReleaseInfo
 import com.leftymods.atrios.model.OtaStatus
-import java.text.SimpleDateFormat
-import java.util.Date
+import com.leftymods.atrios.ui.theme.AppPalette
+import com.leftymods.atrios.ui.theme.OledCard
 import java.util.Locale
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OtaUpdateCard(
+fun UnifiedUpdatesCard(
     fwVersion: String,
-    codename: String,
     ota: OtaStatus,
-    onCheckUpdates: () -> Unit,
-    onRefreshStatus: () -> Unit,
-    onApplyUpdate: (Boolean) -> Unit,
-    onRollback: (Boolean) -> Unit,
-    onRebootNow: () -> Unit
+    palette: AppPalette,
+    curAppVer: String,
+    appUpdateStatusMsg: String?,
+    availableAppUpdate: AppReleaseInfo?,
+    appUpdateProgress: Float?,
+    checkingAppUpdate: Boolean,
+    onCheckOta: () -> Unit,
+    onRefreshOtaStatus: () -> Unit,
+    onApplyOta: (Boolean) -> Unit,
+    onRollbackOta: (Boolean) -> Unit,
+    onRebootNow: () -> Unit,
+    onCheckAppUpdate: () -> Unit,
+    onDownloadAndInstallApp: (AppReleaseInfo) -> Unit
 ) {
     var showApplyDialog by remember { mutableStateOf(false) }
     var showRollbackDialog by remember { mutableStateOf(false) }
     var autoReboot by remember { mutableStateOf(true) }
     var showChangelog by remember { mutableStateOf(false) }
-    var localChecking by remember { mutableStateOf(false) }
+    var localCheckingOta by remember { mutableStateOf(false) }
 
-    // Clear localChecking as soon as speaker settles into a terminal state
+    // Clear localCheckingOta as soon as speaker settles into a terminal state
     LaunchedEffect(ota.state, ota.updateAvailable, ota.lastCheckTs) {
         if (ota.state != "checking" && (ota.updateAvailable || ota.state in setOf("up_to_date", "available", "error", "installed", "rolled_back"))) {
-            localChecking = false
+            localCheckingOta = false
         }
     }
 
     // Bounded polling: max 6 polls (15s) for "checking", max 60 polls (150s) for download/install.
-    // Never loops forever without user interaction.
-    val isCheckingNow = localChecking || ota.state == "checking"
-    LaunchedEffect(ota.state, localChecking) {
-        if (isCheckingNow && !ota.updateAvailable) {
+    val isCheckingOtaNow = localCheckingOta || ota.state == "checking"
+    LaunchedEffect(ota.state, localCheckingOta) {
+        if (isCheckingOtaNow && !ota.updateAvailable) {
             repeat(6) {
                 kotlinx.coroutines.delay(2500L)
-                if (ota.updateAvailable || (ota.state != "checking" && !localChecking)) return@LaunchedEffect
-                onRefreshStatus()
+                if (ota.updateAvailable || (ota.state != "checking" && !localCheckingOta)) return@LaunchedEffect
+                onRefreshOtaStatus()
             }
-            localChecking = false
+            localCheckingOta = false
         } else if (ota.isBusy && ota.state != "checking") {
             repeat(60) {
                 kotlinx.coroutines.delay(2500L)
                 if (!ota.isBusy) return@LaunchedEffect
-                onRefreshStatus()
+                onRefreshOtaStatus()
             }
         }
     }
 
-    val displayCurrent = ota.currentVersion.ifBlank { fwVersion.ifBlank { "—" } }
-    val stateLabel = when (ota.state) {
-        "checking" -> "Проверка…"
-        "up_to_date" -> "Актуально"
-        "available" -> "Доступно обновление"
-        "downloading" -> "Загрузка (${ota.progress}%)"
-        "verifying" -> "Проверка целостности"
-        "installing" -> "Установка (${ota.progress}%)"
-        "installed" -> "Установлено"
-        "rolling_back" -> "Откат прошивки…"
-        "rolled_back" -> "Выполнен откат"
-        "error" -> "Ошибка OTA"
-        else -> "Ожидание"
+    val displayFw = ota.currentVersion.ifBlank { fwVersion.ifBlank { "—" } }
+    val otaStatusText = when {
+        !ota.error.isNullOrBlank() -> "Ошибка: ${ota.error}"
+        ota.state == "checking" || localCheckingOta -> "Проверка обновлений..."
+        ota.state == "downloading" -> "Загрузка прошивки: ${ota.progress}%"
+        ota.state == "verifying" -> "Проверка целостности..."
+        ota.state == "installing" -> "Установка прошивки: ${ota.progress}%"
+        ota.state == "rolling_back" -> "Откат прошивки..."
+        ota.rebootRequired -> "Обновление установлено. Требуется перезагрузка."
+        ota.updateAvailable && !ota.latestVersion.isNullOrBlank() -> {
+            val sz = if (ota.assetSize > 0L) " (${formatMb(ota.assetSize)})" else ""
+            "Доступна новая версия v${ota.latestVersion}$sz"
+        }
+        ota.state == "up_to_date" || ota.state == "installed" -> "Установлена актуальная версия v$displayFw"
+        ota.state == "rolled_back" -> "Выполнен откат до версии v$displayFw"
+        ota.message.isNotBlank() -> ota.message
+        else -> null
     }
 
-    val badgeContainer = when (ota.state) {
-        "available" -> MaterialTheme.colorScheme.primaryContainer
-        "error" -> MaterialTheme.colorScheme.errorContainer
-        "up_to_date", "installed" -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val badgeContent = when (ota.state) {
-        "available" -> MaterialTheme.colorScheme.onPrimaryContainer
-        "error" -> MaterialTheme.colorScheme.onErrorContainer
-        "up_to_date", "installed" -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    ElevatedCard(shape = RoundedCornerShape(24.dp)) {
+    Surface(shape = RoundedCornerShape(22.dp), color = OledCard) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // === Section 1: Speaker Firmware (OTA) ===
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Icon(
-                        if (ota.updateAvailable) Icons.Rounded.SystemUpdateAlt else Icons.Rounded.SystemUpdate,
-                        contentDescription = null,
-                        modifier = Modifier.padding(10.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        "Обновление колонки",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                    Text(
-                        if (codename.isNotBlank()) "v$displayCurrent · $codename" else "v$displayCurrent",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(99.dp),
-                    color = badgeContainer
-                ) {
-                    Text(
-                        stateLabel,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = badgeContent,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
+                Text("Прошивка колонки (OTA)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("v$displayFw", color = palette.accent, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             }
 
-            if (ota.lastCheckTs > 0L && !ota.isBusy) {
-                val formatted = remember(ota.lastCheckTs) {
-                    SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
-                        .format(Date(ota.lastCheckTs * 1000L))
-                }
+            if (otaStatusText != null) {
                 Text(
-                    "Последняя проверка: $formatted",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    otaStatusText,
+                    color = if (!ota.error.isNullOrBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp
                 )
             }
 
-            if (ota.isBusy) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (ota.progress > 0) {
-                            LinearProgressIndicator(
-                                progress = { ota.progress / 100f },
-                                modifier = Modifier.fillMaxWidth().height(6.dp)
-                            )
-                        } else {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
-                        }
-                        val sizeText = if (ota.assetSize > 0L) {
-                            " · ${formatMb(ota.downloadedBytes)} / ${formatMb(ota.assetSize)}"
-                        } else ""
-                        Text(
-                            "${ota.message.ifBlank { ota.stage }}$sizeText",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else if (ota.message.isNotBlank() && !ota.updateAvailable) {
-                val localizedMsg = when {
-                    ota.message.equals("AtriOS is up to date", ignoreCase = true) ||
-                        ota.message.equals("Up to date", ignoreCase = true) -> "Установлена актуальная прошивка"
-                    ota.message.equals("Update check started", ignoreCase = true) -> "Проверка обновлений…"
-                    ota.message.equals("OTA update started", ignoreCase = true) -> "Запуск обновления прошивки…"
-                    else -> ota.message
-                }
-                Text(
-                    localizedMsg,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (!ota.error.isNullOrBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.errorContainer
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.ErrorOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                        Text(
-                            ota.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
-                }
-            }
-
-            if (ota.state == "rolled_back") {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer
+            if (ota.updateAvailable && !ota.changelog.isNullOrBlank()) {
+                TextButton(
+                    onClick = { showChangelog = !showChangelog },
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                 ) {
                     Text(
-                        "Обновление было автоматически отменено и восстановлена предыдущая рабочая прошивка.",
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        if (showChangelog) "Скрыть список изменений" else "Что нового",
+                        color = palette.accent,
+                        fontSize = 12.sp
+                    )
+                }
+                if (showChangelog) {
+                    Text(
+                        ota.changelog.trim(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
                     )
                 }
             }
 
-            if (ota.updateAvailable && !ota.latestVersion.isNullOrBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    "v$displayCurrent",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                                )
-                                Icon(
-                                    Icons.Rounded.ArrowForward,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                                Text(
-                                    "v${ota.latestVersion}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                            if (ota.assetSize > 0L) {
-                                Surface(
-                                    shape = RoundedCornerShape(99.dp),
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
-                                ) {
-                                    Text(
-                                        formatMb(ota.assetSize),
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
-                            }
-                        }
-                        if (ota.changelog.isNotBlank()) {
-                            TextButton(
-                                onClick = { showChangelog = !showChangelog },
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text(if (showChangelog) "Скрыть изменения" else "Что нового")
-                            }
-                            if (showChangelog) {
-                                Text(
-                                    ota.changelog,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when {
-                    ota.isBusy || localChecking -> {
-                        FilledTonalButton(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (localChecking && !ota.isBusy) "Проверка…" else stateLabel)
-                        }
-                    }
-                    ota.updateAvailable -> {
-                        Button(
-                            onClick = { showApplyDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Rounded.Download, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Установить v${ota.latestVersion ?: ""}".trim(), fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    ota.rebootRequired -> {
-                        Button(
-                            onClick = onRebootNow,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Rounded.RestartAlt, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Перезагрузить колонку", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    else -> {
-                        Button(
-                            onClick = {
-                                if (!localChecking && !ota.isBusy) {
-                                    localChecking = true
-                                    onCheckUpdates()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Rounded.Refresh, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Проверить обновления", fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-
-                if (ota.rollbackAvailable && !ota.isBusy) {
-                    OutlinedButton(
-                        onClick = { showRollbackDialog = true },
+            when {
+                ota.isBusy && ota.state != "checking" -> {
+                    LinearProgressIndicator(
+                        progress = { (ota.progress / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
+                        color = palette.accent
+                    )
+                }
+                ota.updateAvailable -> {
+                    Button(
+                        onClick = { showApplyDialog = true },
+                        shape = RoundedCornerShape(99.dp)
                     ) {
-                        Icon(Icons.Rounded.History, contentDescription = null)
+                        Icon(Icons.Rounded.Download, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("Откат на прошлую версию")
+                        Text("Обновить до v${ota.latestVersion ?: "новой"}", fontWeight = FontWeight.Bold)
                     }
+                }
+                ota.rebootRequired -> {
+                    Button(
+                        onClick = onRebootNow,
+                        shape = RoundedCornerShape(99.dp)
+                    ) {
+                        Icon(Icons.Rounded.RestartAlt, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Перезагрузить колонку", fontWeight = FontWeight.Bold)
+                    }
+                }
+                else -> {
+                    FilledTonalButton(
+                        enabled = !isCheckingOtaNow && !ota.isBusy,
+                        onClick = {
+                            if (!localCheckingOta && !ota.isBusy) {
+                                localCheckingOta = true
+                                onCheckOta()
+                            }
+                        },
+                        shape = RoundedCornerShape(99.dp)
+                    ) {
+                        if (isCheckingOtaNow) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null)
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        Text("Проверить обновления колонки")
+                    }
+                }
+            }
+
+            if (ota.rollbackAvailable && !ota.isBusy) {
+                OutlinedButton(
+                    onClick = { showRollbackDialog = true },
+                    shape = RoundedCornerShape(99.dp)
+                ) {
+                    Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Откат на прошлую версию")
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 4.dp),
+                color = Color.White.copy(alpha = 0.08f)
+            )
+
+            // === Section 2: Android App ===
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Приложение AtriOS Control", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("v$curAppVer", color = palette.accent, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+
+            if (appUpdateStatusMsg != null) {
+                Text(appUpdateStatusMsg, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+            }
+
+            if (availableAppUpdate != null) {
+                if (appUpdateProgress != null) {
+                    LinearProgressIndicator(
+                        progress = { appUpdateProgress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = palette.accent
+                    )
+                    Text("Загрузка APK: ${(appUpdateProgress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Button(
+                        onClick = { onDownloadAndInstallApp(availableAppUpdate) },
+                        shape = RoundedCornerShape(99.dp)
+                    ) {
+                        Icon(Icons.Rounded.Download, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Обновить до v${availableAppUpdate.version}", fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                FilledTonalButton(
+                    enabled = !checkingAppUpdate,
+                    onClick = onCheckAppUpdate,
+                    shape = RoundedCornerShape(99.dp)
+                ) {
+                    if (checkingAppUpdate) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text("Проверить обновления приложения")
                 }
             }
         }
@@ -386,7 +267,7 @@ fun OtaUpdateCard(
             confirmButton = {
                 Button(onClick = {
                     showApplyDialog = false
-                    onApplyUpdate(autoReboot)
+                    onApplyOta(autoReboot)
                 }) { Text("Установить") }
             },
             dismissButton = {
@@ -400,12 +281,12 @@ fun OtaUpdateCard(
             onDismissRequest = { showRollbackDialog = false },
             title = { Text("Откатить прошивку?") },
             text = {
-                Text("Будут восстановлены резервные копии предыдущей версии прошивки. После отката рекомендуется перезагрузить колонку.")
+                Text("Будут восстановлены резервные копии предыдущей версии прошивки. После отката колонка перезагрузится.")
             },
             confirmButton = {
                 Button(onClick = {
                     showRollbackDialog = false
-                    onRollback(true)
+                    onRollbackOta(true)
                 }) { Text("Откатить и перезагрузить") }
             },
             dismissButton = {

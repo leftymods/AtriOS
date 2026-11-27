@@ -87,7 +87,7 @@ import com.leftymods.atrios.ui.IntegrationsScreen
 import com.leftymods.atrios.ui.BluetoothCard
 import com.leftymods.atrios.ui.DevicePickerSection
 import com.leftymods.atrios.ui.LedAndScreenCard
-import com.leftymods.atrios.ui.OtaUpdateCard
+import com.leftymods.atrios.ui.UnifiedUpdatesCard
 import com.leftymods.atrios.ui.TelemetryCard
 import com.leftymods.atrios.ui.TimeAndTimezoneCard
 import com.leftymods.atrios.ui.TimersAndAlarmsCard
@@ -140,7 +140,8 @@ private enum class SettingsPage(val title: String, val subtitle: String, val ico
     BLUETOOTH("Bluetooth", "Режим BT-колонки и сопряжение", Icons.Rounded.Bluetooth),
     PALETTE("Оформление и палитра", "Цвет интерфейса и анимации волны", Icons.Rounded.Palette),
     TIME("Время и регион", "Синхронизация NTP и часовой пояс", Icons.Rounded.Schedule),
-    ABOUT("Об устройстве", "Кодовое имя, ревизия, прошивка и OTA", Icons.Rounded.Info),
+    UPDATES("Обновления", "Прошивка колонки (OTA) и приложение", Icons.Rounded.SystemUpdate),
+    ABOUT("Об устройстве", "Кодовое имя, ревизия и серийный номер", Icons.Rounded.Info),
     DEBUG("Debug-меню", "ИИ-сервер, Qwen3-TTS, анимации, RGB, диагностика", Icons.Rounded.BugReport)
 }
 
@@ -1001,6 +1002,7 @@ fun AtriOSApp(
                                 palette = palette,
                                 volumePct = sliderVol.roundToInt().coerceIn(0, 100),
                                 progressFrac = homeProgress,
+                                orbs = ymOrbs,
                                 onBlobTap = {
                                     if (status.ymusic.state == "playing") {
                                         dispatchYMusicControl("pause")
@@ -1017,6 +1019,11 @@ fun AtriOSApp(
                                     dispatchYMusicControl(if (status.ymusic.state == "playing") "pause" else "play")
                                 },
                                 onNext = { dispatchYMusicControl("next") },
+                                onSeek = { targetMs ->
+                                    status = status.copy(ymusic = status.ymusic.copy(positionMs = targetMs))
+                                    client.ymusicSeek(targetMs)
+                                },
+                                onPlayWavePreset = { mode, query -> dispatchYMusicPlay(mode, query) },
                                 onOpenVolume = { showVolumeSheet = true },
                                 onOpenEq = { showEqSheet = true },
                                 onOpenIntegrations = { selectedTab = AppTab.INTEGRATIONS },
@@ -1271,7 +1278,8 @@ fun AtriOSApp(
                                             SettingsPage.TIME to status.timezone.ifBlank { "UTC" }
                                         ),
                                         "Система и диагностика" to listOf(
-                                            SettingsPage.ABOUT to "Прошивка v${status.fwVersion.ifBlank { "—" }} · App v$curAppVer",
+                                            SettingsPage.UPDATES to "Прошивка v${status.fwVersion.ifBlank { "—" }} · App v$curAppVer",
+                                            SettingsPage.ABOUT to "${status.model} (${status.codename.ifBlank { "yndxsttion53" }})",
                                             SettingsPage.DEBUG to "Логи (${DebugLogStore.errorCount.get()} ош.), VQE, E2EE, ИИ"
                                         )
                                     )
@@ -1585,6 +1593,48 @@ fun AtriOSApp(
                                                 )
                                             }
                                         }
+                                        SettingsPage.UPDATES -> {
+                                            item {
+                                                val curAppVer = remember { AppUpdater.currentVersionName(context) }
+                                                UnifiedUpdatesCard(
+                                                    fwVersion = status.fwVersion,
+                                                    ota = status.ota,
+                                                    palette = palette,
+                                                    curAppVer = curAppVer,
+                                                    appUpdateStatusMsg = appUpdateStatusMsg,
+                                                    availableAppUpdate = availableAppUpdate,
+                                                    appUpdateProgress = appUpdateProgress,
+                                                    checkingAppUpdate = checkingAppUpdate,
+                                                    onCheckOta = { client.otaCheck() },
+                                                    onRefreshOtaStatus = { client.otaStatus() },
+                                                    onApplyOta = { reboot -> client.otaApply(reboot) },
+                                                    onRollbackOta = { reboot -> client.otaRollback(reboot) },
+                                                    onRebootNow = { showRebootDialog = true },
+                                                    onCheckAppUpdate = {
+                                                        scope.launch {
+                                                            checkingAppUpdate = true
+                                                            appUpdateStatusMsg = "Проверка обновлений..."
+                                                            val found = AppUpdater.checkForUpdate(context)
+                                                            availableAppUpdate = found
+                                                            checkingAppUpdate = false
+                                                            appUpdateStatusMsg = if (found != null) {
+                                                                "Доступна новая версия v${found.version}"
+                                                            } else {
+                                                                "Установлена актуальная версия v$curAppVer"
+                                                            }
+                                                        }
+                                                    },
+                                                    onDownloadAndInstallApp = { rel ->
+                                                        scope.launch {
+                                                            appUpdateProgress = 0f
+                                                            val res = AppUpdater.downloadAndInstall(context, rel) { p -> appUpdateProgress = p }
+                                                            appUpdateProgress = null
+                                                            res.onFailure { e -> snackbarHostState.showSnackbar("Ошибка загрузки APK: ${e.message}") }
+                                                        }
+                                                    }
+                                                )
+                                            }
+                                        }
                                         SettingsPage.ABOUT -> {
                                             item {
                                                 Surface(shape = RoundedCornerShape(22.dp), color = OledCard) {
@@ -1597,87 +1647,6 @@ fun AtriOSApp(
                                                         InfoRow("Прошивка", "v${status.fwVersion}")
                                                         if (relayConfig.deviceId.isNotBlank()) {
                                                             InfoRow("Device ID", relayConfig.deviceId)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            item {
-                                                OtaUpdateCard(
-                                                    fwVersion = status.fwVersion,
-                                                    codename = status.codename,
-                                                    ota = status.ota,
-                                                    onCheckUpdates = { client.otaCheck() },
-                                                    onRefreshStatus = { client.otaStatus() },
-                                                    onApplyUpdate = { reboot -> client.otaApply(reboot) },
-                                                    onRollback = { reboot -> client.otaRollback(reboot) },
-                                                    onRebootNow = { showRebootDialog = true }
-                                                )
-                                            }
-                                            item {
-                                                Surface(shape = RoundedCornerShape(22.dp), color = OledCard) {
-                                                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                                        val curAppVer = remember { AppUpdater.currentVersionName(context) }
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Text("Приложение AtriOS Control", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                                            Text("v$curAppVer", color = palette.accent, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                                        }
-                                                        if (appUpdateStatusMsg != null) {
-                                                            Text(appUpdateStatusMsg!!, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                                                        }
-                                                        val rel = availableAppUpdate
-                                                        if (rel != null) {
-                                                            val prog = appUpdateProgress
-                                                            if (prog != null) {
-                                                                LinearProgressIndicator(progress = { prog }, modifier = Modifier.fillMaxWidth(), color = palette.accent)
-                                                                Text("Загрузка APK: ${(prog * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
-                                                            } else {
-                                                                Button(
-                                                                    onClick = {
-                                                                        scope.launch {
-                                                                            appUpdateProgress = 0f
-                                                                            val res = AppUpdater.downloadAndInstall(context, rel) { p -> appUpdateProgress = p }
-                                                                            appUpdateProgress = null
-                                                                            res.onFailure { e -> snackbarHostState.showSnackbar("Ошибка загрузки APK: ${e.message}") }
-                                                                        }
-                                                                    },
-                                                                    shape = RoundedCornerShape(99.dp)
-                                                                ) {
-                                                                    Icon(Icons.Rounded.Download, contentDescription = null)
-                                                                    Spacer(Modifier.width(6.dp))
-                                                                    Text("Обновить до v${rel.version}", fontWeight = FontWeight.Bold)
-                                                                }
-                                                            }
-                                                        } else {
-                                                            FilledTonalButton(
-                                                                enabled = !checkingAppUpdate,
-                                                                onClick = {
-                                                                    scope.launch {
-                                                                        checkingAppUpdate = true
-                                                                        appUpdateStatusMsg = "Проверка обновлений..."
-                                                                        val found = AppUpdater.checkForUpdate(context)
-                                                                        availableAppUpdate = found
-                                                                        checkingAppUpdate = false
-                                                                        appUpdateStatusMsg = if (found != null) {
-                                                                            "Доступна новая версия v${found.version}"
-                                                                        } else {
-                                                                            "Установлена актуальная версия v$curAppVer"
-                                                                        }
-                                                                    }
-                                                                },
-                                                                shape = RoundedCornerShape(99.dp)
-                                                            ) {
-                                                                if (checkingAppUpdate) {
-                                                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                                                } else {
-                                                                    Icon(Icons.Rounded.Refresh, contentDescription = null)
-                                                                }
-                                                                Spacer(Modifier.width(6.dp))
-                                                                Text("Проверить обновления приложения")
-                                                            }
                                                         }
                                                     }
                                                 }

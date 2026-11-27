@@ -661,6 +661,10 @@ class BtControlClient(
         JSONObject().put("cmd", "ymusic_control").put("action", action)
     )
 
+    fun ymusicSeek(positionMs: Long) = sendCommand(
+        JSONObject().put("cmd", "ymusic_seek").put("position_ms", positionMs.coerceAtLeast(0L))
+    )
+
     fun setYnisonEnabled(enabled: Boolean) = sendCommand(
         JSONObject().put("cmd", "set_ynison_enabled").put("enabled", enabled)
     )
@@ -884,7 +888,7 @@ class BtControlClient(
                 }
             }
             "ymusic_status", "ymusic_login_response", "ymusic_logout_response",
-            "ymusic_play_response", "ymusic_control_response" -> {
+            "ymusic_play_response", "ymusic_control_response", "ymusic_seek_response" -> {
                 val ymObj = json.optJSONObject("ymusic")
                 val msg = json.optString("message", "")
                 val ok = json.optBoolean("success", true)
