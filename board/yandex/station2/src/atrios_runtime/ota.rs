@@ -1713,6 +1713,17 @@ pub fn run(args: &[String]) -> i32 {
                         sync();
                         reboot(RB_AUTOBOOT);
                     }
+                } else {
+                    // Restart AtriOS services on the rolled-back binary so ymusic/Ynison never stay dead
+                    let _ = Command::new("sh")
+                        .args([
+                            "-c",
+                            "sleep 1;                              [ -x /etc/init.d/S60atrios ] && /etc/init.d/S60atrios restart >/dev/null 2>&1;                              [ -x /etc/init.d/S71atrios-bt-control ] && /etc/init.d/S71atrios-bt-control restart >/dev/null 2>&1;                              pgrep -f 'ymusic daemon' >/dev/null 2>&1 || (/usr/lib/atrios/ymusic daemon >/dev/null 2>&1 &)",
+                        ])
+                        .stdin(Stdio::null())
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn();
                 }
             }
             "recover" => {

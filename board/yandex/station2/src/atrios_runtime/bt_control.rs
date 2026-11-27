@@ -1112,6 +1112,27 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
                 ])),
             }
         }
+        "ymusic_seek" => {
+            let pos_ms = map
+                .get("position_ms")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0)
+                .max(0);
+            match crate::ymusic::trigger_seek(pos_ms) {
+                Ok(st) => Ok(obj(vec![
+                    ("type", Json::Str("ymusic_seek_response".into())),
+                    ("success", Json::Bool(true)),
+                    ("message", Json::Str(format!("Seek to {pos_ms} ms"))),
+                    ("ymusic", st.to_json()),
+                ])),
+                Err(e) => Ok(obj(vec![
+                    ("type", Json::Str("ymusic_seek_response".into())),
+                    ("success", Json::Bool(false)),
+                    ("message", Json::Str(e)),
+                    ("ymusic", crate::ymusic::read_status_json()),
+                ])),
+            }
+        }
         "ota_status" => Ok(obj(vec![
             ("type", Json::Str("ota_status".into())),
             ("success", Json::Bool(true)),
@@ -1685,7 +1706,7 @@ fn spawn_wifi_relay_worker() {
                             let cmd_name = cmd_payload.get_str("cmd").unwrap_or("").to_string();
                             let is_fast_state_cmd = matches!(
                                 cmd_name.as_str(),
-                                "set_volume" | "volume" | "set_mute" | "mute" | "set_eq" | "ymusic_control" | "ymusic_play"
+                                "set_volume" | "volume" | "set_mute" | "mute" | "set_eq" | "ymusic_control" | "ymusic_play" | "ymusic_seek"
                             );
                             let base_c = base.clone();
                             let auth_c = auth.clone();
