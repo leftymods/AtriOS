@@ -1,5 +1,6 @@
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3.h"
+#include <errno.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -11,6 +12,9 @@
 #include <unistd.h>
 
 #define INBUF_SZ (64 * 1024)
+#define MP3_READ_AHEAD (4 * 1024)
+#define MP3_SYNC_TAIL (2 * MAX_FREE_FORMAT_FRAME_SIZE + 4)
+
 #define DUCK_FLAG_FILE "/var/run/atrios/ymusic_duck"
 #define AUDIO_ENV_TMP "/var/run/atrios/ymusic_audio.tmp"
 #define AUDIO_ENV_FILE "/var/run/atrios/ymusic_audio.json"
@@ -135,7 +139,19 @@ static void send_aec_ref(int fd, const struct sockaddr_un *addr, const int16_t *
     }
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+    uint64_t skip_samples = 0;
+    if (argc != 1) {
+        char *end = NULL;
+        if (argc != 3 || strcmp(argv[1], "--skip-samples") != 0 ||
+            argv[2][0] < '0' || argv[2][0] > '9') {
+            fprintf(stderr, "Usage: atri-mp3dec [--skip-samples N]\n");
+            return 2;
+        }
+        errno = 0;
+        skip_samples = strtoull(argv[2], &end, 10);
+        if (errno || *end != '\0') return 2;
+    }
     static uint8_t buf[INBUF_SZ];
     static mp3d_sample_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
     mp3dec_t mp3d;
@@ -150,6 +166,8 @@ int main(void) {
 
     size_t filled = 0;
     int eof = 0;
+    int need_more = 0;
+    int wrote_pcm = 0;
     float cur_gain = 1.0f;
     unsigned int frame_cnt = 0;
     int ducked = 0;
@@ -165,14 +183,31 @@ int main(void) {
     float smooth_beat = 0.0f;
 
     while (!eof || filled > 0) {
-        if (!eof && filled < INBUF_SZ / 2) {
-            size_t n = fread(buf + filled, 1, INBUF_SZ - filled, stdin);
-            if (n == 0) eof = 1;
-            else filled += n;
+        if (!eof && (need_more || filled < MP3_READ_AHEAD)) {
+            ssize_t n = read(STDIN_FILENO, buf + filled, INBUF_SZ - filled);
+            if (n < 0) {
+                if (errno == EINTR) continue;
+                perror("Reading MP3 input");
+                return 1;
+            }
+            eof = n == 0;
+            if (n > 0) filled += (size_t)n;
+            need_more = 0;
+            if (!eof && filled < MP3_READ_AHEAD) continue;
         }
         if (filled == 0) break;
-        mp3dec_frame_info_t info;
+        mp3dec_frame_info_t info = {0};
         int samples = mp3dec_decode_frame(&mp3d, buf, (int)filled, pcm, &info);
+        if (!eof && !samples && info.hz == 0 && (size_t)info.frame_bytes == filled) {
+            // Preserve possible split headers and their following frames when
+            // the sync scan reaches the end of the bytes received so far.
+            if (filled > MP3_SYNC_TAIL) {
+                memmove(buf, buf + filled - MP3_SYNC_TAIL, MP3_SYNC_TAIL);
+                filled = MP3_SYNC_TAIL;
+            }
+            need_more = 1;
+            continue;
+        }
         if (info.frame_bytes > 0) {
             size_t consume = (size_t)info.frame_bytes;
             if (consume >= filled) filled = 0;
@@ -187,7 +222,19 @@ int main(void) {
                 memmove(buf, buf + 1, filled - 1);
                 filled--;
             }
+            need_more = 1;
             continue;
+        }
+        if (skip_samples && info.layer == 3 && info.hz > 0) {
+            // Seeking begins before the target so the MP3 bit reservoir can
+            // fill. Even a preroll frame with no PCM advances the timeline.
+            const uint64_t frames = info.hz >= 32000 ? 1152 : 576;
+            const uint64_t discard = skip_samples < frames ? skip_samples : frames;
+            skip_samples -= discard;
+            if (discard >= (uint64_t)samples) continue;
+            samples -= (int)discard;
+            memmove(pcm, pcm + discard * (size_t)info.channels,
+                    (size_t)samples * (size_t)info.channels * sizeof(*pcm));
         }
         if (samples > 0) {
             int ch = (info.channels == 1) ? 1 : info.channels;
@@ -268,6 +315,7 @@ int main(void) {
                 }
                 cur_gain = target;
             }
+            wrote_pcm = 1;
             if (info.channels == 1) {
                 static int16_t stereo[MINIMP3_MAX_SAMPLES_PER_FRAME * 2];
                 for (int i = 0; i < samples; i++) {
@@ -283,6 +331,6 @@ int main(void) {
         }
     }
     unlink(AUDIO_ENV_FILE);
-    fflush(stdout);
-    return 0;
+    if (fflush(stdout) != 0) return 1;
+    return wrote_pcm ? 0 : 1;
 }

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::https::{WsFrame, WssClient};
 use crate::json::{obj, Json};
-use crate::ymusic::{load_auth, read_status, YMusicStatus, YMUSIC_CMD_SOCK};
+use crate::ymusic::{load_auth, position_at, read_status, YMusicStatus, YMUSIC_CMD_SOCK};
 
 const YNISON_REDIRECT_URL: &str =
     "wss://ynison.music.yandex.ru/redirector.YnisonRedirectService/GetRedirectToYnison";
@@ -18,6 +18,35 @@ const YNISON_DEVICE_ID_FILE: &str = "/var/lib/atrios/ynison_device_id";
 pub const YNISON_ENABLED_FILE: &str = "/var/lib/atrios/ynison_enabled";
 
 static PENDING_REMOTE_VOL: AtomicI32 = AtomicI32::new(-1);
+
+fn protocol_ms(value: &Json) -> Option<i64> {
+    value.as_i64().or_else(|| value.as_str()?.parse().ok())
+}
+
+fn current_queue_track(queue: &Json) -> Option<&str> {
+    let index = usize::try_from(protocol_ms(queue.get("current_playable_index")?)?).ok()?;
+    queue.get("playable_list")?.as_arr()?.get(index)?.get_str("playable_id")
+}
+
+fn remote_seek_target(
+    local: &YMusicStatus, remote_track: &str, progress_ms: i64, now: i64, first_update: bool,
+) -> Option<i64> {
+    if local.track_id.is_empty()
+        || local.track_id != remote_track
+        || local.duration_ms <= 0
+        || !matches!(local.state.as_str(), "playing" | "paused")
+        || progress_ms < 0
+    {
+        return None;
+    }
+    let local_progress = position_at(local, now);
+    // The first status can arrive as playback is handed to the speaker.
+    if first_update && local.position_ms == 0 && local_progress < 6000 && progress_ms <= 6000 {
+        return None;
+    }
+    let target = progress_ms.min(local.duration_ms.saturating_sub(1));
+    (target.abs_diff(local_progress) >= 1000).then_some(target)
+}
 
 pub fn is_ynison_enabled() -> bool {
     match fs::read_to_string(YNISON_ENABLED_FILE) {
@@ -446,11 +475,14 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
     let mut last_remote_vol_pct: i32 = crate::bt_control::get_current_volume();
     let mut last_ping = Instant::now();
     let mut last_status_push = Instant::now();
+    let mut last_progress_push = Instant::now();
+    let mut last_position_base = 0;
     let mut last_pushed_track = String::new();
     let mut last_pushed_paused = true;
     let mut expected_remote_track = String::new();
     let mut last_remote_sync_at: Option<Instant> = None;
     let mut last_remote_status_ts: i64 = 0;
+    let mut last_remote_progress: Option<(String, i64)> = None;
     let mut last_local_queue_push_ms: i64 = 0;
 
     while !stop_flag.load(Ordering::SeqCst) {
@@ -507,6 +539,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                 }
             }
             let local_queue_sig = st.queue_ids.join(",");
+            let position_changed = st.track_id == last_pushed_track && st.position_ms != last_position_base;
             if !paused && !st.track_id.is_empty() && st.mode != "ynison" {
                 let queue_changed = local_queue_sig != last_queue_sig
                     || st.track_id != last_pushed_track
@@ -523,15 +556,12 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                     last_queue_sig = local_queue_sig;
                     last_idx = st.queue_index as i64;
                     last_paused = Some(false);
-                    last_pushed_track = st.track_id;
+                    last_pushed_track = st.track_id.clone();
                     last_pushed_paused = false;
                     last_local_queue_push_ms = now_ms();
-                } else if last_status_push.elapsed() >= Duration::from_secs(2) {
-                    let pos = if st.started_ts > 0 {
-                        st.position_ms + (now_ms() - st.started_ts).max(0)
-                    } else {
-                        st.position_ms
-                    };
+                } else if position_changed || last_progress_push.elapsed() >= Duration::from_secs(2) {
+                    last_progress_push = Instant::now();
+                    let pos = position_at(&st, now_ms());
                     let _ = ws.send_text(&build_playing_status_msg(
                         device_id,
                         false,
@@ -542,11 +572,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
             } else if is_active {
                 let track_changed = !st.track_id.is_empty() && st.track_id != last_pushed_track;
                 let pause_changed = paused != last_pushed_paused;
-                let pos = if !paused && st.started_ts > 0 {
-                    st.position_ms + (now_ms() - st.started_ts).max(0)
-                } else {
-                    st.position_ms
-                };
+                let pos = position_at(&st, now_ms());
                 if track_changed {
                     // Speaker skipped Next/Prev (from our app or track auto-advance):
                     // push updated current_playable_index inside update_player_state so official YM moves to the new track!
@@ -579,11 +605,12 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                         ));
                         last_idx = st.queue_index as i64;
                     }
-                    last_pushed_track = st.track_id;
+                    last_pushed_track = st.track_id.clone();
                     last_pushed_paused = paused;
                     last_paused = Some(paused);
                     last_local_queue_push_ms = now_ms();
-                } else if pause_changed || (!paused && last_status_push.elapsed() >= Duration::from_secs(2)) {
+                } else if pause_changed || position_changed || (!paused && last_progress_push.elapsed() >= Duration::from_secs(2)) {
+                    last_progress_push = Instant::now();
                     let _ = ws.send_text(&build_playing_status_msg(
                         device_id,
                         paused,
@@ -594,6 +621,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                     last_paused = Some(paused);
                 }
             }
+            last_position_base = st.position_ms;
             last_status_push = Instant::now();
         }
 
@@ -651,6 +679,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
             send_ymusic_cmd("pause");
             is_active = false;
             last_paused = Some(true);
+            last_remote_progress = None;
             continue;
         }
         // Wake-on-Select: if user taps AtriStation inside official Yandex Music while in Standby,
@@ -689,8 +718,8 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
         if let Some(q) = queue {
             let q_ts = q
                 .get("version")
-                .and_then(|v| v.get_str("timestamp_ms"))
-                .and_then(|s| s.parse::<i64>().ok())
+                .and_then(|v| v.get("timestamp_ms"))
+                .and_then(protocol_ms)
                 .unwrap_or(0);
             // Ignore our own echoed queue OR any stale queue older than our last local push
             // (prevents Ynison from yanking My Wave back 1-2 tracks during batch replenishment!)
@@ -700,7 +729,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                 last_server_queue = Some(q.clone());
                 let cur_idx = q
                     .get("current_playable_index")
-                    .and_then(|v| v.as_i64())
+                    .and_then(protocol_ms)
                     .unwrap_or(-1);
                 let mut ids: Vec<String> = Vec::new();
                 if let Some(arr) = q.get("playable_list").and_then(|v| v.as_arr()) {
@@ -746,26 +775,28 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
         if status_author != device_id && !status_author.is_empty() {
             let status_ts = status
                 .and_then(|s| s.get("version"))
-                .and_then(|v| v.get_str("timestamp_ms"))
-                .and_then(|v| v.parse::<i64>().ok())
+                .and_then(|v| v.get("timestamp_ms"))
+                .and_then(protocol_ms)
                 .unwrap_or(0);
             if status_ts > last_remote_status_ts {
                 last_remote_status_ts = status_ts;
-                if let Some(rpos) = status
-                    .and_then(|s| s.get_str("progress_ms"))
-                    .and_then(|v| v.parse::<i64>().ok())
+                let track = queue.and_then(current_queue_track)
+                    .or_else(|| last_server_queue.as_ref().and_then(current_queue_track));
+                if let (Some(track), Some(progress)) =
+                    (track, status.and_then(|s| s.get("progress_ms")).and_then(protocol_ms))
                 {
-                    let cur_st = crate::ymusic::read_status();
-                    if !cur_st.track_id.is_empty()
-                        && cur_st.duration_ms > 0
-                        && (rpos - cur_st.position_ms).abs() > 3000
-                    {
-                        println!(
-                            "[ynison] Remote seek -> {rpos} ms (local was {} ms)",
-                            cur_st.position_ms
-                        );
-                        send_ymusic_cmd(&format!("seek:{rpos}"));
-                        last_status_push = Instant::now();
+                    let previous = last_remote_progress.replace((track.to_string(), progress));
+                    let same_track = previous.as_ref().filter(|(id, _)| id == track);
+                    // A repeated progress anchor can arrive with a newer
+                    // volume or pause update. It is not a new seek.
+                    if !same_track.is_some_and(|(_, pos)| *pos == progress) {
+                        let local = read_status();
+                        let now = now_ms();
+                        if let Some(target) = remote_seek_target(&local, track, progress, now, same_track.is_none()) {
+                            println!("[ynison] Remote seek -> {target} ms (local was {} ms)", position_at(&local, now));
+                            send_ymusic_cmd(&format!("seek_remote:{track}:{target}"));
+                            last_status_push = Instant::now();
+                        }
                     }
                 }
             }
@@ -816,4 +847,30 @@ pub fn spawn_ynison_thread(stop_flag: &'static AtomicBool) {
             }
         }
     });
+}
+
+#[cfg(test)]
+#[test]
+fn remote_seek_respects_track_and_elapsed_position() {
+    let now: i64 = 1_800_000_010_000;
+    let mut local = YMusicStatus::default_idle();
+    local.track_id = "402".into();
+    local.duration_ms = 185_000;
+    local.state = "loading".into();
+    assert_eq!(remote_seek_target(&local, "402", 4911, now, true), None);
+
+    local.state = "playing".into();
+    local.started_ts = now - 200;
+    assert_eq!(remote_seek_target(&local, "402", 4911, now, true), None);
+    local.started_ts = now - 2200;
+    assert_eq!(remote_seek_target(&local, "402", 4911, now, true), None);
+    assert_eq!(remote_seek_target(&local, "402", 4911, now, false), Some(4911));
+    local.started_ts = now - 4800;
+    assert_eq!(remote_seek_target(&local, "402", 4911, now, false), None);
+    assert_eq!(remote_seek_target(&local, "403", 45_000, now, false), None);
+    assert_eq!(remote_seek_target(&local, "402", 45_000, now, false), Some(45_000));
+    assert_eq!(remote_seek_target(&local, "402", 0, now, false), Some(0));
+
+    let queue = Json::parse(r#"{"current_playable_index":"0","playable_list":[{"playable_id":"402"}]}"#).unwrap();
+    assert_eq!(current_queue_track(&queue), Some("402"));
 }

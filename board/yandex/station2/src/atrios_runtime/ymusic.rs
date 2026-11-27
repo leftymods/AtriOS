@@ -1,7 +1,8 @@
 use std::fs;
+use std::io::{Read, Write};
 use std::os::unix::net::UnixDatagram;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -22,7 +23,6 @@ use crate::sys::{atomic_write_bytes, kill, now_unix_i64, signal, SIGINT, SIGTERM
 
 const SIGSTOP_NUM: i32 = 19;
 const SIGCONT_NUM: i32 = 18;
-const SIGKILL_NUM: i32 = 9;
 
 pub const YMUSIC_CONFIG_FILE: &str = "/var/lib/atrios/ymusic.json";
 pub const YMUSIC_STATUS_FILE: &str = "/var/run/atrios/ymusic_status.json";
@@ -507,13 +507,19 @@ pub fn read_status() -> YMusicStatus {
 
 pub fn read_status_json() -> Json {
     let mut st = read_status();
-    if st.state == "playing" && st.duration_ms > 0 && st.started_ts > 0 {
-        let now_ms = now_unix_ms();
-        let start_ms = if st.started_ts > 10_000_000_000 { st.started_ts } else { st.started_ts * 1000 };
-        let elapsed = (now_ms - start_ms).max(0);
-        st.position_ms = (st.position_ms + elapsed).clamp(0, st.duration_ms);
-    }
+    st.position_ms = position_at(&st, now_unix_ms());
     st.to_json()
+}
+
+pub(crate) fn position_at(st: &YMusicStatus, now_ms: i64) -> i64 {
+    let elapsed = if st.state == "playing" && st.started_ts > 0 {
+        let start_ms = if st.started_ts > 10_000_000_000 { st.started_ts } else { st.started_ts * 1000 };
+        now_ms.saturating_sub(start_ms).max(0)
+    } else {
+        0
+    };
+    let pos = st.position_ms.saturating_add(elapsed).max(0);
+    if st.duration_ms > 0 { pos.min(st.duration_ms) } else { pos }
 }
 
 fn write_status(st: &mut YMusicStatus) {
@@ -1522,35 +1528,37 @@ fn resolve_track_stream_url(auth: &YMusicAuth, track_id: &str) -> Result<String,
         .and_then(|r| r.as_arr())
         .ok_or("Track has no download-info")?;
 
-    // Prefer 192 kbps MP3 for fastest playback startup on speaker, fallback to any MP3 / codec
-    let mut best: Option<(&Json, i32)> = None;
-    for info in infos {
-        let codec = info.get_str("codec").unwrap_or("");
-        let is_mp3 = codec.eq_ignore_ascii_case("mp3");
+    let mut choices = infos.iter().filter_map(|info| {
+        let codec = info.get_str("codec")?;
+        let url = info.get_str("downloadInfoUrl").filter(|u| !u.is_empty())?;
         let bitrate = info.get("bitrateInKbps").and_then(|v| v.as_i64()).unwrap_or(0);
-        let score = if is_mp3 {
-            match bitrate {
-                192 => 100,
-                128 => 90,
-                320 => 80,
-                b if b > 0 => 70,
-                _ => 60,
-            }
+        let rating = if codec.eq_ignore_ascii_case("mp3") {
+            match bitrate { 192 => 100, 128 => 90, 320 => 80, _ => 70 }
         } else {
-            10
+            0
         };
-        if best.map(|(_, ps)| score > ps).unwrap_or(true) {
-            best = Some((info, score));
-        }
-    }
-    let chosen = best.ok_or("No playable audio stream for track")?.0;
-    let dl_url = chosen.get_str("downloadInfoUrl").ok_or("Missing downloadInfoUrl")?;
-    let codec = chosen.get_str("codec").unwrap_or("mp3");
+        Some((rating, codec, url))
+    }).collect::<Vec<_>>();
+    choices.sort_by_key(|(rating, _, _)| std::cmp::Reverse(*rating));
+
     let auth_hdr = format!("OAuth {}", auth.token);
     let hdrs = [("Authorization", auth_hdr.as_str()), CLIENT_HEADER, LANG_HEADER];
-    let raw = request_bytes(dl_url, None, &hdrs, None, 15, 256 * 1024, None)?;
-    let (host, path, ts, s) = parse_download_info_payload(&raw)?;
-    Ok(build_stream_url(&host, codec, &path, &ts, &s))
+    let mut last_error = String::from("No playable audio stream for track");
+    let mut allow_other_codec = None;
+    for (rating, codec, url) in choices {
+        if rating == 0 && !*allow_other_codec.get_or_insert_with(|| {
+            bin_exists("ffmpeg") || bin_exists("gst-launch-1.0")
+        }) {
+            continue;
+        }
+        match request_bytes(url, None, &hdrs, None, 8, 256 * 1024, None)
+            .and_then(|raw| parse_download_info_payload(&raw))
+        {
+            Ok((host, path, ts, salt)) => return Ok(build_stream_url(&host, codec, &path, &ts, &salt)),
+            Err(error) => last_error = error,
+        }
+    }
+    Err(last_error)
 }
 
 
@@ -1645,8 +1653,12 @@ fn mp3_cache_get(track_id: &str) -> Option<Vec<u8>> {
     g.iter().find(|(id, _)| id == track_id).map(|(_, b)| b.clone())
 }
 
-fn mp3_cache_put(track_id: String, data: Vec<u8>) {
-    if track_id.is_empty() || data.len() < 16384 || data.len() > 18 * 1024 * 1024 { return; }
+const MP3_CACHE_LIMIT: usize = 18 * 1024 * 1024;
+
+fn mp3_cache_put(track_id: String, data: Vec<u8>) -> bool {
+    if track_id.is_empty() || data.len() > MP3_CACHE_LIMIT || first_mp3_frame(&data).is_none() {
+        return false;
+    }
     let c = MP3_RAM_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::VecDeque::new()));
     if let Ok(mut g) = c.lock() {
         g.retain(|(id, _)| id != &track_id);
@@ -1654,7 +1666,9 @@ fn mp3_cache_put(track_id: String, data: Vec<u8>) {
             g.pop_front();
         }
         g.push_back((track_id, data));
+        return true;
     }
+    false
 }
 
 struct ActivePipeline {
@@ -1662,9 +1676,18 @@ struct ActivePipeline {
     sink: Option<Child>,
     paused: bool,
     started_at: std::time::Instant,
+    ready: Option<Arc<AtomicBool>>,
+    cancel: Option<Arc<AtomicBool>>,
 }
 
-fn mp3_frame_len(hdr: &[u8]) -> Option<usize> {
+#[derive(Clone, Copy)]
+struct Mp3Frame {
+    len: usize,
+    rate: u64,
+    samples: u64,
+}
+
+fn mp3_frame(hdr: &[u8]) -> Option<Mp3Frame> {
     if hdr.len() < 4 || hdr[0] != 0xFF || (hdr[1] & 0xE0) != 0xE0 {
         return None;
     }
@@ -1690,25 +1713,67 @@ fn mp3_frame_len(hdr: &[u8]) -> Option<usize> {
     };
     let coeff = if ver_id == 3 { 144 } else { 72 };
     let flen = coeff * bitrate / sr + pad;
-    if flen < 24 || flen > 2880 { None } else { Some(flen) }
+    (24..=2880).contains(&flen).then_some(Mp3Frame {
+        len: flen,
+        rate: sr as u64,
+        samples: if ver_id == 3 { 1152 } else { 576 },
+    })
 }
 
-fn find_mp3_frame_sync(bytes: &[u8], start: usize) -> usize {
-    if start == 0 || bytes.len() < 8 {
-        return 0;
-    }
-    let lim = bytes.len().saturating_sub(4);
-    let mut i = start.min(lim);
-    while i < lim {
-        if let Some(flen) = mp3_frame_len(&bytes[i..]) {
-            let next = i + flen;
-            if next + 4 <= bytes.len() && mp3_frame_len(&bytes[next..]).is_some() {
-                return i;
-            }
+fn first_mp3_frame(bytes: &[u8]) -> Option<(usize, Mp3Frame)> {
+    let start = id3v2_header_len(bytes);
+    // Valid files normally sync at the tag boundary. Bound the fallback scan
+    // for broken downloads and responses in a different codec.
+    for i in start..bytes.len().saturating_sub(4).min(start.saturating_add(64 * 1024)) {
+        let Some(frame) = mp3_frame(&bytes[i..]) else { continue };
+        let Some(next) = bytes.get(i + frame.len..).and_then(mp3_frame) else { continue };
+        if next.rate == frame.rate && next.samples == frame.samples {
+            return Some((i, frame));
         }
-        i += 1;
     }
-    0
+    None
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct Mp3SeekPoint {
+    byte_offset: usize,
+    skip_samples: u64,
+    position_ms: i64,
+}
+
+fn mp3_seek_point(bytes: &[u8], target_ms: i64) -> Option<Mp3SeekPoint> {
+    const PREROLL_FRAMES: usize = 12;
+    let (mut offset, first) = first_mp3_frame(bytes)?;
+    let target_samples = (target_ms.max(0) as u64).saturating_mul(first.rate) / 1000;
+    let mut last_offsets = [(0, 0); PREROLL_FRAMES];
+    let (mut index, mut elapsed) = (0usize, 0u64);
+    while let Some(frame) = mp3_frame(&bytes[offset..]) {
+        if frame.rate != first.rate || frame.samples != first.samples || frame.len > bytes.len() - offset {
+            break;
+        }
+        let next = offset + frame.len;
+        let has_next = mp3_frame(&bytes[next..]).is_some_and(|h| {
+            h.rate == first.rate && h.samples == first.samples && h.len <= bytes.len() - next
+        });
+        if target_samples < elapsed + frame.samples || !has_next {
+            let (byte_offset, preroll_samples) = if index == 0 {
+                (offset, 0)
+            } else {
+                last_offsets[index.saturating_sub(PREROLL_FRAMES) % PREROLL_FRAMES]
+            };
+            let requested = target_samples.min(elapsed + frame.samples - 1);
+            return Some(Mp3SeekPoint {
+                byte_offset,
+                skip_samples: requested - preroll_samples,
+                position_ms: (requested * 1000 / first.rate) as i64,
+            });
+        }
+        last_offsets[index % PREROLL_FRAMES] = (offset, elapsed);
+        index += 1;
+        offset = next;
+        elapsed += frame.samples;
+    }
+    None
 }
 
 fn id3v2_header_len(bytes: &[u8]) -> usize {
@@ -1717,45 +1782,77 @@ fn id3v2_header_len(bytes: &[u8]) -> usize {
             | (((bytes[7] & 0x7F) as usize) << 14)
             | (((bytes[8] & 0x7F) as usize) << 7)
             | ((bytes[9] & 0x7F) as usize);
-        (10 + sz).min(bytes.len())
+        let footer = if bytes[3] == 4 && bytes[5] & 0x10 != 0 { 10 } else { 0 };
+        (10 + sz + footer).min(bytes.len())
     } else {
         0
     }
 }
 
 impl ActivePipeline {
-    fn spawn_from_ram(bytes: Vec<u8>) -> Result<Self, String> {
-        Self::spawn_from_ram_offset(bytes, 0)
-    }
-
-    fn spawn_from_ram_offset(bytes: Vec<u8>, byte_off: usize) -> Result<Self, String> {
-        let sync_off = if byte_off == 0 { 0 } else { find_mp3_frame_sync(&bytes, byte_off) };
-        let _ = Command::new("pkill").args(["-9", "-x", "atri-mp3dec"]).stdout(Stdio::null()).stderr(Stdio::null()).status();
-        let _ = Command::new("pkill").args(["-9", "-x", "aplay"]).stdout(Stdio::null()).stderr(Stdio::null()).status();
-        thread::sleep(Duration::from_millis(20));
-        let mut dec = Command::new("atri-mp3dec")
+    fn spawn_native(skip_samples: u64) -> Result<(Self, ChildStdin), String> {
+        let mut dec_cmd = Command::new("atri-mp3dec");
+        if skip_samples > 0 {
+            dec_cmd.args(["--skip-samples", &skip_samples.to_string()]);
+        }
+        let mut decoder = dec_cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
             .map_err(|e| format!("atri-mp3dec spawn failed: {e}"))?;
-        let dec_in = dec.stdin.take().ok_or("Missing atri-mp3dec stdin")?;
-        let dec_out = dec.stdout.take().ok_or("Missing atri-mp3dec stdout")?;
-        let sink = Command::new("aplay")
+        let dec_in = decoder.stdin.take().ok_or("Missing atri-mp3dec stdin")?;
+        let mut dec_out = decoder.stdout.take().ok_or("Missing atri-mp3dec stdout")?;
+        let mut sink = Command::new("aplay")
             .args(["-q", "-B", "100000", "-F", "25000", "-t", "raw", "-f", "S16_LE", "-r", "44100", "-c", "2"])
-            .stdin(Stdio::from(dec_out))
+            .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|e| { let _ = dec.kill(); format!("aplay spawn failed: {e}") })?;
+            .map_err(|e| {
+                let _ = decoder.kill();
+                let _ = decoder.wait();
+                format!("aplay spawn failed: {e}")
+            })?;
+        let mut sink_in = sink.stdin.take().ok_or("Missing aplay stdin")?;
+        let ready = Arc::new(AtomicBool::new(false));
+        let started_at = std::time::Instant::now();
+        let signal = ready.clone();
         thread::spawn(move || {
-            use std::io::Write;
-            let mut w = dec_in;
-            if sync_off < bytes.len() {
-                let _ = w.write_all(&bytes[sync_off..]);
+            let mut pcm = [0u8; 8192];
+            loop {
+                let count = match dec_out.read(&mut pcm) {
+                    Ok(0) => break,
+                    Ok(count) => count,
+                    Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => break,
+                };
+                if sink_in.write_all(&pcm[..count]).is_err() {
+                    break;
+                }
+                if !signal.swap(true, Ordering::Release) {
+                    println!("[ymusic] PCM ready after {} ms", started_at.elapsed().as_millis());
+                }
             }
         });
-        Ok(Self { decoder: dec, sink: Some(sink), paused: false, started_at: std::time::Instant::now() })
+        Ok((Self {
+            decoder, sink: Some(sink), paused: false, started_at,
+            ready: Some(ready),
+            cancel: Some(Arc::new(AtomicBool::new(false))),
+        }, dec_in))
+    }
+
+    fn spawn_from_ram(bytes: Vec<u8>) -> Result<Self, String> {
+        let point = mp3_seek_point(&bytes, 0).ok_or("Cached audio is not a valid MP3")?;
+        Self::spawn_from_ram_at(bytes, point)
+    }
+
+    fn spawn_from_ram_at(bytes: Vec<u8>, point: Mp3SeekPoint) -> Result<Self, String> {
+        let (pipe, mut dec_in) = Self::spawn_native(point.skip_samples)?;
+        thread::spawn(move || {
+            let _ = dec_in.write_all(&bytes[point.byte_offset..]);
+        });
+        Ok(pipe)
     }
 
     fn spawn_with_cache(track_id: &str, url: &str) -> Result<Self, String> {
@@ -1766,18 +1863,6 @@ impl ActivePipeline {
     }
 
     fn spawn_inner(track_id: &str, url: &str) -> Result<Self, String> {
-        // Ensure zero overlapping decoders/sinks from any previous track or TTS
-        let _ = Command::new("pkill")
-            .args(["-9", "-x", "atri-mp3dec"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        let _ = Command::new("pkill")
-            .args(["-9", "-x", "aplay"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        thread::sleep(Duration::from_millis(20));
         if bin_exists("ffmpeg") {
             let mut dec = Command::new("ffmpeg")
                 .args([
@@ -1816,7 +1901,7 @@ impl ActivePipeline {
                     let _ = dec.wait();
                     format!("aplay spawn failed: {e}")
                 })?;
-            return Ok(Self { decoder: dec, sink: Some(sink), paused: false, started_at: std::time::Instant::now() });
+            return Ok(Self { decoder: dec, sink: Some(sink), paused: false, started_at: std::time::Instant::now(), ready: None, cancel: None });
         }
         if bin_exists("mpg123") {
             let mut dec = Command::new("mpg123")
@@ -1837,7 +1922,7 @@ impl ActivePipeline {
                     let _ = dec.wait();
                     format!("aplay spawn failed: {e}")
                 })?;
-            return Ok(Self { decoder: dec, sink: Some(sink), paused: false, started_at: std::time::Instant::now() });
+            return Ok(Self { decoder: dec, sink: Some(sink), paused: false, started_at: std::time::Instant::now(), ready: None, cancel: None });
         }
         if bin_exists("gst-launch-1.0") {
             let dec = Command::new("gst-launch-1.0")
@@ -1846,7 +1931,7 @@ impl ActivePipeline {
                 .stderr(Stdio::null())
                 .spawn()
                 .map_err(|e| format!("gst-launch-1.0 spawn failed: {e}"))?;
-            return Ok(Self { decoder: dec, sink: None, paused: false, started_at: std::time::Instant::now() });
+            return Ok(Self { decoder: dec, sink: None, paused: false, started_at: std::time::Instant::now(), ready: None, cancel: None });
         }
         if bin_exists("madplay") && bin_exists("curl") {
             let dec = Command::new("sh")
@@ -1860,106 +1945,83 @@ impl ActivePipeline {
                 .stderr(Stdio::null())
                 .spawn()
                 .map_err(|e| format!("madplay pipeline failed: {e}"))?;
-            return Ok(Self { decoder: dec, sink: None, paused: false, started_at: std::time::Instant::now() });
+            return Ok(Self { decoder: dec, sink: None, paused: false, started_at: std::time::Instant::now(), ready: None, cancel: None });
         }
         if bin_exists("atri-mp3dec") {
-            let mut dec = Command::new("atri-mp3dec")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .spawn()
-                .map_err(|e| format!("atri-mp3dec spawn failed: {e}"))?;
-            let dec_in = dec.stdin.take().ok_or("Missing atri-mp3dec stdin")?;
-            let dec_out = dec.stdout.take().ok_or("Missing atri-mp3dec stdout")?;
-            let sink = Command::new("aplay")
-                .args(["-q", "-B", "100000", "-F", "25000", "-t", "raw", "-f", "S16_LE", "-r", "44100", "-c", "2"])
-                .stdin(Stdio::from(dec_out))
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn()
-                .map_err(|e| {
-                    let _ = dec.kill();
-                    format!("aplay spawn failed: {e}")
-                })?;
+            let (pipe, mut dec_in) = Self::spawn_native(0)?;
+            let cancel = pipe.cancel.as_ref().expect("native pipeline cancellation").clone();
             let stream_url = url.to_string();
             let cache_tid = track_id.to_string();
-            // Full-speed RAM-buffered feeder + 4-track LRU cache (instant prev switch + zero 1/4 CDN drop!)
-            let shared = std::sync::Arc::new((
+            let shared = Arc::new((
                 std::sync::Mutex::new((std::collections::VecDeque::<Vec<u8>>::new(), false)),
                 std::sync::Condvar::new(),
             ));
             let prod_s = shared.clone();
+            let producer_cancel = cancel.clone();
             thread::spawn(move || {
-                let mut full_buf: Vec<u8> = Vec::with_capacity(4 * 1024 * 1024);
-                let mut ok = false;
                 for attempt in 0..2 {
-                    full_buf.clear();
-                    let res = crate::https::request_stream(
-                        &stream_url,
-                        None,
-                        &[],
-                        None,
-                        45,
-                        64 * 1024 * 1024,
-                        None,
+                    let mut received = 0;
+                    let mut cache = Some(Vec::new());
+                    let cancelled = || producer_cancel.load(Ordering::Relaxed);
+                    let result = crate::https::request_stream(
+                        &stream_url, None, &[], None, 45, 64 * 1024 * 1024, Some(&cancelled),
                         |chunk| {
-                            if full_buf.len() + chunk.len() <= 18 * 1024 * 1024 {
-                                full_buf.extend_from_slice(chunk);
+                            if cancelled() {
+                                return Err("Playback cancelled".into());
                             }
-                            let (lk, cv) = &*prod_s;
-                            let mut g = lk.lock().unwrap();
-                            g.0.push_back(chunk.to_vec());
+                            received += chunk.len();
+                            if received <= MP3_CACHE_LIMIT {
+                                if let Some(buf) = &mut cache {
+                                    buf.extend_from_slice(chunk);
+                                }
+                            } else {
+                                cache = None;
+                            }
+                            let (lock, cv) = &*prod_s;
+                            lock.lock().unwrap().0.push_back(chunk.to_vec());
                             cv.notify_one();
                             Ok(())
                         },
                     );
-                    if res.is_ok() && !full_buf.is_empty() {
-                        ok = true;
+                    if result.is_ok() && received != 0 {
+                        if let Some(buf) = cache {
+                            mp3_cache_put(cache_tid, buf);
+                        }
                         break;
                     }
-                    if !full_buf.is_empty() || attempt == 1 {
+                    if cancelled() || received != 0 || attempt == 1 {
                         break;
                     }
                     thread::sleep(Duration::from_millis(150));
                 }
-                if ok && !cache_tid.is_empty() && !full_buf.is_empty() {
-                    mp3_cache_put(cache_tid, full_buf);
-                }
-                let (lk, cv) = &*prod_s;
-                let mut g = lk.lock().unwrap();
-                g.1 = true;
+                let (lock, cv) = &*prod_s;
+                lock.lock().unwrap().1 = true;
                 cv.notify_one();
             });
             thread::spawn(move || {
-                use std::io::Write;
-                let mut w = dec_in;
-                let (lk, cv) = &*shared;
+                let (lock, cv) = &*shared;
                 loop {
-                    let next_chunk = {
-                        let mut g = lk.lock().unwrap();
-                        while g.0.is_empty() && !g.1 {
-                            g = cv.wait(g).unwrap();
+                    let next = {
+                        let mut queue = lock.lock().unwrap();
+                        while queue.0.is_empty() && !queue.1 {
+                            queue = cv.wait(queue).unwrap();
                         }
-                        g.0.pop_front()
+                        queue.0.pop_front()
                     };
-                    match next_chunk {
-                        Some(buf) => {
-                            if w.write_all(&buf).is_err() {
-                                break;
-                            }
-                        }
-                        None => break,
+                    let Some(bytes) = next else { break };
+                    if dec_in.write_all(&bytes).is_err() {
+                        cancel.store(true, Ordering::Relaxed);
+                        break;
                     }
                 }
             });
-            return Ok(Self {
-                decoder: dec,
-                sink: Some(sink),
-                paused: false,
-                started_at: std::time::Instant::now(),
-            });
+            return Ok(pipe);
         }
         Err("No audio stream decoder found (install ffmpeg, mpg123, madplay, or atri-mp3dec)".into())
+    }
+
+    fn has_audio(&self) -> bool {
+        self.ready.as_ref().is_none_or(|ready| ready.load(Ordering::Acquire))
     }
 
     fn set_paused(&mut self, pause: bool) {
@@ -1990,6 +2052,9 @@ impl ActivePipeline {
     }
 
     fn stop(mut self) {
+        if let Some(cancel) = &self.cancel {
+            cancel.store(true, Ordering::Relaxed);
+        }
         if self.paused {
             self.set_paused(false);
         }
@@ -1999,27 +2064,18 @@ impl ActivePipeline {
                 kill(s.id() as i32, 15);
             }
             let deadline = std::time::Instant::now() + Duration::from_millis(80);
-            while std::time::Instant::now() < deadline {
-                if matches!(s.try_wait(), Ok(Some(_))) {
-                    break;
-                }
+            while matches!(s.try_wait(), Ok(None)) && std::time::Instant::now() < deadline {
                 thread::sleep(Duration::from_millis(10));
             }
-            unsafe {
-                kill(s.id() as i32, SIGKILL_NUM);
+            if matches!(s.try_wait(), Ok(None)) {
+                let _ = s.kill();
             }
             let _ = s.wait();
         }
-        unsafe {
-            kill(self.decoder.id() as i32, SIGKILL_NUM);
+        if matches!(self.decoder.try_wait(), Ok(None)) {
+            let _ = self.decoder.kill();
         }
         let _ = self.decoder.wait();
-        let _ = Command::new("pkill")
-            .args(["-9", "-x", "atri-mp3dec"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        thread::sleep(Duration::from_millis(25));
     }
 }
 
@@ -2050,8 +2106,14 @@ enum DaemonEvent {
     SeekCacheReady {
         gen: u64,
         track_id: String,
-        target_ms: i64,
+        result: Result<(), String>,
     },
+}
+
+struct PendingSeek {
+    gen: u64,
+    track_id: String,
+    target_ms: i64,
 }
 
 struct PlayerState {
@@ -2066,6 +2128,7 @@ struct PlayerState {
     pipeline: Option<ActivePipeline>,
     prefetch: Arc<std::sync::Mutex<Option<(String, String)>>>,
     pending_play_at: Option<std::time::Instant>,
+    pending_seek: Option<PendingSeek>,
     last_skip_at: Option<std::time::Instant>,
     repeat_one: bool,
     load_gen: Arc<AtomicU64>,
@@ -2087,6 +2150,7 @@ impl PlayerState {
             pipeline: None,
             prefetch: Arc::new(std::sync::Mutex::new(None)),
             pending_play_at: None,
+            pending_seek: None,
             last_skip_at: None,
             repeat_one: false,
             load_gen: Arc::new(AtomicU64::new(1)),
@@ -2158,7 +2222,8 @@ impl PlayerState {
         });
     }
 
-    fn bump_gen(&self) -> u64 {
+    fn bump_gen(&mut self) -> u64 {
+        self.pending_seek = None;
         self.load_gen.fetch_add(1, Ordering::SeqCst) + 1
     }
 
@@ -2237,10 +2302,11 @@ impl PlayerState {
     fn finish_starting_pipeline(&mut self, track: &TrackInfo, auth: &YMusicAuth, pipe_res: Result<ActivePipeline, String>) {
         match pipe_res {
             Ok(pipe) => {
+                let has_audio = pipe.has_audio();
                 self.pipeline = Some(pipe);
-                self.status.state = "playing".into();
+                self.status.state = if has_audio { "playing" } else { "loading" }.into();
                 self.status.position_ms = 0;
-                self.status.started_ts = now_unix_ms();
+                self.status.started_ts = if has_audio { now_unix_ms() } else { 0 };
                 self.status.error = None;
                 write_status(&mut self.status);
                 println!("[ymusic] Playing: {} — {}", track.artist, track.title);
@@ -2517,12 +2583,19 @@ impl PlayerState {
                 let pipe_res = res.and_then(|url| ActivePipeline::spawn_with_cache(&track.id, &url));
                 self.finish_starting_pipeline(&track, &auth, pipe_res);
             }
-            DaemonEvent::SeekCacheReady { gen, track_id, target_ms } => {
-                if gen != self.load_gen.load(Ordering::SeqCst) {
+            DaemonEvent::SeekCacheReady { gen, track_id, result } => {
+                let current = self.queue.get(self.index).is_some_and(|t| t.id == track_id);
+                if !current || !self.pending_seek.as_ref()
+                    .is_some_and(|p| p.gen == gen && p.track_id == track_id)
+                {
                     return;
                 }
-                if self.queue.get(self.index).map(|t| t.id == track_id).unwrap_or(false) {
-                    self.seek_to_cached(target_ms);
+                let target = self.pending_seek.take().unwrap().target_ms;
+                let applied = result.and_then(|()| self.seek_to_cached(target)).and_then(|ready| {
+                    if ready { Ok(()) } else { Err("Track was evicted before seeking".into()) }
+                });
+                if let Err(error) = applied {
+                    self.report_seek_error(error);
                 }
             }
             DaemonEvent::LikedChecked { track_id, liked } => {
@@ -2702,96 +2775,93 @@ impl PlayerState {
         }
     }
 
-    fn seek_to_cached(&mut self, target_ms: i64) -> bool {
-        let Some(cur) = self.queue.get(self.index).cloned() else {
-            return false;
-        };
-        if cur.duration_ms <= 0 {
-            return false;
+    fn report_seek_error(&mut self, error: String) {
+        eprintln!("[ymusic] {error}");
+        if self.pipeline.is_none() && self.status.state != "paused" {
+            self.status.state = "error".into();
+            self.status.started_ts = 0;
         }
-        let Some(bytes) = mp3_cache_get(&cur.id) else {
-            return false;
+        self.status.error = Some(error);
+        write_status(&mut self.status);
+    }
+
+    fn seek_to_cached(&mut self, target_ms: i64) -> Result<bool, String> {
+        let Some(track) = self.queue.get(self.index) else {
+            return Ok(false);
         };
-        let target = target_ms.clamp(0, cur.duration_ms);
-        let frac = (target as f64 / cur.duration_ms as f64).clamp(0.0, 0.99);
-        let id3_skip = id3v2_header_len(&bytes);
-        let audio_len = bytes.len().saturating_sub(id3_skip);
-        let byte_off = if target <= 1500 {
-            0
-        } else {
-            id3_skip + ((audio_len as f64) * frac) as usize
+        let Some(bytes) = mp3_cache_get(&track.id) else {
+            return Ok(false);
         };
-        let was_paused = self
-            .pipeline
-            .as_ref()
-            .map(|p| p.paused)
-            .unwrap_or(self.status.state == "paused");
-        if let Some(p) = self.pipeline.take() {
-            p.stop();
+        let point = mp3_seek_point(&bytes, target_ms).ok_or("No valid MP3 frame for seek")?;
+        let position = point.position_ms;
+        let paused = self.pipeline.as_ref().map_or(self.status.state == "paused", |p| p.paused);
+        self.bump_gen();
+        self.pending_play_at = None;
+        if let Some(pipe) = self.pipeline.take() {
+            pipe.stop();
         }
-        let total_bytes = bytes.len();
-        println!("[ymusic] Seek {} -> {} ms (off={}/{})", cur.id, target, byte_off, total_bytes);
-        if let Ok(mut pipe) = ActivePipeline::spawn_from_ram_offset(bytes, byte_off) {
-            if was_paused {
-                pipe.set_paused(true);
-            }
-            self.pipeline = Some(pipe);
-            self.status.position_ms = target;
-            self.status.started_ts = if was_paused { 0 } else { now_unix_ms() };
-            self.status.state = if was_paused { "paused".into() } else { "playing".into() };
-            write_status(&mut self.status);
-            true
-        } else {
-            false
+        let mut pipe = ActivePipeline::spawn_from_ram_at(bytes, point)?;
+        if paused {
+            pipe.set_paused(true);
         }
+        self.pipeline = Some(pipe);
+        self.status.position_ms = position;
+        self.status.started_ts = 0;
+        self.status.state = if paused { "paused" } else { "loading" }.into();
+        self.status.error = None;
+        write_status(&mut self.status);
+        println!("[ymusic] Applied seek to {position} ms");
+        Ok(true)
     }
 
     fn seek_to(&mut self, target_ms: i64) {
-        let Some(cur) = self.queue.get(self.index).cloned() else {
-            return;
-        };
-        if cur.duration_ms <= 0 {
-            return;
-        }
-        let target = target_ms.clamp(0, cur.duration_ms);
-        if self.seek_to_cached(target) {
+        let Some(track) = self.queue.get(self.index) else { return };
+        if track.duration_ms <= 0
+            || track.id != self.status.track_id
+            || !matches!(self.status.state.as_str(), "playing" | "paused" | "loading")
+        {
             return;
         }
-        // Not in RAM cache yet (still streaming): fetch into cache on background thread and seek when ready
-        self.status.position_ms = target;
-        if self.status.state == "playing" {
-            self.status.started_ts = now_unix_ms();
-        }
-        write_status(&mut self.status);
-        let Some(auth) = load_auth() else {
-            return;
-        };
-        let tx = self.tx.clone();
-        let gen = self.load_gen.load(Ordering::SeqCst);
-        let tid = cur.id.clone();
-        thread::spawn(move || {
-            // Brief wait in case active stream finishes populating mp3_cache
-            for _ in 0..10 {
-                if mp3_cache_get(&tid).is_some() {
-                    let _ = tx.send(DaemonEvent::SeekCacheReady { gen, track_id: tid, target_ms: target });
-                    return;
-                }
-                thread::sleep(Duration::from_millis(120));
+        let target = target_ms.clamp(0, track.duration_ms.saturating_sub(1));
+        let track_id = track.id.clone();
+        match self.seek_to_cached(target) {
+            Ok(true) => return,
+            Err(error) => {
+                self.report_seek_error(error);
+                return;
             }
-            if let Ok(url) = resolve_track_stream_url(&auth, &tid) {
-                let mut buf = Vec::with_capacity(4 * 1024 * 1024);
-                let ok = crate::https::request_stream(&url, None, &[], None, 60, 18 * 1024 * 1024, None, |chunk| {
-                    buf.extend_from_slice(chunk);
-                    if buf.len() >= 18 * 1024 * 1024 {
-                        return Err("track too large".into());
-                    }
-                    Ok(())
-                })
-                .is_ok();
-                if ok && buf.len() >= 16384 {
-                    mp3_cache_put(tid.clone(), buf);
-                    let _ = tx.send(DaemonEvent::SeekCacheReady { gen, track_id: tid, target_ms: target });
+            Ok(false) => {}
+        }
+        let gen = self.load_gen.load(Ordering::SeqCst);
+        if let Some(pending) = self.pending_seek.as_mut() {
+            if pending.gen == gen && pending.track_id == track_id {
+                pending.target_ms = target;
+                return;
+            }
+        }
+        let Some(auth) = load_auth() else { return };
+        self.pending_seek = Some(PendingSeek { gen, track_id: track_id.clone(), target_ms: target });
+        let tx = self.tx.clone();
+        let load_gen = self.load_gen.clone();
+        thread::spawn(move || {
+            let cancelled = || load_gen.load(Ordering::SeqCst) != gen;
+            let result = (|| -> Result<(), String> {
+                // Let an in-flight playback download fill the cache first.
+                for _ in 0..5 {
+                    if cancelled() { return Err("Seek cancelled".into()); }
+                    if mp3_cache_get(&track_id).is_some() { return Ok(()); }
+                    thread::sleep(Duration::from_millis(100));
                 }
+                let url = resolve_track_stream_url(&auth, &track_id)?;
+                let bytes = request_bytes(&url, None, &[], None, 30, MP3_CACHE_LIMIT, Some(&cancelled))?;
+                if mp3_cache_put(track_id.clone(), bytes) {
+                    Ok(())
+                } else {
+                    Err("Seek requires a complete MP3 stream that fits in the cache".into())
+                }
+            })();
+            if !cancelled() {
+                let _ = tx.send(DaemonEvent::SeekCacheReady { gen, track_id, result });
             }
         });
     }
@@ -2816,7 +2886,7 @@ impl PlayerState {
             self.load_mode("search", Some(q));
         } else if cmd == "pause" {
             self.pending_play_at = None;
-            if self.status.state == "loading" {
+            if self.status.state == "loading" && self.pipeline.is_none() {
                 self.bump_gen();
             }
             if let Some(ref mut p) = self.pipeline {
@@ -2837,8 +2907,9 @@ impl PlayerState {
             if let Some(ref mut p) = self.pipeline {
                 if p.paused {
                     p.set_paused(false);
-                    self.status.started_ts = now_unix_ms();
-                    self.status.state = "playing".into();
+                    let has_audio = p.has_audio();
+                    self.status.started_ts = if has_audio { now_unix_ms() } else { 0 };
+                    self.status.state = if has_audio { "playing" } else { "loading" }.into();
                     write_status(&mut self.status);
                 }
             } else if !self.queue.is_empty() {
@@ -2853,6 +2924,14 @@ impl PlayerState {
                 self.handle_command("play");
             } else {
                 self.handle_command("pause");
+            }
+        } else if let Some(remote) = cmd.strip_prefix("seek_remote:") {
+            if let Some((track_id, ms)) = remote.rsplit_once(':') {
+                if track_id == self.status.track_id {
+                    if let Ok(ms) = ms.parse() {
+                        self.seek_to(ms);
+                    }
+                }
             }
         } else if let Some(ms_str) = cmd.strip_prefix("seek:") {
             if let Ok(ms) = ms_str.trim().parse::<i64>() {
@@ -3080,9 +3159,21 @@ fn run_daemon() -> i32 {
                 player.start_current_track();
             }
         }
-        let finished = player.pipeline.as_mut().map(|p| p.is_finished()).unwrap_or(false);
+        if player.status.state == "loading"
+            && player.pipeline.as_ref().is_some_and(|p| p.has_audio() && !p.paused)
+        {
+            player.status.state = "playing".into();
+            player.status.started_ts = now_unix_ms();
+            write_status(&mut player.status);
+        }
+        let finished = player.pipeline.as_mut().is_some_and(ActivePipeline::is_finished);
         if finished {
-            if player.repeat_one {
+            if player.pipeline.as_ref().is_some_and(|p| !p.has_audio()) {
+                if let Some(pipe) = player.pipeline.take() {
+                    pipe.stop();
+                }
+                player.report_seek_error("Audio stream ended before producing PCM".into());
+            } else if player.repeat_one {
                 player.start_current_track();
             } else {
                 player.next_track(false);
@@ -3539,6 +3630,26 @@ mod tests {
         let url = build_stream_url("s123.storage.yandex.net", "mp3", "/rmusic/U2FsdGVk/track.mp3", "0005f", "salt123");
         assert!(url.starts_with("https://s123.storage.yandex.net/get-mp3/"));
         assert!(url.ends_with("/0005f/rmusic/U2FsdGVk/track.mp3"));
+    }
+
+    #[test]
+    fn mp3_seek_uses_sample_time_in_a_variable_bitrate_stream() {
+        let mut mp3 = b"ID3\x04\x00\x00\x00\x00\x00\x04tag!".to_vec();
+        let mut offsets = Vec::new();
+        for i in 0..60 {
+            offsets.push(mp3.len());
+            let hdr = [0xff, 0xfb, if i < 30 { 0x50 } else { 0xe0 }, 0];
+            let frame = mp3_frame(&hdr).unwrap();
+            mp3.extend(hdr);
+            mp3.resize(mp3.len() + frame.len - 4, 0);
+        }
+        assert_eq!(first_mp3_frame(&mp3).unwrap().0, 14);
+        let point = mp3_seek_point(&mp3, 1000).unwrap();
+        assert_eq!(point.byte_offset, offsets[26]);
+        assert_eq!(point.skip_samples, 44_100 - 26 * 1152);
+        assert_eq!(point.position_ms, 1000);
+        assert_eq!(mp3_seek_point(&mp3, 0).unwrap().skip_samples, 0);
+        assert!(mp3_seek_point(b"not audio", 1000).is_none());
     }
 
     #[test]
