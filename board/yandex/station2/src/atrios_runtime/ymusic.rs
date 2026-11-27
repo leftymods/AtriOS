@@ -1970,6 +1970,7 @@ struct PlayerState {
     queue: Vec<TrackInfo>,
     seen_track_ids: Vec<String>,
     wave_refill_inflight: bool,
+    wave_warm_cache: Arc<std::sync::Mutex<Option<(std::time::Instant, String, Vec<TrackInfo>)>>>,
     index: usize,
     pipeline: Option<ActivePipeline>,
     prefetch: Arc<std::sync::Mutex<Option<(String, String)>>>,
@@ -1990,6 +1991,7 @@ impl PlayerState {
             queue: Vec::new(),
             seen_track_ids: Vec::new(),
             wave_refill_inflight: false,
+            wave_warm_cache: Arc::new(std::sync::Mutex::new(None)),
             index: 0,
             pipeline: None,
             prefetch: Arc::new(std::sync::Mutex::new(None)),
@@ -2249,6 +2251,32 @@ impl PlayerState {
         });
     }
 
+    fn warm_my_wave_in_bg(&self) {
+        let Some(auth) = load_auth() else {
+            return;
+        };
+        let cache = self.wave_warm_cache.clone();
+        let pf = self.prefetch.clone();
+        thread::spawn(move || {
+            if let Ok((bid, tracks)) = fetch_my_wave(&auth, None) {
+                if let Some(first) = tracks.first().cloned() {
+                    if let Ok(u) = resolve_track_stream_url(&auth, &first.id) {
+                        if let Ok(mut g) = pf.lock() {
+                            *g = Some((first.id.clone(), u.clone()));
+                        }
+                        if let Ok(bytes) = request_bytes(&u, None, &[], None, 15, 16 * 1024 * 1024, None) {
+                            mp3_cache_put(first.id, bytes);
+                        }
+                    }
+                }
+                if let Ok(mut g) = cache.lock() {
+                    *g = Some((std::time::Instant::now(), bid, tracks));
+                }
+                println!("[ymusic] Pre-warmed My Wave batch + first track in RAM");
+            }
+        });
+    }
+
     fn load_mode(&mut self, mode: &str, query: Option<&str>) {
         let gen = self.bump_gen();
         self.pending_play_at = None;
@@ -2262,6 +2290,34 @@ impl PlayerState {
             write_status(&mut self.status);
             return;
         };
+        // Ultra-fast path: consume pre-warmed My Wave batch (<15 min old) for instant <50ms playback!
+        if mode == "wave" {
+            let warm = self.wave_warm_cache.lock().ok().and_then(|mut g| {
+                let fresh = g
+                    .as_ref()
+                    .map(|(ts, _, tr)| ts.elapsed() < Duration::from_secs(900) && !tr.is_empty())
+                    .unwrap_or(false);
+                if fresh { g.take() } else { None }
+            });
+            if let Some((_, bid, tracks)) = warm {
+                let auth_fb = auth.clone();
+                let bid_fb = bid.clone();
+                thread::spawn(move || {
+                    send_rotor_feedback(&auth_fb, &bid_fb, "radioStarted", None, None);
+                });
+                self.mode = "wave".into();
+                self.active_station = "user:onyourwave".into();
+                self.batch_id = bid;
+                self.wave_refill_inflight = false;
+                self.seen_track_ids.clear();
+                self.record_seen_tracks(&tracks);
+                self.queue = tracks;
+                self.index = 0;
+                self.start_current_track();
+                self.maybe_refill_wave(false, false);
+                return;
+            }
+        }
         self.mode = mode.into();
         self.status.mode = mode.into();
         self.status.state = "loading".into();
@@ -2279,7 +2335,11 @@ impl PlayerState {
             let res = match mode_s.as_str() {
                 "wave" => fetch_my_wave(&auth, None).map(|(bid, tr)| {
                     batch_id = bid.clone();
-                    send_rotor_feedback(&auth, &bid, "radioStarted", None, None);
+                    let auth_fb = auth.clone();
+                    let bid_fb = bid.clone();
+                    thread::spawn(move || {
+                        send_rotor_feedback(&auth_fb, &bid_fb, "radioStarted", None, None);
+                    });
                     tr
                 }),
                 "likes" => fetch_likes(&auth),
@@ -2289,7 +2349,12 @@ impl PlayerState {
                     station = st.to_string();
                     fetch_rotor_station(&auth, st, None).map(|(bid, tr)| {
                         batch_id = bid.clone();
-                        send_rotor_feedback_station(&auth, st, &bid, "radioStarted", None, None);
+                        let auth_fb = auth.clone();
+                        let st_fb = st.to_string();
+                        let bid_fb = bid.clone();
+                        thread::spawn(move || {
+                            send_rotor_feedback_station(&auth_fb, &st_fb, &bid_fb, "radioStarted", None, None);
+                        });
                         tr
                     })
                 }
@@ -2798,6 +2863,7 @@ fn run_daemon() -> i32 {
     let (tx, rx) = mpsc::channel::<DaemonEvent>();
     let mut player = PlayerState::new(tx);
     write_status(&mut player.status);
+    player.warm_my_wave_in_bg();
     crate::ynison::spawn_ynison_thread(&STOP_REQUESTED);
     let mut buf = [0u8; 4096];
 
