@@ -86,7 +86,7 @@ def ota(tmp_path, monkeypatch, signing_keys):
     paths["VERSION_FILE"].parent.mkdir(parents=True, exist_ok=True)
     paths["VERSION_FILE"].write_text("1.0\n")
     paths["CONFIG_FILE"].parent.mkdir(parents=True, exist_ok=True)
-    paths["CONFIG_FILE"].write_text(json.dumps({"repository": "leftymods/AtriOS-linux", "public_key": str(signing_keys[1])}))
+    paths["CONFIG_FILE"].write_text(json.dumps({"repository": "leftymods/AtriOS", "public_key": str(signing_keys[1])}))
     monkeypatch.setitem(globals_, "device_id", lambda: "station-max")
     monkeypatch.setitem(globals_, "set_error", lambda *args, **kwargs: None)
     mounts = []
@@ -330,7 +330,7 @@ def test_kernel_install_requires_boot_mount_but_does_not_touch_real_boot(ota, bu
 
 def release_response(body=b"download"):
     name = "AtriOS-station-max-ota.tar.gz"
-    url = "https://github.com/leftymods/AtriOS-linux/releases/download/v2.0/" + name
+    url = "https://github.com/leftymods/AtriOS/releases/download/v2.0/" + name
     asset = {"name": name, "browser_download_url": url, "size": len(body), "digest": "sha256:" + hashlib.sha256(body).hexdigest()}
     return {"tag_name": "v2.0", "draft": False, "prerelease": False, "assets": [asset]}
 
@@ -356,7 +356,7 @@ def test_latest_release_rejects_bad_metadata(ota, monkeypatch, failure):
     elif failure == "wrong_url":
         response["assets"][0]["browser_download_url"] = "https://example.invalid/payload"
     elif failure == "http":
-        response["assets"][0]["browser_download_url"] = "http://github.com/leftymods/AtriOS-linux/releases/download/v2/payload"
+        response["assets"][0]["browser_download_url"] = "http://github.com/leftymods/AtriOS/releases/download/v2/payload"
     else:
         response["assets"][0]["size"] = ota.g["MAX_DOWNLOAD"] + 1
     monkeypatch.setitem(ota.g, "request_json", lambda *a, **kw: response)

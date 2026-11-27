@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 TOOL_ROOT = Path(__file__).resolve().parent.parent          # tools/fw_builder
-REPO_ROOT = TOOL_ROOT.parent.parent                          # AtriOS-linux
+REPO_ROOT = TOOL_ROOT.parent.parent                          # AtriOS
 DEVICE_UPGRADE_DIR = REPO_ROOT / "device" / "yandex" / "station_max" / "upgrade"
 
 BOOTLOADER_IMG = DEVICE_UPGRADE_DIR / "bootloader.img"

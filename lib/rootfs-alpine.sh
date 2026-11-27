@@ -131,7 +131,7 @@ VERSION="${RELEASE_VERSION} (${RELEASE_NAME})"
 VERSION_ID="${RELEASE_VERSION}"
 ATRIOS_PROFILE="${ATRIOS_PROFILE:-lite}"
 ATRIOS_APP_FLAVOR="${ATRIOS_APP_FLAVOR:-lite}"
-HOME_URL="https://github.com/leftymods/AtriOS-linux"
+HOME_URL="https://github.com/leftymods/AtriOS"
 EOF
     cat <<EOF | sudo tee "$stage_dir/etc/fstab" >/dev/null
 LABEL=BOOT      /boot           vfat    defaults,sync    0       2

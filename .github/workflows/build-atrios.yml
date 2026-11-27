@@ -15,10 +15,9 @@ on:
         type: string
   push:
     branches:
-      - main
-      - master
+      - legacy
       - slim
-      # mainline is covered by mainline-checks.yml
+      # main / mainline are covered by mainline-checks.yml
     paths:
       - "VERSION"
       - "build_atrios.sh"

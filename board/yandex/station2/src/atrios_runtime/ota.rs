@@ -55,7 +55,7 @@ struct OtaConfig {
 
 fn load_config() -> Result<OtaConfig, String> {
     let mut cfg = OtaConfig {
-        repository: "leftymods/AtriOS-linux".into(),
+        repository: "leftymods/AtriOS".into(),
         enabled: true,
         interval_seconds: 21600,
         public_key: "/etc/atrios/ota-public.pem".into(),

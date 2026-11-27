@@ -6,9 +6,9 @@
 
 Профили устройств, ядро Linux и U-Boot, драйверы оборудования, системные службы и OTA.
 
-[![Signed OTA](https://github.com/leftymods/AtriOS-linux/actions/workflows/release-ota-runtime.yml/badge.svg)](https://github.com/leftymods/AtriOS-linux/actions/workflows/release-ota-runtime.yml)
+[![Signed OTA](https://github.com/leftymods/AtriOS/actions/workflows/release-ota-runtime.yml/badge.svg)](https://github.com/leftymods/AtriOS/actions/workflows/release-ota-runtime.yml)
 
-[Устройства](DEVICES.md) · [Драйверы](DRIVERS.md) · [Релизы](https://github.com/leftymods/AtriOS-linux/releases) · [История изменений](CHANGELOG.md)
+[Устройства](DEVICES.md) · [Драйверы](DRIVERS.md) · [Релизы](https://github.com/leftymods/AtriOS/releases) · [История изменений](CHANGELOG.md)
 
 </div>
 
@@ -77,4 +77,4 @@ make verify
 - [Устройства и добавление профиля платы](DEVICES.md)
 - [Драйверы и статусы поддержки](DRIVERS.md)
 - [История версий](CHANGELOG.md)
-- [Готовые релизы](https://github.com/leftymods/AtriOS-linux/releases)
+- [Готовые релизы](https://github.com/leftymods/AtriOS/releases)

@@ -156,8 +156,8 @@ ID=atrios
 ID_LIKE=debian
 VERSION="${RELEASE_VERSION} (${RELEASE_NAME})"
 VERSION_ID="${RELEASE_VERSION}"
-HOME_URL="https://github.com/leftymods/AtriOS-linux"
-SUPPORT_URL="https://github.com/leftymods/AtriOS-linux/issues"
+HOME_URL="https://github.com/leftymods/AtriOS"
+SUPPORT_URL="https://github.com/leftymods/AtriOS/issues"
 EOF
 
     # fstab
