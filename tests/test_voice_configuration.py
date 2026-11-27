@@ -5,6 +5,9 @@ import stat
 import sys
 
 import pytest
+from pathlib import Path
+if not (Path(__file__).resolve().parents[1] / "board/yandex/station2/rootfs_overlay/usr/lib/atrios/atrios_https.py").exists():
+    pytest.skip("Legacy Python runtime replaced by Rust atrios_runtime.rs", allow_module_level=True)
 from test_runtime_regressions import load_script
 
 

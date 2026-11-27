@@ -19,6 +19,8 @@ from types import SimpleNamespace
 import pytest
 
 RUNTIME = Path(__file__).resolve().parents[1] / "board/yandex/station2/rootfs_overlay/usr/lib/atrios"
+if (RUNTIME / "ota").exists() and (RUNTIME / "ota").read_bytes().startswith(b"\x7fELF"):
+    pytest.skip("Legacy Python OTA script replaced by Rust atrios_runtime.rs", allow_module_level=True)
 
 
 def image_payload(kind):

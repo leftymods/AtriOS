@@ -503,6 +503,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                         true,
                     ));
                     is_active = true;
+                    last_server_queue = None;
                     last_queue_sig = local_queue_sig;
                     last_idx = st.queue_index as i64;
                     last_paused = Some(false);
@@ -696,8 +697,15 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                     last_pushed_track = ids[cur_idx as usize].clone();
                     last_pushed_paused = paused;
                     let mode_tag = if paused { "pause" } else { "play" };
-                    let cmd = format!("ynison_sync:{mode_tag}:{rel_idx}:{joined}");
-                    println!("[ynison] Syncing queue ({} tracks, idx={rel_idx}, {mode_tag})", win_end - win_start);
+                    let entity_type = q.get_str("entity_type").unwrap_or("");
+                    let entity_id = q.get_str("entity_id").unwrap_or("");
+                    let cmd = if entity_type == "RADIO" {
+                        let st_id = if entity_id.is_empty() { "user:onyourwave" } else { entity_id };
+                        format!("ynison_sync_radio|{mode_tag}|{st_id}|{rel_idx}|{joined}")
+                    } else {
+                        format!("ynison_sync:{mode_tag}:{rel_idx}:{joined}")
+                    };
+                    println!("[ynison] Syncing queue ({} tracks, idx={rel_idx}, {mode_tag}, type={entity_type})", win_end - win_start);
                     send_ymusic_cmd(&cmd);
                     continue;
                 }

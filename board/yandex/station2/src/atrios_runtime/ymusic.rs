@@ -748,10 +748,10 @@ fn fetch_rotor_session_new(
     Ok((sid, batch_id, tracks))
 }
 
-fn fetch_rotor_station(
+fn fetch_rotor_station_with_queue(
     auth: &YMusicAuth,
     station: &str,
-    queue_track_id: Option<&str>,
+    queue_ids: &[String],
 ) -> Result<(String, Vec<TrackInfo>), String> {
     let raw_st = station.trim();
     let st = match raw_st {
@@ -760,19 +760,21 @@ fn fetch_rotor_station(
         "activity:workout" => "activity:run",
         other => other,
     };
-    // Prefer modern MarshalX RotorSessions API (/rotor/session/new) first
-    let q_vec: Vec<String> = queue_track_id
-        .filter(|s| !s.is_empty())
-        .map(|s| vec![s.to_string()])
-        .unwrap_or_default();
-    if let Ok((_sid, bid, tracks)) = fetch_rotor_session_new(auth, st, &q_vec) {
+    // Prefer modern MarshalX RotorSessions API (/rotor/session/new) with up to 25 recent IDs for dedup
+    let recent_q: Vec<String> = if queue_ids.len() > 25 {
+        queue_ids[queue_ids.len() - 25..].to_vec()
+    } else {
+        queue_ids.to_vec()
+    };
+    if let Ok((_sid, bid, tracks)) = fetch_rotor_session_new(auth, st, &recent_q) {
         return Ok((bid, tracks));
     }
-    let ep = match queue_track_id {
-        Some(tid) if !tid.is_empty() => {
+    let last_tid = recent_q.last().map(|s| s.as_str()).filter(|s| !s.is_empty());
+    let ep = match last_tid {
+        Some(tid) => {
             format!("/rotor/station/{st}/tracks?settings2=true&queue={}", url_encode(tid))
         }
-        _ => format!("/rotor/station/{st}/tracks?settings2=true"),
+        None => format!("/rotor/station/{st}/tracks?settings2=true"),
     };
     if let Ok(resp) = api_get_json(&auth.token, &ep) {
         if let Some(res) = resp.get("result") {
@@ -795,6 +797,18 @@ fn fetch_rotor_station(
     let fb_q = station_search_fallback_query(st);
     let tracks = fetch_search(auth, fb_q)?;
     Ok((String::new(), tracks))
+}
+
+fn fetch_rotor_station(
+    auth: &YMusicAuth,
+    station: &str,
+    queue_track_id: Option<&str>,
+) -> Result<(String, Vec<TrackInfo>), String> {
+    let q_vec: Vec<String> = queue_track_id
+        .filter(|s| !s.is_empty())
+        .map(|s| vec![s.to_string()])
+        .unwrap_or_default();
+    fetch_rotor_station_with_queue(auth, station, &q_vec)
 }
 
 fn fetch_my_wave(auth: &YMusicAuth, queue_track_id: Option<&str>) -> Result<(String, Vec<TrackInfo>), String> {
@@ -1954,6 +1968,8 @@ struct PlayerState {
     active_station: String,
     batch_id: String,
     queue: Vec<TrackInfo>,
+    seen_track_ids: Vec<String>,
+    wave_refill_inflight: bool,
     index: usize,
     pipeline: Option<ActivePipeline>,
     prefetch: Arc<std::sync::Mutex<Option<(String, String)>>>,
@@ -1972,6 +1988,8 @@ impl PlayerState {
             active_station: "user:onyourwave".into(),
             batch_id: String::new(),
             queue: Vec::new(),
+            seen_track_ids: Vec::new(),
+            wave_refill_inflight: false,
             index: 0,
             pipeline: None,
             prefetch: Arc::new(std::sync::Mutex::new(None)),
@@ -1982,6 +2000,69 @@ impl PlayerState {
             tx,
             status: YMusicStatus::default_idle(),
         }
+    }
+
+    fn record_seen_tracks(&mut self, tracks: &[TrackInfo]) {
+        for t in tracks {
+            if !t.id.is_empty() && !self.seen_track_ids.iter().any(|id| id == &t.id) {
+                self.seen_track_ids.push(t.id.clone());
+            }
+        }
+        if self.seen_track_ids.len() > 80 {
+            let drop_n = self.seen_track_ids.len() - 80;
+            self.seen_track_ids.drain(0..drop_n);
+        }
+    }
+
+    fn recent_wave_ids(&self) -> Vec<String> {
+        let mut ids = self.seen_track_ids.clone();
+        for t in &self.queue {
+            if !t.id.is_empty() && !ids.iter().any(|id| id == &t.id) {
+                ids.push(t.id.clone());
+            }
+        }
+        if ids.len() > 25 {
+            ids.drain(0..ids.len() - 25);
+        }
+        ids
+    }
+
+    fn maybe_refill_wave(&mut self, force: bool, auto_play: bool) {
+        if !(self.mode == "wave" || self.mode == "station") {
+            return;
+        }
+        if self.wave_refill_inflight && !force {
+            return;
+        }
+        if !force && self.index + 3 < self.queue.len() {
+            return;
+        }
+        let Some(auth) = load_auth() else {
+            return;
+        };
+        self.wave_refill_inflight = true;
+        let st = self.active_station.clone();
+        let recent = self.recent_wave_ids();
+        let tx = self.tx.clone();
+        thread::spawn(move || {
+            match fetch_rotor_station_with_queue(&auth, &st, &recent) {
+                Ok((bid, more)) => {
+                    let _ = tx.send(DaemonEvent::WaveAppended {
+                        batch_id: bid,
+                        tracks: more,
+                        auto_play,
+                    });
+                }
+                Err(e) => {
+                    eprintln!("[ymusic] Wave refill failed for {st}: {e}");
+                    let _ = tx.send(DaemonEvent::WaveAppended {
+                        batch_id: String::new(),
+                        tracks: Vec::new(),
+                        auto_play: false,
+                    });
+                }
+            }
+        });
     }
 
     fn bump_gen(&self) -> u64 {
@@ -2235,12 +2316,22 @@ impl PlayerState {
                 }
                 match res {
                     Ok(tracks) => {
-                        let start_paused = mode == "ynison_paused";
-                        self.mode = if start_paused { "ynison".into() } else { mode };
+                        let start_paused = mode == "ynison_paused"
+                            || mode == "wave_paused"
+                            || mode == "station_paused";
+                        self.mode = match mode.as_str() {
+                            "ynison_paused" => "ynison".into(),
+                            "wave_paused" => "wave".into(),
+                            "station_paused" => "station".into(),
+                            _ => mode,
+                        };
                         self.active_station = station;
                         if !batch_id.is_empty() {
                             self.batch_id = batch_id;
                         }
+                        self.wave_refill_inflight = false;
+                        self.seen_track_ids.clear();
+                        self.record_seen_tracks(&tracks);
                         self.queue = tracks;
                         self.index = start_index.min(self.queue.len().saturating_sub(1));
                         if start_paused {
@@ -2248,6 +2339,7 @@ impl PlayerState {
                         } else {
                             self.start_current_track();
                         }
+                        self.maybe_refill_wave(false, false);
                     }
                     Err(e) => {
                         eprintln!("[ymusic] Load {mode} failed: {e}");
@@ -2281,15 +2373,48 @@ impl PlayerState {
                 }
             }
             DaemonEvent::WaveAppended { batch_id, tracks, auto_play } => {
+                self.wave_refill_inflight = false;
                 if !tracks.is_empty() {
-                    self.batch_id = batch_id;
+                    if !batch_id.is_empty() {
+                        self.batch_id = batch_id;
+                    }
                     let was_empty = self.queue.is_empty();
-                    self.queue.extend(tracks);
-                    self.sync_neighbors_to_status();
-                    if auto_play && (was_empty || self.status.state == "loading") {
-                        self.start_current_track();
-                    } else {
-                        write_status(&mut self.status);
+                    let prev_len = self.queue.len();
+                    let mut fresh: Vec<TrackInfo> = Vec::new();
+                    for t in &tracks {
+                        let in_q = self.queue.iter().any(|q| q.id == t.id)
+                            || fresh.iter().any(|q| q.id == t.id);
+                        let seen = self.seen_track_ids.iter().any(|id| id == &t.id);
+                        if !in_q && !seen {
+                            fresh.push(t.clone());
+                        }
+                    }
+                    if fresh.is_empty() {
+                        // Fallback: allow tracks not currently in the active queue so playback never stalls
+                        for t in &tracks {
+                            if !self.queue.iter().any(|q| q.id == t.id)
+                                && !fresh.iter().any(|q| q.id == t.id)
+                            {
+                                fresh.push(t.clone());
+                            }
+                        }
+                    }
+                    if !fresh.is_empty() {
+                        self.record_seen_tracks(&fresh);
+                        self.queue.extend(fresh);
+                        self.sync_neighbors_to_status();
+                        if auto_play {
+                            if !was_empty && self.index + 1 >= prev_len && self.index + 1 < self.queue.len() {
+                                self.index += 1;
+                                self.start_current_track();
+                            } else if was_empty || self.status.state == "loading" {
+                                self.start_current_track();
+                            } else {
+                                write_status(&mut self.status);
+                            }
+                        } else {
+                            write_status(&mut self.status);
+                        }
                     }
                 }
             }
@@ -2364,19 +2489,8 @@ impl PlayerState {
                 self.queue.drain(0..drop_n);
                 self.index -= drop_n;
             }
-            // Proactively replenish My Wave / Station near queue tail (like Yandex Music mobile!)
-            if (self.mode == "wave" || self.mode == "station") && self.index + 2 >= self.queue.len() {
-                if let Some(auth) = load_auth() {
-                    let st = self.active_station.clone();
-                    let last_id = self.queue.last().map(|t| t.id.clone());
-                    let tx = self.tx.clone();
-                    thread::spawn(move || {
-                        if let Ok((bid, more)) = fetch_rotor_station(&auth, &st, last_id.as_deref()) {
-                            let _ = tx.send(DaemonEvent::WaveAppended { batch_id: bid, tracks: more, auto_play: false });
-                        }
-                    });
-                }
-            }
+            // Proactively replenish My Wave / Station near queue tail (with 25-track dedup history)
+            self.maybe_refill_wave(false, false);
             if should_play {
                 self.start_current_track();
             } else {
@@ -2384,8 +2498,15 @@ impl PlayerState {
             }
             return;
         }
-        if self.mode == "wave" || self.mode == "none" {
-            self.load_mode("wave", None);
+        if self.mode == "wave" || self.mode == "station" || self.mode == "none" {
+            if self.mode == "none" || self.queue.is_empty() {
+                self.load_mode("wave", None);
+            } else {
+                // At tail of wave/station: fetch fresh deduplicated batch and advance into it
+                self.status.state = "loading".into();
+                write_status(&mut self.status);
+                self.maybe_refill_wave(true, should_play);
+            }
             return;
         } else if !self.queue.is_empty() {
             self.index = 0;
@@ -2513,11 +2634,24 @@ impl PlayerState {
             self.repeat_one = !self.repeat_one;
             self.status.repeat = self.repeat_one;
             write_status(&mut self.status);
-        } else if let Some(rest) = cmd.strip_prefix("ynison_sync:") {
-            let mut parts = rest.splitn(3, ':');
-            let want_play = parts.next().unwrap_or("play") != "pause";
-            let rel_idx = parts.next().and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
-            let ids_csv = parts.next().unwrap_or("").trim();
+        } else if cmd.starts_with("ynison_sync:") || cmd.starts_with("ynison_sync_radio|") {
+            let (is_radio, radio_station, want_play, rel_idx, ids_csv) =
+                if let Some(rest) = cmd.strip_prefix("ynison_sync_radio|") {
+                    let mut parts = rest.splitn(4, '|');
+                    let wp = parts.next().unwrap_or("play") != "pause";
+                    let st_raw = parts.next().unwrap_or("user:onyourwave").trim();
+                    let st = if st_raw.is_empty() { "user:onyourwave" } else { st_raw };
+                    let ri = parts.next().and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+                    let csv = parts.next().unwrap_or("").trim();
+                    (true, st.to_string(), wp, ri, csv)
+                } else {
+                    let rest = cmd.strip_prefix("ynison_sync:").unwrap_or("");
+                    let mut parts = rest.splitn(3, ':');
+                    let wp = parts.next().unwrap_or("play") != "pause";
+                    let ri = parts.next().and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+                    let csv = parts.next().unwrap_or("").trim();
+                    (false, "user:onyourwave".to_string(), wp, ri, csv)
+                };
             if ids_csv.is_empty() {
                 return;
             }
@@ -2525,13 +2659,23 @@ impl PlayerState {
             if target_ids.is_empty() {
                 return;
             }
+            let synced_mode: String = if is_radio {
+                if radio_station == "user:onyourwave" { "wave".into() } else { "station".into() }
+            } else if self.mode == "wave" || self.mode == "station" {
+                self.mode.clone()
+            } else {
+                "ynison".into()
+            };
             // Fast path: same queue already loaded -> jump immediately without network fetch!
             let same_queue = self.queue.len() == target_ids.len()
                 && self.queue.iter().zip(target_ids.iter()).all(|(t, id)| t.id == *id);
             if same_queue {
                 let idx = rel_idx.min(self.queue.len().saturating_sub(1));
-                self.mode = "ynison".into();
-                self.status.mode = "ynison".into();
+                self.mode = synced_mode.clone();
+                self.status.mode = synced_mode;
+                if is_radio {
+                    self.active_station = radio_station;
+                }
                 if self.index != idx || self.pipeline.is_none() {
                     self.index = idx;
                     if want_play {
@@ -2544,6 +2688,7 @@ impl PlayerState {
                 } else {
                     self.handle_command("pause");
                 }
+                self.maybe_refill_wave(false, false);
                 return;
             }
             let Some(auth) = load_auth() else {
@@ -2554,14 +2699,29 @@ impl PlayerState {
             if let Some(p) = self.pipeline.take() {
                 p.stop();
             }
-            self.mode = "ynison".into();
-            self.status.mode = "ynison".into();
+            let mode_live = if is_radio {
+                if radio_station == "user:onyourwave" { "wave" } else { "station" }
+            } else {
+                "ynison"
+            };
+            self.mode = mode_live.into();
+            self.status.mode = mode_live.into();
+            if is_radio {
+                self.active_station = radio_station.clone();
+            }
             self.status.state = if want_play { "loading".into() } else { "paused".into() };
             self.status.started_ts = 0;
             self.status.error = None;
             write_status(&mut self.status);
             let csv_owned = ids_csv.to_string();
             let tx = self.tx.clone();
+            let mode_tag = match (mode_live, want_play) {
+                ("wave", false) => "wave_paused".to_string(),
+                ("station", false) => "station_paused".to_string(),
+                ("ynison", false) => "ynison_paused".to_string(),
+                (m, true) => m.to_string(),
+                _ => "ynison".to_string(),
+            };
             thread::spawn(move || {
                 let form = format!("track-ids={}", url_encode(&csv_owned));
                 let res = api_post_form_json(&auth.token, "/tracks", &form).and_then(|det| {
@@ -2580,11 +2740,10 @@ impl PlayerState {
                         Ok(tracks)
                     }
                 });
-                let mode_tag = if want_play { "ynison".to_string() } else { "ynison_paused".to_string() };
                 let _ = tx.send(DaemonEvent::ModeLoaded {
                     gen,
                     mode: mode_tag,
-                    station: "user:onyourwave".into(),
+                    station: radio_station,
                     batch_id: String::new(),
                     start_index: rel_idx,
                     res,

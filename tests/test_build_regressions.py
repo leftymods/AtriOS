@@ -174,9 +174,12 @@ def test_image_target_rebuilds_packages_and_rootfs_despite_stale_files(tmp_path)
     for name, body in {
         'general.sh': 'exit_with_error() { echo "$*"; exit 1; }\n',
         'config.sh': 'load_board_config() { :; }\n',
+        'modules.sh': '',
         'compilation-kernel.sh': '',
         'packages.sh': 'build_all_packages() { echo packages >> "$ORDER"; }\n',
         'rootfs-debian.sh': 'build_debian_micro_rootfs() { echo rootfs >> "$ORDER"; }\n',
+        'rootfs-alpine.sh': 'build_alpine_micro_rootfs() { echo rootfs >> "$ORDER"; }\n',
+        'rootfs.sh': 'build_rootfs() { build_debian_micro_rootfs; }\n',
         'image-emmc.sh': 'build_emmc_image() { echo image >> "$ORDER"; }\n',
     }.items(): (project / 'lib' / name).write_text(body)
     (project / 'output/images').mkdir(parents=True)

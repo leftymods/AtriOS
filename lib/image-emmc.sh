@@ -103,11 +103,11 @@ resolve_uboot_kernel_boot_command() {
         case "$architecture" in
             arm64) selected=booti ;;
             arm) selected=bootz ;;
-            *) exit_with_error "Set UBOOT_KERNEL_BOOT_COMMAND for kernel architecture: $architecture" ;;
+            *) exit_with_error "Set UBOOT_KERNEL_BOOT_COMMAND for kernel architecture: $architecture" >&2 ;;
         esac
     fi
     case "$selected" in
         booti|bootz|bootm) printf '%s\n' "$selected" ;;
-        *) exit_with_error "Invalid UBOOT_KERNEL_BOOT_COMMAND: $selected (expected booti, bootz or bootm)" ;;
+        *) exit_with_error "Invalid UBOOT_KERNEL_BOOT_COMMAND: $selected (expected booti, bootz or bootm)" >&2 ;;
     esac
 }

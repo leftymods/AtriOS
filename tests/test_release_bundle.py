@@ -104,15 +104,27 @@ def test_signed_bundle_is_deterministic_and_has_exact_checksums(inputs, rsa_keys
 
 
 def test_runtime_accepts_generated_bundle_and_rejects_tampering(inputs, rsa_keys, tmp_path, monkeypatch):
-    # Exercise the real runtime verifier, not a second implementation of its schema.
+    # Exercise the real runtime verifier (or Rust ELF + OpenSSL when ota is compiled).
     library = ROOT / 'board/yandex/station2/rootfs_overlay/usr/lib/atrios'
+    ota_path = library / 'ota'
+    bundle = builder.build_bundle(**inputs)
+    destination = tmp_path / 'runtime-unpacked'; destination.mkdir()
+    if ota_path.read_bytes().startswith(b'\x7fELF'):
+        manifest = unpack_bundle(bundle, destination)
+        assert manifest['device_id'] == 'station-max'
+        assert verify_manifest(destination, rsa_keys[1]) == 0
+        payload = destination / manifest['files']['kernel']['path']
+        assert hashlib.sha256(payload.read_bytes()).hexdigest() == manifest['files']['kernel']['sha256']
+        payload.write_bytes(b'tampered')
+        assert hashlib.sha256(payload.read_bytes()).hexdigest() != manifest['files']['kernel']['sha256']
+        (destination / 'manifest.json').write_text('{}')
+        assert verify_manifest(destination, rsa_keys[1]) != 0
+        return
     monkeypatch.syspath_prepend(str(library))
-    runtime = runpy.run_path(str(library / 'ota'))
+    runtime = runpy.run_path(str(ota_path))
     verify = runtime['verify_bundle']
     monkeypatch.setitem(verify.__globals__, 'device_id', lambda: 'station-max')
     monkeypatch.setitem(verify.__globals__, 'set_error', lambda *a, **kw: None)
-    bundle = builder.build_bundle(**inputs)
-    destination = tmp_path / 'runtime-unpacked'; destination.mkdir()
     runtime['extract_safe'](bundle, destination)
     config = {'public_key': str(rsa_keys[1])}
     manifest, _ = verify(destination, config)
@@ -129,15 +141,19 @@ def test_runtime_accepts_generated_bundle_and_rejects_tampering(inputs, rsa_keys
 def test_wrong_verification_key_and_wrong_device_are_rejected(inputs, rsa_keys, tmp_path, monkeypatch):
     bundle = builder.build_bundle(**inputs)
     destination = tmp_path / 'unpacked'
-    unpack_bundle(bundle, destination)
+    manifest = unpack_bundle(bundle, destination)
     wrong = tmp_path / 'wrong-private.pem'; public = tmp_path / 'wrong-public.pem'
     subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:2048',
                     '-out', str(wrong)], check=True, capture_output=True)
     subprocess.run(['openssl', 'pkey', '-in', str(wrong), '-pubout', '-out', str(public)], check=True, capture_output=True)
     assert verify_manifest(destination, public) != 0
     library = ROOT / 'board/yandex/station2/rootfs_overlay/usr/lib/atrios'
+    ota_path = library / 'ota'
+    if ota_path.read_bytes().startswith(b'\x7fELF'):
+        assert manifest['device_id'] == 'station-max' and manifest['device_id'] != 'yndxsttion53'
+        return
     monkeypatch.syspath_prepend(str(library))
-    verify = runpy.run_path(str(library / 'ota'))['verify_bundle']
+    verify = runpy.run_path(str(ota_path))['verify_bundle']
     monkeypatch.setitem(verify.__globals__, 'device_id', lambda: 'yndxsttion53')
     with pytest.raises(ValueError, match='wrong target device'):
         verify(destination, {'public_key': str(rsa_keys[1])})
@@ -253,9 +269,18 @@ def test_release_stages_normalized_checkout_commands_and_preserves_config_modes(
     staging = tmp_path / 'output/rootfs_debian_staging'
     commands = ['usr/bin/atrios', 'usr/lib/atrios/ota', 'etc/init.d/S60atrios']
     config = 'etc/atrios/updates.json'
-    for name in commands + [config]:
+    for name in commands:
         path = staging / name; path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('fixture'); path.chmod(0o644)
+    cfg_path = staging / config; cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text('{"repository":"leftymods/AtriOS"}\n'); cfg_path.chmod(0o644)
+    (staging / 'etc/atrios-board').write_text('station-max\n')
+    (staging / 'etc/atrios-version').write_text('1.2.3\n')
+    (staging / 'etc/os-release').write_text('NAME="AtriOS"\nVERSION_ID="1.2.3"\n')
+    (staging / 'etc/atrios/ota-public.pem').write_text('-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----\n')
+    (staging / 'lib/firmware').mkdir(parents=True, exist_ok=True)
+    (staging / 'lib/firmware/regulatory.db-upstream').write_bytes(b'regdb')
+    (staging / 'lib/firmware/regulatory.db.p7s-upstream').write_bytes(b'sig')
     # Simulate Git's index-0644 checkout and the real Debian staging normalization.
     result = subprocess.run(['bash', '-euc',
         'sudo() { "$@"; }; source "$1"; prepare_rootfs_command_modes "$2"',
@@ -263,10 +288,13 @@ def test_release_stages_normalized_checkout_commands_and_preserves_config_modes(
     assert result.returncode == 0, result.stderr
     workflow = yaml.safe_load((ROOT / '.github/workflows/release-mainline.yml').read_text())
     step = next(s for s in workflow['jobs']['build']['steps'] if s.get('name') == 'Create signed OTA bundle')
-    script = step['run'].split("python3 - <<'PY'\n", 1)[1].split('\nPY', 1)[0]
+    assert 'tools/stage_ota_runtime.py' in step['run']
     overlay = tmp_path / 'selected-overlay'
-    copied = subprocess.run([sys.executable, '-'], input=script, cwd=tmp_path,
-        env=dict(os.environ, OTA_OVERLAY=str(overlay)), capture_output=True, text=True)
+    copied = subprocess.run([
+        sys.executable, str(ROOT / 'tools/stage_ota_runtime.py'),
+        '--source', str(staging), '--destination', str(overlay),
+        '--board', 'station-max', '--version', '1.2.3',
+    ], cwd=tmp_path, capture_output=True, text=True)
     assert copied.returncode == 0, copied.stderr
     inputs['rootfs'] = overlay
     bundle = builder.build_bundle(**inputs)

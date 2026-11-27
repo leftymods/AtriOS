@@ -176,4 +176,4 @@ def test_recipe_preserves_authentication_and_validates_after_stripping():
     assert 'sudo sed -i' in source and 'root:/root:/usr/bin/fish' in source
     assert 'ncurses-base,ncurses-bin' in source
     assert source.index('"$stage_dir/usr/share/man"') < source.index('validate_rootfs_terminfo "$stage_dir"')
-    assert source.index('validate_rootfs_terminfo "$stage_dir"') < source.index('sudo rm -f "$stage_dir/usr/bin/qemu-aarch64-static"')
+    assert source.index('validate_rootfs_terminfo "$stage_dir"') < source.index('sudo rm -f "$stage_dir/usr/bin/$qemu_name"')

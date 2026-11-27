@@ -11,8 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def shell(code, env):
-    return subprocess.run(['bash', '-euo', 'pipefail', '-c', code],
-        env=dict(os.environ, **env), capture_output=True, text=True)
+    clean_env = dict(os.environ, PS1='', **env)
+    clean_env.pop('BASH_ENV', None)
+    return subprocess.run(['bash', '--norc', '-euo', 'pipefail', '-c', code],
+        env=clean_env, capture_output=True, text=True)
 
 
 def library(name):
@@ -63,7 +65,7 @@ def test_invalid_emulator_is_rejected_before_base_or_staging_mutation(tmp_path, 
     result = shell(command, {'PROJECT_ROOT': str(tmp_path), 'ARCH': 'armhf',
         'ROOTFS_QEMU_BINARY': str(emulator), 'OS_NAME': 'AtriOS', 'RELEASE_NAME': 'test'})
     assert result.returncode != 0
-    assert 'ROOTFS_QEMU_BINARY' in result.stdout
+    assert 'ROOTFS_QEMU_BINARY' in (result.stdout + result.stderr)
     assert (cache / 'previous').read_text() == 'untouched'
     assert not (tmp_path / 'output').exists()
 
@@ -105,7 +107,7 @@ def test_invalid_boot_command_fails_before_image_output(tmp_path, architecture, 
         {'PROJECT_ROOT': str(tmp_path), 'KERNEL_BUILD_ARCH': architecture,
          'UBOOT_KERNEL_BOOT_COMMAND': override})
     assert result.returncode != 0
-    assert 'UBOOT_KERNEL_BOOT_COMMAND' in result.stdout
+    assert 'UBOOT_KERNEL_BOOT_COMMAND' in (result.stdout + result.stderr)
     assert not (tmp_path / 'output').exists()
 
 

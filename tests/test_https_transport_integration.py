@@ -16,6 +16,8 @@ from pathlib import Path
 import pytest
 
 RUNTIME = (Path(__file__).resolve().parents[1] / "board/yandex/station2/rootfs_overlay/usr/lib/atrios")
+if not (RUNTIME / "atrios_https.py").exists():
+    pytest.skip("Legacy Python runtime replaced by Rust atrios_runtime.rs", allow_module_level=True)
 sys.path.insert(0, str(RUNTIME))
 import atrios_https as https
 

@@ -466,6 +466,6 @@ resolve_rootfs_qemu_binary() {
         selected="${PROJECT_ROOT:?PROJECT_ROOT is required for a relative ROOTFS_QEMU_BINARY}/$selected"
     fi
     [ ! -L "$selected" ] && [ -f "$selected" ] && [ -s "$selected" ] && [ -x "$selected" ] || \
-        exit_with_error "ROOTFS_QEMU_BINARY must be a non-empty executable regular file: $selected"
+        exit_with_error "ROOTFS_QEMU_BINARY must be a non-empty executable regular file: $selected" >&2
     realpath -e -- "$selected"
 }
