@@ -43,7 +43,7 @@ jobs:
           /tmp/atrios_runtime_test
           rustc --edition=2021 -C opt-level=2 --target aarch64-unknown-linux-gnu -C linker=aarch64-linux-gnu-gcc atrios_runtime.rs -o "$GITHUB_WORKSPACE/atrios-runtime-aarch64"
           aarch64-linux-gnu-gcc -O2 atri_mp3dec.c -lm -o "$GITHUB_WORKSPACE/atri-mp3dec-aarch64"
-          aarch64-linux-gnu-gcc -O2 atri_aec.c -lm -o "$GITHUB_WORKSPACE/atri-aec-aarch64"
+          aarch64-linux-gnu-gcc -O3 atri_aec.c pbfdaf_aec.c gtcrn_ns.c -lm -ldl -o "$GITHUB_WORKSPACE/atri-aec-aarch64"
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
