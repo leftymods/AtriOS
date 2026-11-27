@@ -214,10 +214,13 @@ class BtControlClient(
         if (token.isNotBlank()) relayToken = token.trim()
     }
 
+    val btLastAttemptFailed = AtomicBoolean(false)
+
     @SuppressLint("MissingPermission")
-    fun connect(device: BluetoothDevice) {
+    fun connect(device: BluetoothDevice, failFast: Boolean = false) {
         disconnect(silent = true)
         userDisconnected = false
+        btLastAttemptFailed.set(false)
         activeDevice = device
         readJob = scope.launch(Dispatchers.IO) {
             while (isActive && !userDisconnected) {
@@ -227,6 +230,7 @@ class BtControlClient(
                     }
                     val sock = device.createRfcommSocketToServiceRecord(SPP_UUID)
                     sock.connect()
+                    btLastAttemptFailed.set(false)
                     socket = sock
                     writer = OutputStreamWriter(sock.outputStream, Charsets.UTF_8)
                     withContext(Dispatchers.Main) {
@@ -262,8 +266,13 @@ class BtControlClient(
                     throw e
                 } catch (e: Exception) {
                     closeQuietly()
+                    btLastAttemptFailed.set(true)
                     if (userDisconnected || !isActive) return@launch
                     if (trySeamlessRelayFailover()) return@launch
+                    if (failFast) {
+                        DebugLogStore.log("INFO", "BT", "BT unavailable on 1st try (${e.message}); switching to Wi-Fi/Relay")
+                        return@launch
+                    }
                     DebugLogStore.log("WARN", "BT", "RFCOMM error: ${e.message}; retrying in 3.5s")
                     withContext(Dispatchers.Main) {
                         onConnectionState(false, "Переподключение: ${e.message ?: "ожидание сети"}", device)

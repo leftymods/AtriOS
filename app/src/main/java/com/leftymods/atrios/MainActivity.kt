@@ -199,6 +199,7 @@ fun AtriOSApp(
     var connText by remember { mutableStateOf("Подключение к колонке...") }
     var autoConnectState by remember { mutableStateOf("trying") }
     var autoAttemptSeq by remember { mutableIntStateOf(0) }
+    var btUnavailableThisSession by remember { mutableStateOf(false) }
 
     var status by remember { mutableStateOf(SpeakerStatus()) }
     var sliderVol by remember { mutableFloatStateOf(60f) }
@@ -615,17 +616,22 @@ fun AtriOSApp(
                 ?: bonded.firstOrNull { (it.name ?: "").contains("Atri", ignoreCase = true) }
         } else null
 
-        if (btTarget != null) {
-            client.connect(btTarget)
-            val deadline = System.currentTimeMillis() + 5500L
-            while (!connected && System.currentTimeMillis() < deadline) delay(200)
+        val hasRelay = relay.gatewayUrl.startsWith("https://") && relay.deviceId.isNotBlank() && relay.token.isNotBlank()
+        if (btTarget != null && !btUnavailableThisSession) {
+            client.connect(btTarget, failFast = hasRelay)
+            val deadline = System.currentTimeMillis() + if (hasRelay) 2500L else 5500L
+            while (!connected && System.currentTimeMillis() < deadline) {
+                if (hasRelay && client.btLastAttemptFailed.get()) break
+                delay(100)
+            }
             if (connected) return@LaunchedEffect
+            if (hasRelay) btUnavailableThisSession = true
         }
 
-        if (relay.gatewayUrl.startsWith("https://") && relay.deviceId.isNotBlank() && relay.token.isNotBlank()) {
+        if (hasRelay) {
             client.connectRelay(relay.gatewayUrl, relay.deviceId, relay.token)
             val deadline = System.currentTimeMillis() + 6500L
-            while (!connected && System.currentTimeMillis() < deadline) delay(200)
+            while (!connected && System.currentTimeMillis() < deadline) delay(150)
             if (connected) return@LaunchedEffect
         }
 
