@@ -217,8 +217,12 @@ ROOTFS_OVERLAY="board/test/overlay"
 UPGRADE_DIR="device/test/upgrade"
 OTA_RUNTIME_MANIFEST=''' + shlex.quote(setting) + '\n')
     command = 'source "$PROJECT_ROOT/lib/release-board.sh"; release_board_config custom; printf "MANIFEST=%s\\n" "$OTA_RUNTIME_MANIFEST_PATH"'
-    result = subprocess.run(['bash', '-euo', 'pipefail', '-c', command],
-        env=dict(os.environ, PROJECT_ROOT=str(project)), capture_output=True, text=True)
+    clean_env = {k: v for k, v in os.environ.items() if k not in (
+        'DTB_IMAGE', 'BOOTLOADER_BIN', 'KERNEL_IMAGE', 'ROOTFS_IMAGE',
+        'ROOTFS_OVERLAY_PATH', 'IMAGE_FILENAME', 'OTA_RUNTIME_MANIFEST_PATH', 'BASH_ENV')}
+    clean_env.update(PROJECT_ROOT=str(project), PS1='')
+    result = subprocess.run(['bash', '--norc', '-euo', 'pipefail', '-c', command],
+        env=clean_env, capture_output=True, text=True)
     assert (result.returncode == 0) == (kind == 'inside'), result.stdout + result.stderr
     if kind == 'inside': assert 'MANIFEST=' + str(manifest) in result.stdout
 
