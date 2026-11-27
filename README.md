@@ -47,7 +47,7 @@
 ## Сборка APK
 
 ```bash
-git clone -b app https://github.com/leftymods/AtriOS-linux.git AtriOS-App
+git clone -b app https://github.com/leftymods/AtriOS.git AtriOS-App
 cd AtriOS-App
 ./gradlew assembleDebug
 ```

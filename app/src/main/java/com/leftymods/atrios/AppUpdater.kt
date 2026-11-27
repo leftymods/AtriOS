@@ -25,8 +25,8 @@ data class AppReleaseInfo(
 )
 
 object AppUpdater {
-    private const val RELEASES_API = "https://api.github.com/repos/leftymods/AtriOS-linux/releases?per_page=15"
-    private const val RELEASES_HTML = "https://github.com/leftymods/AtriOS-linux/releases"
+    private const val RELEASES_API = "https://api.github.com/repos/leftymods/AtriOS/releases?per_page=15"
+    private const val RELEASES_HTML = "https://github.com/leftymods/AtriOS/releases"
 
     fun currentVersionName(context: Context): String {
         return try {
@@ -149,7 +149,7 @@ object AppUpdater {
                     version = bestVer,
                     tagName = tag,
                     notes = "Обновление AtriOS Control v$bestVer",
-                    apkUrl = "https://github.com/leftymods/AtriOS-linux/releases/download/$tag/$apkName",
+                    apkUrl = "https://github.com/leftymods/AtriOS/releases/download/$tag/$apkName",
                     apkName = apkName,
                     apkSize = 0L
                 )
