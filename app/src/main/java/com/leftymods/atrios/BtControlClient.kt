@@ -463,7 +463,7 @@ class BtControlClient(
 
     fun sendCommand(payload: JSONObject) {
         val cmdName = payload.optString("cmd", "")
-        val isCoalesceable = cmdName == "set_volume" || cmdName == "set_eq" || cmdName == "ota_status"
+        val isCoalesceable = cmdName == "set_volume" || cmdName == "set_eq" || cmdName == "ota_status" || cmdName == "ymusic_status"
         val isSilentPoll = cmdName == "ymusic_status" || cmdName == "get_status" || cmdName == "ota_status"
         val job = scope.launch(Dispatchers.IO) {
             if (relayActive && writer == null) {

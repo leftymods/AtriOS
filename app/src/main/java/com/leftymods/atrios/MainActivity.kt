@@ -485,12 +485,16 @@ fun AtriOSApp(
         pendingPlayStateRef.set(null)
         status = status.copy(ymusic = status.ymusic.copy(mode = mode, state = "loading", error = null))
         client.ymusicPlay(mode, query)
-        if (!client.isRelayActive()) {
+        trackTransitionJobRef.getAndSet(
             scope.launch {
-                delay(750)
+                delay(650)
                 client.ymusicStatus()
+                delay(1400)
+                if (status.ymusic.state == "loading") {
+                    client.ymusicStatus()
+                }
             }
-        }
+        )?.cancel()
     }
 
     fun dispatchYMusicControl(action: String) {
@@ -580,9 +584,12 @@ fun AtriOSApp(
         if (action == "next" || action == "prev") {
             trackTransitionJobRef.getAndSet(
                 scope.launch {
-                    delay(750)
-                    if (!client.isRelayActive()) client.ymusicStatus()
-                    delay(1800)
+                    delay(650)
+                    client.ymusicStatus()
+                    delay(1200)
+                    if (status.ymusic.state == "loading") {
+                        client.ymusicStatus()
+                    }
                     isTrackTransitioning = false
                 }
             )?.cancel()
