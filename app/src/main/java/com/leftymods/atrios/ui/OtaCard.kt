@@ -34,7 +34,7 @@ fun OtaUpdateCard(
 
     LaunchedEffect(ota.isBusy) {
         while (ota.isBusy) {
-            kotlinx.coroutines.delay(1000L)
+            kotlinx.coroutines.delay(2500L)
             onRefreshStatus()
         }
     }

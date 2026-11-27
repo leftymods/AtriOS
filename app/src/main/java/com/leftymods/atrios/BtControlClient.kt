@@ -360,8 +360,50 @@ class BtControlClient(
         startRelayLoop(cleanUrl, cleanDid, cleanTok, keepConnectedOnStart = false)
     }
 
+    private val cachedHostIps = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private fun openRelayConnection(urlStr: String): HttpsURLConnection {
+        val orig = URL(urlStr)
+        val host = orig.host
+        try {
+            val addr = java.net.InetAddress.getByName(host)
+            addr.hostAddress?.let { cachedHostIps[host] = it }
+            return orig.openConnection() as HttpsURLConnection
+        } catch (dnsErr: java.net.UnknownHostException) {
+            val fallbackIp = cachedHostIps[host] ?: throw dnsErr
+            val ipUrl = URL(orig.protocol, fallbackIp, orig.port, orig.file)
+            val conn = ipUrl.openConnection() as HttpsURLConnection
+            conn.setRequestProperty("Host", if (orig.port > 0) "$host:${orig.port}" else host)
+            val baseFactory = HttpsURLConnection.getDefaultSSLSocketFactory()
+            conn.sslSocketFactory = object : javax.net.ssl.SSLSocketFactory() {
+                private fun withSni(s: java.net.Socket): java.net.Socket {
+                    if (s is javax.net.ssl.SSLSocket) {
+                        val params = s.sslParameters
+                        params.serverNames = listOf(javax.net.ssl.SNIHostName(host))
+                        s.sslParameters = params
+                    }
+                    return s
+                }
+                override fun getDefaultCipherSuites(): Array<String> = baseFactory.defaultCipherSuites
+                override fun getSupportedCipherSuites(): Array<String> = baseFactory.supportedCipherSuites
+                override fun createSocket(s: java.net.Socket, h: String, p: Int, autoClose: Boolean) =
+                    withSni(baseFactory.createSocket(s, host, p, autoClose))
+                override fun createSocket(h: String, p: Int) = withSni(baseFactory.createSocket(h, p))
+                override fun createSocket(h: String, p: Int, lh: java.net.InetAddress, lp: Int) =
+                    withSni(baseFactory.createSocket(h, p, lh, lp))
+                override fun createSocket(a: java.net.InetAddress, p: Int) = withSni(baseFactory.createSocket(a, p))
+                override fun createSocket(a: java.net.InetAddress, p: Int, la: java.net.InetAddress, lp: Int) =
+                    withSni(baseFactory.createSocket(a, p, la, lp))
+            }
+            conn.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, session ->
+                HttpsURLConnection.getDefaultHostnameVerifier().verify(host, session)
+            }
+            return conn
+        }
+    }
+
     private fun relayHttpGet(urlStr: String, token: String): JSONObject {
-        val conn = (URL(urlStr).openConnection() as HttpsURLConnection).apply {
+        val conn = openRelayConnection(urlStr).apply {
             requestMethod = "GET"
             connectTimeout = 8000
             readTimeout = 10000
@@ -384,7 +426,7 @@ class BtControlClient(
     private fun relayHttpPost(urlStr: String, token: String, payload: JSONObject): JSONObject {
         val t0 = System.currentTimeMillis()
         DebugLogStore.totalRequests.incrementAndGet()
-        val conn = (URL(urlStr).openConnection() as HttpsURLConnection).apply {
+        val conn = openRelayConnection(urlStr).apply {
             requestMethod = "POST"
             doOutput = true
             connectTimeout = 8000
@@ -412,12 +454,13 @@ class BtControlClient(
 
     fun sendCommand(payload: JSONObject) {
         val cmdName = payload.optString("cmd", "")
-        val isCoalesceable = cmdName == "set_volume" || cmdName == "set_eq"
+        val isCoalesceable = cmdName == "set_volume" || cmdName == "set_eq" || cmdName == "ota_status"
+        val isSilentPoll = cmdName == "ymusic_status" || cmdName == "get_status" || cmdName == "ota_status"
         val job = scope.launch(Dispatchers.IO) {
             if (relayActive && writer == null) {
                 val tStart = System.currentTimeMillis()
                 var lastErr: Exception? = null
-                val maxAttempts = if (isCoalesceable) 2 else 3
+                val maxAttempts = if (isSilentPoll) 1 else if (isCoalesceable) 2 else 3
                 for (attempt in 0 until maxAttempts) {
                     try {
                         val url = "$relayGateway/relay/v1/app/$relayDeviceId/cmd"
@@ -425,7 +468,7 @@ class BtControlClient(
                         val dt = System.currentTimeMillis() - tStart
                         val reply = resp.optJSONObject("reply")
                         val rtype = reply?.optString("type", "") ?: ""
-                        if (cmdName != "ymusic_status" && cmdName != "get_status") {
+                        if (!isSilentPoll) {
                             DebugLogStore.log("OK", "RELAY", "cmd=$cmdName -> 200 (${dt}ms) reply=$rtype")
                         }
                         if (reply != null && rtype != "coalesced") {
@@ -437,7 +480,6 @@ class BtControlClient(
                     } catch (e: Exception) {
                         lastErr = e
                         val msg = e.message ?: e.javaClass.simpleName
-                        val isSilentPoll = cmdName == "ymusic_status" || cmdName == "get_status"
                         val isDnsOffline = e is java.net.UnknownHostException || msg.contains("Unable to resolve host")
                         val isRetryable = !isDnsOffline && (msg.contains("HTTP 429") || msg.contains("HTTP 502") ||
                             msg.contains("HTTP 503") || msg.contains("HTTP 504") ||
@@ -447,7 +489,7 @@ class BtControlClient(
                             DebugLogStore.log("WARN", "RELAY", "cmd=$cmdName retry #${attempt + 1} in ${backoffMs}ms: $msg")
                             delay(backoffMs)
                         } else {
-                            if (!isSilentPoll || !isDnsOffline) {
+                            if (!isSilentPoll) {
                                 DebugLogStore.log("ERR", "RELAY", "cmd=$cmdName FAILED: $msg")
                             }
                             break
@@ -455,7 +497,7 @@ class BtControlClient(
                     }
                 }
                 // Don't spam UI snackbars on silent background polls or superseded live slider drags
-                if (cmdName != "ymusic_status" && cmdName != "get_status" && !isCoalesceable) {
+                if (!isSilentPoll && !isCoalesceable) {
                     withContext(Dispatchers.Main) {
                         onMessage("Нет связи с сервером ($cmdName): ${lastErr?.message ?: "таймаут"}", true)
                     }
