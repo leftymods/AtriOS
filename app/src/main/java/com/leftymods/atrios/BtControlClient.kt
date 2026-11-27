@@ -9,10 +9,14 @@ import com.leftymods.atrios.model.AiStatus
 import com.leftymods.atrios.model.AlarmItem
 import com.leftymods.atrios.model.DeviceCapabilities
 import com.leftymods.atrios.model.EqStatus
+import com.leftymods.atrios.model.MusicQuality
 import com.leftymods.atrios.model.OtaStatus
 import com.leftymods.atrios.model.SpeakerStatus
 import com.leftymods.atrios.model.TimerItem
 import com.leftymods.atrios.model.VqeStatus
+import com.leftymods.atrios.model.VoicePreference
+import com.leftymods.atrios.model.WeatherOption
+import com.leftymods.atrios.model.WeatherSettings
 import com.leftymods.atrios.model.YMusicStatus
 import com.leftymods.atrios.model.YMusicAlbum
 import com.leftymods.atrios.model.YMusicCollection
@@ -114,9 +118,11 @@ class BtControlClient(
     private val onButtonsPush: (Boolean, Boolean) -> Unit = { _, _ -> },
     private val onOtaUpdate: (OtaStatus) -> Unit = {},
     private val onYMusicUpdate: (YMusicStatus) -> Unit = {},
+    private val onYMusicSeekRejected: (String) -> Unit = {},
     private val onYMusicSearchResults: (List<YMusicTrack>, List<YMusicAlbum>) -> Unit = { _, _ -> },
     private val onYMusicOrbsUpdate: (List<YMusicOrb>) -> Unit = {},
     private val onYMusicCollectionUpdate: (YMusicCollection) -> Unit = {},
+    private val onWeatherForecast: (String) -> Unit = {},
     private val onTimersUpdate: (List<TimerItem>) -> Unit = {},
     private val onAlarmsUpdate: (List<AlarmItem>) -> Unit = {},
     private val onBtSpeakerPush: (Boolean) -> Unit = {},
@@ -465,11 +471,13 @@ class BtControlClient(
         val cmdName = payload.optString("cmd", "")
         val isCoalesceable = cmdName == "set_volume" || cmdName == "set_eq" || cmdName == "ota_status" || cmdName == "ymusic_status"
         val isSilentPoll = cmdName == "ymusic_status" || cmdName == "get_status" || cmdName == "ota_status"
+        // A timeout leaves the first request's outcome unknown. Repeating these can trigger the action twice.
+        val singleAttempt = cmdName in setOf("ymusic_control", "set_timer", "ota_apply", "ota_rollback", "reboot", "audio_test")
         val job = scope.launch(Dispatchers.IO) {
             if (relayActive && writer == null) {
                 val tStart = System.currentTimeMillis()
                 var lastErr: Exception? = null
-                val maxAttempts = if (isSilentPoll) 1 else if (isCoalesceable) 2 else 3
+                val maxAttempts = if (isSilentPoll || singleAttempt) 1 else if (isCoalesceable) 2 else 3
                 for (attempt in 0 until maxAttempts) {
                     try {
                         val url = "$relayGateway/relay/v1/app/$relayDeviceId/cmd"
@@ -512,8 +520,16 @@ class BtControlClient(
                     }
                 }
             } else {
-                DebugLogStore.log("INFO", "BT", "tx cmd=$cmdName")
-                writeJson(payload)
+                try {
+                    writeJson(payload)
+                    DebugLogStore.log("INFO", "BT", "tx cmd=$cmdName")
+                } catch (e: java.io.IOException) {
+                    if (!isSilentPoll && !isCoalesceable) {
+                        withContext(Dispatchers.Main) {
+                            onMessage("Команда не отправлена по Bluetooth. Проверьте соединение.", true)
+                        }
+                    }
+                }
             }
         }
         if (isCoalesceable) {
@@ -523,13 +539,9 @@ class BtControlClient(
 
     private suspend fun writeJson(payload: JSONObject) {
         writeMutex.withLock {
-            try {
-                writer?.let {
-                    it.write(payload.toString() + "\n")
-                    it.flush()
-                }
-            } catch (_: Exception) {
-            }
+            val output = writer ?: throw java.io.IOException("Bluetooth connection closed")
+            output.write(payload.toString() + "\n")
+            output.flush()
         }
     }
 
@@ -661,8 +673,9 @@ class BtControlClient(
         JSONObject().put("cmd", "ymusic_control").put("action", action)
     )
 
-    fun ymusicSeek(positionMs: Long) = sendCommand(
+    fun ymusicSeek(positionMs: Long, trackId: String, seekId: String) = sendCommand(
         JSONObject().put("cmd", "ymusic_seek").put("position_ms", positionMs.coerceAtLeast(0L))
+            .put("track_id", trackId).put("seek_id", seekId)
     )
 
     fun setYnisonEnabled(enabled: Boolean) = sendCommand(
@@ -722,6 +735,30 @@ class BtControlClient(
     )
 
     // AI & Qwen3-TTS (#10 contract)
+    fun setRoom(name: String) = sendCommand(
+        JSONObject().put("cmd", "set_room").put("room", name)
+    )
+
+    fun setWeather(settings: WeatherSettings) {
+        val options = JSONObject()
+        WeatherOption.entries.forEach { options.put(it.key, it in settings.options) }
+        sendCommand(JSONObject().put("cmd", "set_weather").put("city", settings.city).put("options", options))
+    }
+
+    fun getWeather() = sendCommand(JSONObject().put("cmd", "get_weather"))
+
+    fun setMusicQuality(quality: MusicQuality) = sendCommand(
+        JSONObject().put("cmd", "set_music_quality").put("quality", quality.id)
+    )
+
+    fun setVoicePreferences(values: Map<VoicePreference, Boolean>) {
+        val preferences = JSONObject()
+        values.forEach { (preference, enabled) -> preferences.put(preference.key, enabled) }
+        sendCommand(JSONObject()
+            .put("cmd", "set_voice_preferences")
+            .put("preferences", preferences))
+    }
+
     fun setAi(
         enabled: Boolean? = null,
         mode: String? = null,
@@ -832,10 +869,14 @@ class BtControlClient(
                     wifiIp = wifi.optString("ip", ""),
                     btSpeakerMode = bt.optBoolean("is_speaker_mode", false),
                     btHidden = bt.optBoolean("hidden", false),
+                    btAvailable = bt.optBoolean("available", bt.has("adapter")),
                     btDiscoverable = bt.optBoolean("discoverable", false),
                     btPairRemainingSec = bt.optInt("pair_remaining_sec", 0),
                     pairedDevices = paired,
                     ai = ai,
+                    musicQuality = MusicQuality.entries.firstOrNull { it.id == json.optString("music_quality") },
+                    room = json.optString("room").takeIf { json.has("room") },
+                    weather = json.optJSONObject("weather")?.let { WeatherSettings.fromJson(it) },
                     vqe = vqe,
                     eq = eq,
                     ota = ota,
@@ -843,6 +884,14 @@ class BtControlClient(
                     capabilities = caps
                 )
                 withContext(Dispatchers.Main) { onStatus(status) }
+            }
+            "mute_response" -> {
+                if (json.has("volume")) {
+                    val volume = json.optInt("volume")
+                    withContext(Dispatchers.Main) { onVolumePush(volume, volume == 0) }
+                } else {
+                    requestStatus()
+                }
             }
             "volume_change", "volume_response" -> {
                 val vol = json.optInt("volume", 60)
@@ -894,6 +943,9 @@ class BtControlClient(
                 val ok = json.optBoolean("success", true)
                 withContext(Dispatchers.Main) {
                     if (ymObj != null) onYMusicUpdate(YMusicStatus.fromJson(ymObj))
+                    if (!ok && json.optString("type") == "ymusic_seek_response") {
+                        onYMusicSeekRejected(json.optString("seek_id"))
+                    }
                     if (msg.isNotBlank() && json.optString("type") != "ymusic_status") {
                         onMessage(msg, !ok)
                     }
@@ -916,6 +968,10 @@ class BtControlClient(
                     onAlarmsUpdate(alarms)
                     if (msg.isNotBlank()) onMessage(msg, !ok)
                 }
+            }
+            "weather_forecast" -> {
+                val forecast = json.optString("forecast")
+                withContext(Dispatchers.Main) { onWeatherForecast(forecast) }
             }
             "action_response" -> {
                 val msg = json.optString("message", "")
@@ -1041,7 +1097,7 @@ class BtControlClient(
                 }
             }
             "error" -> {
-                val msg = json.optString("message", "Ошибка команды")
+                val msg = json.optString("message").ifBlank { json.optString("error", "Ошибка команды") }
                 // Gracefully translate unknown commands from older firmware
                 val friendly = if (msg.startsWith("Unknown command:", ignoreCase = true)) {
                     val cmdName = msg.substringAfter(":").trim()

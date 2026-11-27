@@ -45,6 +45,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -79,6 +80,10 @@ import com.leftymods.atrios.model.YMusicCollection
 import com.leftymods.atrios.model.YMusicOrb
 import com.leftymods.atrios.model.YMusicTrack
 import com.leftymods.atrios.ui.AiAssistantCard
+import com.leftymods.atrios.ui.VoicePreferencesCard
+import com.leftymods.atrios.ui.MusicQualityCard
+import com.leftymods.atrios.ui.RoomCard
+import com.leftymods.atrios.ui.WeatherCard
 import com.leftymods.atrios.ui.AsyncCoverArt
 import com.leftymods.atrios.ui.AtriHomeScreen
 import com.leftymods.atrios.ui.AudioCard
@@ -135,14 +140,56 @@ private enum class AppTab(val label: String, val icon: ImageVector) {
 
 private enum class SettingsPage(val title: String, val subtitle: String, val icon: ImageVector) {
     ROOT("Настройки", "", Icons.Rounded.Tune),
-    ACCOUNT("Аккаунт Яндекс", "Яндекс Музыка, вход и профиль", Icons.Rounded.Person),
-    WIFI("Wi-Fi и сеть", "Подключение колонки к Wi-Fi, интернет-пара", Icons.Rounded.Wifi),
-    BLUETOOTH("Bluetooth", "Режим BT-колонки и сопряжение", Icons.Rounded.Bluetooth),
+    WIFI("Wi-Fi и сеть", "Текущая сеть и подключение к другой", Icons.Rounded.Wifi),
+    BLUETOOTH("Bluetooth", "Видимость и сопряжение", Icons.Rounded.Bluetooth),
+    ASSISTANT("Ассистент", "Активация, диалог и быстрые команды", Icons.Rounded.AutoAwesome),
+    SOUND("Звук и индикация", "Громкость, эквалайзер, дисплей и кольцо", Icons.Rounded.GraphicEq),
+    WEATHER("Погода", "Город и сведения для голосового ответа", Icons.Rounded.WbSunny),
+    DIALOG("Активация и диалог", "Сигнал пробуждения и продолжение разговора", Icons.Rounded.Mic),
+    QUICK("Быстрые команды", "Управление колонкой без слова активации", Icons.Rounded.Bolt),
+    VOICE("Ассистент и сервер", "Слово активации и подключение к AtriAI", Icons.Rounded.RecordVoiceOver),
+    QUALITY("Качество музыки", "Поток Яндекс Музыки для следующих треков", Icons.Rounded.MusicNote),
+    LIGHTING("Экран и кольцо", "Индикация на колонке", Icons.Rounded.LightMode),
     PALETTE("Оформление и палитра", "Цвет интерфейса и анимации волны", Icons.Rounded.Palette),
     TIME("Время и регион", "Синхронизация NTP и часовой пояс", Icons.Rounded.Schedule),
     UPDATES("Обновления", "Прошивка колонки (OTA) и приложение", Icons.Rounded.SystemUpdate),
     ABOUT("Об устройстве", "Кодовое имя, ревизия и серийный номер", Icons.Rounded.Info),
-    DEBUG("Debug-меню", "ИИ-сервер, Qwen3-TTS, анимации, RGB, диагностика", Icons.Rounded.BugReport)
+    DEBUG("Диагностика", "Логи, обработка микрофонов и тест динамиков", Icons.Rounded.BugReport);
+
+    val parent: SettingsPage
+        get() = when (this) {
+            DIALOG, QUICK, VOICE -> ASSISTANT
+            QUALITY, LIGHTING -> SOUND
+            DEBUG -> ABOUT
+            else -> ROOT
+        }
+}
+
+@Composable
+private fun SettingsGlyph(icon: ImageVector, accent: Color) {
+    Surface(shape = RoundedCornerShape(14.dp), color = accent.copy(alpha = 0.14f)) {
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsLink(title: String, summary: String, icon: ImageVector, accent: Color, open: () -> Unit) {
+    Surface(onClick = open, shape = RoundedCornerShape(20.dp), color = OledCard) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SettingsGlyph(icon, accent)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
 }
 
 @Composable
@@ -204,6 +251,7 @@ fun AtriOSApp(
 
     var status by remember { mutableStateOf(SpeakerStatus()) }
     var sliderVol by remember { mutableFloatStateOf(60f) }
+    var weatherForecast by remember { mutableStateOf("") }
     var timers by remember { mutableStateOf<List<TimerItem>>(emptyList()) }
     var alarms by remember { mutableStateOf<List<AlarmItem>>(emptyList()) }
     var ymSearchResults by remember { mutableStateOf<List<YMusicTrack>>(emptyList()) }
@@ -252,17 +300,28 @@ fun AtriOSApp(
     var isTrackTransitioning by remember { mutableStateOf(false) }
     var showVolumeSheet by remember { mutableStateOf(false) }
     var showEqSheet by remember { mutableStateOf(false) }
-    var liveElapsedMs by remember(status.ymusic.trackId) { mutableLongStateOf(status.ymusic.positionMs.coerceAtLeast(0L)) }
-    LaunchedEffect(status.ymusic.positionMs) {
-        val srv = status.ymusic.positionMs.coerceAtLeast(0L)
-        if (kotlin.math.abs(srv - liveElapsedMs) >= 2000L) liveElapsedMs = srv
+    var pendingSeek by remember { mutableStateOf<PendingMusicSeek?>(null) }
+    var playbackClock by remember { mutableStateOf(PlaybackClock(status.ymusic, android.os.SystemClock.elapsedRealtime())) }
+    var liveElapsedMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(status.ymusic) {
+        val music = status.ymusic
+        playbackClock = playbackClock.sync(music, android.os.SystemClock.elapsedRealtime())
+        val requested = pendingSeek ?: return@LaunchedEffect
+        when (requested.outcome(music)) {
+            SeekOutcome.WAITING -> Unit
+            SeekOutcome.APPLIED, SeekOutcome.REPLACED -> pendingSeek = null
+            SeekOutcome.FAILED -> {
+                pendingSeek = null
+                snackbarHostState.showSnackbar("Не удалось перемотать трек")
+            }
+        }
     }
-    LaunchedEffect(status.ymusic.trackId, status.ymusic.state, selectedTab) {
-        if (selectedTab == AppTab.HOME) {
-            while (status.ymusic.state == "playing") {
-                delay(500)
-                val dur = status.ymusic.durationMs
-                liveElapsedMs = if (dur > 0L) (liveElapsedMs + 500L).coerceAtMost(dur) else (liveElapsedMs + 500L)
+    LaunchedEffect(playbackClock, selectedTab) {
+        liveElapsedMs = playbackClock.positionAt(android.os.SystemClock.elapsedRealtime())
+        if (selectedTab == AppTab.HOME && playbackClock.music.state == "playing") {
+            while (true) {
+                delay(250)
+                liveElapsedMs = playbackClock.positionAt(android.os.SystemClock.elapsedRealtime())
             }
         }
     }
@@ -411,6 +470,10 @@ fun AtriOSApp(
                     }
                 }
             },
+            onYMusicSeekRejected = { id ->
+                if (pendingSeek?.id == id) pendingSeek = null
+            },
+            onWeatherForecast = { weatherForecast = it },
             onTimersUpdate = { list -> timers = list },
             onAlarmsUpdate = { list -> alarms = list },
             onRelayInfo = { did, gw, tok ->
@@ -478,6 +541,19 @@ fun AtriOSApp(
             lastVolumeSentRef.set(nowMs)
             lastVolumeSentPctRef.set(pct)
             client.setVolume(pct)
+        }
+    }
+
+    LaunchedEffect(pendingSeek?.id, connected) {
+        val request = pendingSeek ?: return@LaunchedEffect
+        if (!connected) return@LaunchedEffect
+        repeat(24) {
+            delay(1800)
+            client.ymusicStatus()
+        }
+        if (pendingSeek?.id == request.id) {
+            pendingSeek = null
+            snackbarHostState.showSnackbar("Колонка не подтвердила перемотку")
         }
     }
 
@@ -618,7 +694,7 @@ fun AtriOSApp(
         when {
             showEqSheet -> showEqSheet = false
             showVolumeSheet -> showVolumeSheet = false
-            selectedTab == AppTab.SETTINGS && settingsPage != SettingsPage.ROOT -> settingsPage = SettingsPage.ROOT
+            selectedTab == AppTab.SETTINGS && settingsPage != SettingsPage.ROOT -> settingsPage = settingsPage.parent
             selectedTab != AppTab.HOME -> selectedTab = AppTab.HOME
         }
     }
@@ -1003,7 +1079,9 @@ fun AtriOSApp(
                     when (currentTab) {
                         AppTab.HOME -> {
                             val homeProgress = if (status.ymusic.durationMs > 0L) {
-                                (liveElapsedMs.toFloat() / status.ymusic.durationMs.toFloat()).coerceIn(0f, 1f)
+                                val position = pendingSeek?.takeIf { it.trackId == status.ymusic.trackId }?.targetMs
+                                    ?: liveElapsedMs
+                                (position.toFloat() / status.ymusic.durationMs.toFloat()).coerceIn(0f, 1f)
                             } else 0f
                             AtriHomeScreen(
                                 status = status,
@@ -1029,8 +1107,12 @@ fun AtriOSApp(
                                 },
                                 onNext = { dispatchYMusicControl("next") },
                                 onSeek = { targetMs ->
-                                    status = status.copy(ymusic = status.ymusic.copy(positionMs = targetMs))
-                                    client.ymusicSeek(targetMs)
+                                    val music = status.ymusic
+                                    if (music.trackId.isNotBlank() && music.isActive) {
+                                        val request = PendingMusicSeek(java.util.UUID.randomUUID().toString(), music.trackId, targetMs, music.seq)
+                                        pendingSeek = request
+                                        client.ymusicSeek(request.targetMs, request.trackId, request.id)
+                                    }
                                 },
                                 onPlayWavePreset = { mode, query -> dispatchYMusicPlay(mode, query) },
                                 onOpenVolume = { showVolumeSheet = true },
@@ -1211,12 +1293,12 @@ fun AtriOSApp(
 
                         AppTab.SETTINGS -> {
                             BackHandler(enabled = settingsPage != SettingsPage.ROOT && !showBigPlayer && !showVolumeSheet && !showEqSheet) {
-                                settingsPage = SettingsPage.ROOT
+                                settingsPage = settingsPage.parent
                             }
                             AnimatedContent(
                                 targetState = settingsPage,
                                 transitionSpec = {
-                                    val forward = targetState != SettingsPage.ROOT
+                                    val forward = targetState != initialState.parent
                                     val dir = if (forward) 1 else -1
                                     (slideInHorizontally(spring(dampingRatio = 0.86f, stiffness = 340f)) { (it * 0.32f).toInt() * dir } +
                                         scaleIn(initialScale = 0.96f, animationSpec = tween(220)) +
@@ -1277,19 +1359,22 @@ fun AtriOSApp(
                                     }
                                     val curAppVer = AppUpdater.currentVersionName(context)
                                     val sections = listOf(
-                                        "Подключение и аккаунт" to listOf(
-                                            SettingsPage.ACCOUNT to if (status.ymusic.loggedIn) status.ymusic.displayName.ifBlank { status.ymusic.login.ifBlank { "Подключён" } } else "Не выполнен вход",
+                                        "Подключение" to listOf(
                                             SettingsPage.WIFI to if (status.wifiConnected) "${status.wifiSsid.ifBlank { "Wi-Fi OK" }} (${status.wifiIp})" else "Wi-Fi не подключён",
-                                            SettingsPage.BLUETOOTH to "${if (status.btSpeakerMode) "BT-колонка вкл." else "BT-колонка выкл."} · ${if (status.btHidden) "Скрыта" else "Видима"}"
+                                            SettingsPage.BLUETOOTH to status.bluetoothVisibility
+                                        ),
+                                        "Управление колонкой" to listOf(
+                                            SettingsPage.ASSISTANT to if (status.ai.enabled) "Активация и голосовые команды" else "Ассистент выключен",
+                                            SettingsPage.SOUND to "Громкость, эквалайзер, дисплей и кольцо",
+                                            SettingsPage.WEATHER to status.weather?.city.orEmpty().ifBlank { "Город и голосовой ответ" }
                                         ),
                                         "Интерфейс и время" to listOf(
                                             SettingsPage.PALETTE to palette.label,
                                             SettingsPage.TIME to status.timezone.ifBlank { "UTC" }
                                         ),
-                                        "Система и диагностика" to listOf(
+                                        "Система" to listOf(
                                             SettingsPage.UPDATES to "Прошивка v${status.fwVersion.ifBlank { "—" }} · App v$curAppVer",
-                                            SettingsPage.ABOUT to "${status.model} (${status.codename.ifBlank { "yndxsttion53" }})",
-                                            SettingsPage.DEBUG to "Логи (${DebugLogStore.errorCount.get()} ош.), VQE, E2EE, ИИ"
+                                            SettingsPage.ABOUT to status.room.orEmpty().ifBlank { status.model }
                                         )
                                     )
                                     sections.forEach { (sectionTitle, entries) ->
@@ -1348,93 +1433,113 @@ fun AtriOSApp(
                                     }
                                 } else {
                                     item {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            IconButton(
-                                                onClick = { settingsPage = SettingsPage.ROOT },
-                                                modifier = Modifier.size(38.dp).clip(CircleShape).background(OledCard)
-                                            ) {
-                                                Icon(Icons.Rounded.ArrowBack, contentDescription = "Назад", tint = Color.White)
+                                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            TextButton(onClick = { settingsPage = curPage.parent }) {
+                                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(curPage.parent.title)
                                             }
-                                            Text(curPage.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                                        }
-                                    }
-
-                                    when (curPage) {
-                                        SettingsPage.ACCOUNT -> {
-                                            item {
-                                                Surface(shape = RoundedCornerShape(22.dp), color = OledCard) {
-                                                    Column(
-                                                        modifier = Modifier.fillMaxWidth().padding(18.dp),
-                                                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                                                    ) {
-                                                        Text(
-                                                            "Управление аккаунтом AtriOS и интеграцией Яндекс Музыки (Ynison) перенесено во вкладку «Сервисы».",
-                                                            color = Color(0xFFB0B0C0),
-                                                            fontSize = 14.sp
-                                                        )
-                                                        Button(
-                                                            onClick = {
-                                                                settingsPage = SettingsPage.ROOT
-                                                                selectedTab = AppTab.INTEGRATIONS
-                                                            },
-                                                            colors = ButtonDefaults.buttonColors(containerColor = palette.accent, contentColor = Color.Black)
-                                                        ) {
-                                                            Text("Открыть «Сервисы»", fontWeight = FontWeight.SemiBold)
+                                            Surface(shape = RoundedCornerShape(24.dp), color = OledCard) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    SettingsGlyph(curPage.icon, palette.accent)
+                                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Text(curPage.title, style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                                                        if (curPage != SettingsPage.ASSISTANT && curPage != SettingsPage.SOUND) {
+                                                            Text(curPage.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                         }
                                                     }
                                                 }
                                             }
                                         }
+                                    }
+
+                                    when (curPage) {
                                         SettingsPage.WIFI -> {
                                             item {
                                                 WifiCard(
                                                     wifiConnected = status.wifiConnected,
                                                     wifiSsid = status.wifiSsid,
                                                     wifiIp = status.wifiIp,
+                                                    canChangeNetwork = activeDevice != null && !client.isRelayActive(),
                                                     onConnectWifi = { ssid, psk -> client.wifiConnect(ssid, psk) }
                                                 )
-                                            }
-                                            item {
-                                                Surface(shape = RoundedCornerShape(22.dp), color = OledCard) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                    ) {
-                                                        Icon(
-                                                            if (relayConfig.token.isNotBlank()) Icons.Rounded.CloudDone else Icons.Rounded.CloudOff,
-                                                            contentDescription = null,
-                                                            tint = if (relayConfig.token.isNotBlank()) palette.accent else Color(0xFF6B6B75)
-                                                        )
-                                                        Column {
-                                                            Text(
-                                                                if (relayConfig.token.isNotBlank()) "Интернет-пара активна" else "Интернет-пара не настроена",
-                                                                color = Color.White,
-                                                                fontWeight = FontWeight.SemiBold
-                                                            )
-                                                            Text(
-                                                                if (relayConfig.token.isNotBlank()) "ID: ${relayConfig.deviceId} · автопереход при отключении BT"
-                                                                else "Подключитесь 1 раз по Bluetooth для автопривязки",
-                                                                style = MaterialTheme.typography.labelSmall,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                            )
-                                                        }
-                                                    }
-                                                }
                                             }
                                         }
                                         SettingsPage.BLUETOOTH -> {
                                             item {
                                                 BluetoothCard(
                                                     status = status,
-                                                    onToggleSpeakerMode = { enabled -> client.setBtSpeakerMode(enabled) },
-                                                    onPair = { secs -> client.btPair(secs) },
-                                                    onHide = { client.btHide() },
-                                                    onUnpair = { mac -> client.btUnpair(mac) }
+                                                    onPair = { client.btPair(120) },
+                                                    onHide = { client.btHide() }
+                                                )
+                                            }
+                                        }
+                                        SettingsPage.ASSISTANT -> {
+                                            listOf(SettingsPage.DIALOG, SettingsPage.QUICK, SettingsPage.VOICE).forEach { page ->
+                                                item {
+                                                    SettingsLink(page.title, page.subtitle, page.icon, palette.accent) { settingsPage = page }
+                                                }
+                                            }
+                                        }
+                                        SettingsPage.DIALOG, SettingsPage.QUICK -> {
+                                            item {
+                                                VoicePreferencesCard(
+                                                    status.ai.voicePreferences,
+                                                    quickCommands = curPage == SettingsPage.QUICK,
+                                                    onChange = client::setVoicePreferences
+                                                )
+                                            }
+                                        }
+                                        SettingsPage.VOICE -> {
+                                            item {
+                                                AiAssistantCard(
+                                                    ai = status.ai,
+                                                    onApplyAi = { enabled, server, wake ->
+                                                        client.setAi(enabled = enabled, server = server, wakeWord = wake)
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        SettingsPage.SOUND -> {
+                                            item {
+                                                SettingsLink("Громкость", "${status.volume}%", Icons.Rounded.GraphicEq, palette.accent) { showVolumeSheet = true }
+                                            }
+                                            item {
+                                                SettingsLink("Эквалайзер", "Пресеты и пять полос", Icons.Rounded.Equalizer, palette.accent) { showEqSheet = true }
+                                            }
+                                            listOf(SettingsPage.QUALITY, SettingsPage.LIGHTING).forEach { page ->
+                                                item {
+                                                    SettingsLink(page.title, page.subtitle, page.icon, palette.accent) { settingsPage = page }
+                                                }
+                                            }
+                                        }
+                                        SettingsPage.QUALITY -> {
+                                            item {
+                                                MusicQualityCard(status.musicQuality, client::setMusicQuality)
+                                            }
+                                        }
+                                        SettingsPage.LIGHTING -> {
+                                            item {
+                                                LedAndScreenCard(
+                                                    capabilities = status.capabilities,
+                                                    currentScreenMode = status.screenMode,
+                                                    currentRingMode = status.ringMode,
+                                                    onSetScreen = { mode, st, txt -> client.setScreen(mode, st, txt) },
+                                                    onSetRing = { mode -> status = status.copy(ringMode = mode); client.setRing(mode) }
+                                                )
+                                            }
+                                        }
+                                        SettingsPage.WEATHER -> {
+                                            item {
+                                                WeatherCard(
+                                                    settings = status.weather,
+                                                    forecast = weatherForecast,
+                                                    onSave = { weatherForecast = ""; client.setWeather(it) },
+                                                    onForecast = { weatherForecast = ""; client.getWeather() }
                                                 )
                                             }
                                         }
@@ -1645,14 +1750,16 @@ fun AtriOSApp(
                                             }
                                         }
                                         SettingsPage.ABOUT -> {
+                                            status.room?.let { room ->
+                                                item { RoomCard(room, client::setRoom) }
+                                            }
                                             item {
                                                 Surface(shape = RoundedCornerShape(22.dp), color = OledCard) {
                                                     Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                                        Text("Информация об устройстве", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                                         InfoRow("Модель", status.model)
                                                         InfoRow("Кодовое имя", status.codename.ifBlank { "—" })
                                                         InfoRow("Ревизия", status.rev.ifBlank { "—" })
-                                                        InfoRow("Платформа (SoC)", status.soc.substringBefore("(").trim().ifBlank { "Amlogic S905X3" })
+                                                        InfoRow("Платформа (SoC)", status.soc.substringBefore("(").trim().ifBlank { "—" })
                                                         InfoRow("Прошивка", "v${status.fwVersion}")
                                                         if (relayConfig.deviceId.isNotBlank()) {
                                                             InfoRow("Device ID", relayConfig.deviceId)
@@ -1660,9 +1767,14 @@ fun AtriOSApp(
                                                     }
                                                 }
                                             }
+                                            item {
+                                                val page = SettingsPage.DEBUG
+                                                SettingsLink(page.title, page.subtitle, page.icon, palette.accent) { settingsPage = page }
+                                            }
                                         }
                                         SettingsPage.DEBUG -> {
                                             item {
+                                                val canUseTerminal = activeDevice != null && !client.isRelayActive()
                                                 var debugSection by remember { mutableStateOf("ALL") }
                                                 var logFilter by remember { mutableStateOf("ALL") }
                                                 val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
@@ -1691,9 +1803,9 @@ fun AtriOSApp(
                                                             "ALL" to "Все",
                                                             "DIAG" to "Диагностика",
                                                             "LOGS" to "Логи (${DebugLogStore.entries.size})",
-                                                            "E2EE" to "E2EE",
-                                                            "HW" to "ИИ и LED"
-                                                        )
+                                                            "E2EE" to "Терминал",
+                                                            "HW" to "Тест звука"
+                                                        ).filter { (id, _) -> id != "E2EE" || canUseTerminal }
                                                         items(secChips.size) { i ->
                                                             val (id, label) = secChips[i]
                                                             FilterChip(
@@ -1737,7 +1849,16 @@ fun AtriOSApp(
                                                                 InfoRow("Задержка (RTT)", "${DebugLogStore.lastLatencyMs} мс (ср. ${DebugLogStore.avgLatencyMs} мс)")
                                                                 InfoRow("Запросы / Повторы / Ош.", "${DebugLogStore.totalRequests.get()} / ${DebugLogStore.retryCount.get()} / ${DebugLogStore.errorCount.get()}")
                                                                 InfoRow("Кэш Яндекс Музыки", "Сфер: ${ymOrbs.size} · Коллекция: ${if (ymCollection.loaded) "${ymCollection.likesCount} л." else "—"}")
-                                                                InfoRow("VQE / AEC", if (status.vqe.refActive) "ERLE %.1f дБ · SNR %.1f дБ · MIC #%d".format(status.vqe.erleDb, status.vqe.snrDb, status.vqe.bestMic) else "Ожидание loopback")
+                                                                InfoRow("VQE / AEC", if (status.vqe.refActive) "ERLE %.1f дБ · SNR %.1f дБ · MIC #%d".format(status.vqe.erleDb, status.vqe.snrDb, status.vqe.bestMic) else "Ожидание опорного сигнала")
+                                                                val vqe = status.vqe
+                                                                vqe.noiseSuppression?.let { ns ->
+                                                                    val mode = if (vqe.sampleAgeMs != null && vqe.sampleAgeMs > 5000) {
+                                                                        "Нет свежих данных"
+                                                                    } else if (ns.active) "Активен" else ns.mode
+                                                                    InfoRow("Шумодав GTCRN", mode)
+                                                                    InfoRow("Обработка", "%.1f мс в среднем · %.1f мс макс.".format(ns.averageMs, ns.peakMs))
+                                                                    InfoRow("Блоки с превышением 16 мс", "${ns.deadlineMisses} из ${ns.hops}")
+                                                                }
                                                                 InfoRow("Задержка VQE / Barge-In", "${status.vqe.lagMs} мс · ${if (status.vqe.bargeIn) "Речь" else "Готово"}")
                                                             }
                                                         }
@@ -1836,7 +1957,7 @@ fun AtriOSApp(
                                                     }
 
                                                     // 3. E2EE Station Terminal
-                                                    if (debugSection == "ALL" || debugSection == "E2EE") {
+                                                    if (canUseTerminal && (debugSection == "ALL" || debugSection == "E2EE")) {
                                                         Surface(
                                                             shape = RoundedCornerShape(TypeUI.RadiusLg),
                                                             color = TypeUI.SurfaceElevated,
@@ -1947,21 +2068,7 @@ fun AtriOSApp(
                                                         }
                                                     }
 
-                                                    // 4. AI / Qwen3-TTS, LED Ring/Matrix & Audio Test
                                                     if (debugSection == "ALL" || debugSection == "HW") {
-                                                        AiAssistantCard(
-                                                            ai = status.ai,
-                                                            onApplyAi = { enabled, mode, server, wake, voice, emotion ->
-                                                                client.setAi(enabled = enabled, mode = mode, server = server, wakeWord = wake, ttsVoice = voice, ttsEmotion = emotion)
-                                                            }
-                                                        )
-                                                        LedAndScreenCard(
-                                                            capabilities = status.capabilities,
-                                                            currentScreenMode = status.screenMode,
-                                                            currentRingMode = status.ringMode,
-                                                            onSetScreen = { mode, st, txt -> client.setScreen(mode, st, txt) },
-                                                            onSetRing = { mode -> status = status.copy(ringMode = mode); client.setRing(mode) }
-                                                        )
                                                         Surface(
                                                             shape = RoundedCornerShape(TypeUI.RadiusLg),
                                                             color = TypeUI.SurfaceElevated,
@@ -2010,22 +2117,7 @@ fun AtriOSApp(
                             speakersDesc = status.speakersDesc,
                             onVolumeChange = { dispatchVolumeLive(it, forceCommit = false) },
                             onVolumeCommit = { dispatchVolumeLive(latestSliderPctRef.get().toFloat(), forceCommit = true) },
-                            onToggleMute = {
-                                val nextMute = !status.mute
-                                val nowMs = System.currentTimeMillis()
-                                lastVolumeDragRef.set(nowMs)
-                                pendingVolUntilRef.set(nowMs + 2500L)
-                                if (nextMute) {
-                                    pendingVolRef.set(0)
-                                    latestSliderPctRef.set(0)
-                                    sliderVol = 0f
-                                    status = status.copy(volume = 0, mute = true)
-                                } else {
-                                    pendingVolRef.set(-1)
-                                    status = status.copy(mute = false)
-                                }
-                                client.setMute(nextMute)
-                            },
+                            onToggleMute = { client.setMute(!status.mute) },
                             onAudioTest = { client.audioTest() },
                             showAudioTest = false
                         )

@@ -2,6 +2,7 @@ package com.leftymods.atrios.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
@@ -11,14 +12,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.leftymods.atrios.model.AiStatus
 import com.leftymods.atrios.model.AlarmItem
 import com.leftymods.atrios.model.DeviceCapabilities
+import com.leftymods.atrios.model.MusicQuality
 import com.leftymods.atrios.model.SpeakerStatus
 import com.leftymods.atrios.model.TimerItem
+import com.leftymods.atrios.model.VoicePreference
+import com.leftymods.atrios.model.WeatherOption
+import com.leftymods.atrios.model.WeatherSettings
 import kotlinx.coroutines.delay
 import java.util.TimeZone
 
@@ -459,173 +466,249 @@ fun TimersAndAlarmsCard(
     }
 }
 
+@Composable
+fun RoomCard(room: String, onSave: (String) -> Unit) {
+    var name by remember(room) { mutableStateOf(room) }
+    ElevatedCard(shape = RoundedCornerShape(24.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(50) },
+                label = { Text("Комната") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            TextButton(onClick = { onSave(name.trim()) }, enabled = name.trim() != room) {
+                Text("Сохранить комнату")
+            }
+        }
+    }
+}
+
+@Composable
+fun WeatherCard(
+    settings: WeatherSettings?,
+    forecast: String,
+    onSave: (WeatherSettings) -> Unit,
+    onForecast: () -> Unit
+) {
+    ElevatedCard(shape = RoundedCornerShape(24.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (settings == null) {
+                Text("Обновите прошивку колонки, чтобы настроить погоду.")
+                return@Column
+            }
+            var city by remember(settings.city) { mutableStateOf(settings.city) }
+            var options by remember(settings.options) { mutableStateOf(settings.options) }
+            val draft = WeatherSettings(city.trim(), options)
+
+            OutlinedTextField(
+                value = city,
+                onValueChange = { city = it.take(80) },
+                label = { Text("Город") },
+                supportingText = { Text("Например, Москва, Россия") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Text("Дополнительно озвучивать", style = MaterialTheme.typography.titleSmall)
+            WeatherOption.entries.forEach { option ->
+                VoicePreferenceRow(option.label, option.subtitle, option in options) { checked ->
+                    options = if (checked) options + option else options - option
+                }
+            }
+            Button(onClick = { onSave(draft) }, enabled = draft != settings) {
+                Text("Сохранить")
+            }
+            OutlinedButton(onClick = onForecast, enabled = settings.city.isNotBlank() && draft == settings) {
+                Text("Показать погоду сейчас")
+            }
+            if (draft == settings && forecast.isNotBlank()) {
+                Text(forecast, style = MaterialTheme.typography.bodyMedium)
+            }
+            Text("Данные Open-Meteo.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun MusicQualityCard(quality: MusicQuality?, onChange: (MusicQuality) -> Unit) {
+    ElevatedCard(shape = RoundedCornerShape(24.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (quality == null) {
+                Text("Для этой настройки обновите прошивку колонки.", style = MaterialTheme.typography.bodySmall)
+            } else {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MusicQuality.entries.forEach { option ->
+                        FilterChip(
+                            selected = quality == option,
+                            onClick = { if (quality != option) onChange(option) },
+                            label = { Text(option.label) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VoicePreferencesCard(
+    preferences: Map<VoicePreference, Boolean>?,
+    quickCommands: Boolean,
+    onChange: (Map<VoicePreference, Boolean>) -> Unit
+) {
+    ElevatedCard(shape = RoundedCornerShape(24.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (preferences == null) {
+                Text(
+                    "Обновите прошивку колонки, чтобы менять эти настройки.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                return@Column
+            }
+
+            if (!quickCommands) {
+                val dialogOptions = listOf(
+                    Triple(VoicePreference.ACTIVATION_CHIME, "Звук активации", "Сигнал после слова активации"),
+                    Triple(VoicePreference.CONTINUOUS_DIALOG, "Продолжать диалог", "Слушать следующую фразу после ответа"),
+                    Triple(VoicePreference.QUIET_REPLY, "Тихий ответ", "Приглушает голос Атри, когда вы говорите тихо"),
+                    Triple(VoicePreference.ADAPTIVE_REPLY_VOLUME, "Адаптивная громкость", "Учитывает шум в комнате при озвучивании ответа")
+                )
+                dialogOptions.forEach { (key, title, description) ->
+                    preferences[key]?.let { checked ->
+                        VoicePreferenceRow(title, description, checked) { onChange(mapOf(key to it)) }
+                    }
+                }
+                return@Column
+            }
+
+            VoicePreferenceRow("Воспроизведение и пауза", "Пауза, продолжи",
+                preferences[VoicePreference.QUICK_MEDIA] == true) {
+                onChange(mapOf(VoicePreference.QUICK_MEDIA to it))
+            }
+            VoicePreferenceRow("Переключение треков", "Следующий или предыдущий трек",
+                preferences[VoicePreference.QUICK_TRACKS] == true) {
+                onChange(mapOf(VoicePreference.QUICK_TRACKS to it))
+            }
+            VoicePreferenceRow("Оценки треков", "Лайк и дизлайк в Яндекс Музыке",
+                preferences[VoicePreference.QUICK_FAVORITES] == true) {
+                onChange(mapOf(VoicePreference.QUICK_FAVORITES to it))
+            }
+            VoicePreferenceRow("Громкость", "Тише, громче", preferences[VoicePreference.QUICK_VOLUME] == true) {
+                onChange(mapOf(VoicePreference.QUICK_VOLUME to it))
+            }
+            VoicePreferenceRow("Bluetooth", "Включи или выключи Bluetooth",
+                preferences[VoicePreference.QUICK_BLUETOOTH] == true) {
+                onChange(mapOf(VoicePreference.QUICK_BLUETOOTH to it))
+            }
+            val availableCommands = listOf(
+                VoicePreference.QUICK_MEDIA, VoicePreference.QUICK_TRACKS,
+                VoicePreference.QUICK_FAVORITES, VoicePreference.QUICK_VOLUME,
+                VoicePreference.QUICK_BLUETOOTH
+            ).filter(preferences::containsKey)
+            val allOn = availableCommands.all { preferences[it] == true }
+            TextButton(enabled = availableCommands.isNotEmpty(), onClick = { onChange(availableCommands.associateWith { !allOn }) }) {
+                Text(if (allOn) "Выключить все быстрые команды" else "Включить все быстрые команды")
+            }
+            Text(
+                "Команда «Стоп» работает всегда.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun VoicePreferenceRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().toggleable(
+            value = checked,
+            role = Role.Switch,
+            onValueChange = onChange
+        ),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
 @Composable
 fun AiAssistantCard(
     ai: AiStatus,
-    onApplyAi: (
-        enabled: Boolean?,
-        mode: String?,
-        server: String?,
-        wakeWord: String?,
-        ttsVoice: String?,
-        ttsEmotion: String?
-    ) -> Unit
+    onApplyAi: (enabled: Boolean?, server: String?, wakeWord: String?) -> Unit
 ) {
     var serverText by remember(ai.server) { mutableStateOf(ai.server) }
     var wakeText by remember(ai.wakeWord) { mutableStateOf(ai.wakeWord) }
-    var selectedMode by remember(ai.mode) { mutableStateOf(ai.mode) }
-    var selectedVoice by remember(ai.ttsVoice) { mutableStateOf(ai.ttsVoice) }
-    var selectedEmotion by remember(ai.ttsEmotion) { mutableStateOf(ai.ttsEmotion) }
+    val serverChanged = serverText.trim() != ai.server
+    val wakeChanged = wakeText.trim() != ai.wakeWord
 
     ElevatedCard(shape = RoundedCornerShape(24.dp)) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
-                    Column {
-                        Text("ИИ-ассистент и Qwen3-TTS", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Состояние: ${ai.state}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Switch(
-                    checked = ai.enabled,
-                    onCheckedChange = { enabled ->
-                        onApplyAi(enabled, null, null, null, null, null)
-                    }
-                )
-            }
-
-            if (ai.lastAsr.isNotBlank() || ai.lastAnswer.isNotBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        if (ai.lastAsr.isNotBlank()) {
-                            Text("Вы: ${ai.lastAsr}", style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (ai.lastAnswer.isNotBlank()) {
-                            Text(
-                                "Ассистент: ${ai.lastAnswer}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
+            VoicePreferenceRow("Ассистент", "", ai.enabled) { enabled ->
+                onApplyAi(enabled, null, null)
             }
 
             if (ai.error.isNotBlank()) {
-                Text(
-                    "Ошибка ИИ: ${ai.error}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-
-            Text("Режим работы ИИ", style = MaterialTheme.typography.labelLarge)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                AiStatus.MODES.forEach { (id, label) ->
-                    FilterChip(
-                        selected = selectedMode == id,
-                        onClick = {
-                            selectedMode = id
-                            onApplyAi(null, id, null, null, null, null)
-                        },
-                        label = { Text(label) }
-                    )
-                }
-            }
-
-            if (selectedMode != "local") {
-                OutlinedTextField(
-                    value = serverText,
-                    onValueChange = { serverText = it },
-                    label = { Text("Адрес GPU-сервера AtriAI") },
-                    placeholder = { Text("https://192.168.1.107:8090") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                Text(ai.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
 
             OutlinedTextField(
                 value = wakeText,
                 onValueChange = { wakeText = it },
-                label = { Text("Слово активации (Wake Word)") },
+                label = { Text("Слово активации") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = serverText,
+                onValueChange = { serverText = it },
+                label = { Text("HTTPS-адрес AtriAI") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
 
-            Text("Голос Qwen3-TTS", style = MaterialTheme.typography.labelLarge)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                AiStatus.QWEN3_VOICES.forEach { voice ->
-                    FilterChip(
-                        selected = selectedVoice.equals(voice, ignoreCase = true),
-                        onClick = {
-                            selectedVoice = voice
-                            onApplyAi(null, null, null, null, voice, null)
-                        },
-                        label = { Text(voice) }
-                    )
-                }
-            }
-
-            Text("Эмоция голоса (Qwen3-TTS)", style = MaterialTheme.typography.labelLarge)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                AiStatus.QWEN3_EMOTIONS.forEach { (id, label) ->
-                    FilterChip(
-                        selected = selectedEmotion.equals(id, ignoreCase = true),
-                        onClick = {
-                            selectedEmotion = id
-                            onApplyAi(null, null, null, null, null, id)
-                        },
-                        label = { Text(label) }
-                    )
-                }
-            }
-
             Button(
                 onClick = {
-                    onApplyAi(
-                        ai.enabled,
-                        selectedMode,
-                        if (selectedMode != "local") serverText else null,
-                        wakeText,
-                        selectedVoice,
-                        selectedEmotion
-                    )
-                }
+                    onApplyAi(null, serverText.trim().takeIf { serverChanged }, wakeText.trim().takeIf { wakeChanged })
+                },
+                enabled = (serverChanged || wakeChanged) && (!serverChanged || serverText.trim().startsWith("https://"))
             ) {
-                Icon(Icons.Rounded.Save, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Сохранить настройки ИИ")
+                Text("Сохранить")
             }
         }
     }
@@ -633,96 +716,57 @@ fun AiAssistantCard(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun BluetoothCard(
-    status: SpeakerStatus,
-    onToggleSpeakerMode: (Boolean) -> Unit,
-    onPair: (Int) -> Unit,
-    onHide: () -> Unit,
-    onUnpair: (String) -> Unit
-) {
+fun BluetoothCard(status: SpeakerStatus, onPair: () -> Unit, onHide: () -> Unit) {
+    var requestedVisibility by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(requestedVisibility, status.btDiscoverable, status.btPairRemainingSec) {
+        val requested = requestedVisibility ?: return@LaunchedEffect
+        if (requested == status.btDiscoverable && (!requested || status.btPairRemainingSec > 0)) {
+            requestedVisibility = null
+        }
+    }
+    LaunchedEffect(requestedVisibility) {
+        if (requestedVisibility != null) {
+            delay(25_000)
+            requestedVisibility = null
+        }
+    }
     ElevatedCard(shape = RoundedCornerShape(24.dp)) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Rounded.BluetoothAudio, contentDescription = null)
-                    Text("Bluetooth и приватность", style = MaterialTheme.typography.titleMedium)
-                }
-                AssistChip(
-                    onClick = {},
-                    label = {
-                        Text(
-                            when {
-                                status.btHidden -> "Скрыта (PSCAN)"
-                                status.btPairRemainingSec > 0 -> "Видима (${status.btPairRemainingSec} с)"
-                                else -> "Видима"
-                            }
-                        )
-                    }
+            val title = when (requestedVisibility) {
+                true -> "Открываем поиск…"
+                false -> "Скрываем колонку…"
+                null -> status.bluetoothVisibility
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            if (status.btAvailable) {
+                Text(
+                    "Текущие подключения сохраняются при скрытии колонки из поиска.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-
-            if (status.capabilities.hasBluetoothSpeaker) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Режим Bluetooth-колонки", fontWeight = FontWeight.Medium)
-                            Text(
-                                if (status.btSpeakerMode) "A2DP-приёмник активен" else "Режим колонки выключен",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        enabled = requestedVisibility == null && status.btPairRemainingSec == 0,
+                        onClick = {
+                            requestedVisibility = true
+                            onPair()
                         }
-                        Switch(
-                            checked = status.btSpeakerMode,
-                            onCheckedChange = onToggleSpeakerMode
-                        )
+                    ) {
+                        Text("Сопряжение на 2 минуты")
+                    }
+                    if (status.btDiscoverable) {
+                        OutlinedButton(
+                            enabled = requestedVisibility == null,
+                            onClick = {
+                                requestedVisibility = false
+                                onHide()
+                            }
+                        ) { Text("Скрыть") }
                     }
                 }
-            }
-
-            Text(
-                if (status.btHidden)
-                    "Идентификатор колонки скрыт от поиска, чужие устройства не могут подключиться."
-                else
-                    "Колонка видима для сопряжения.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            status.pairedDevices.forEach { mac ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(mac, style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = { onUnpair(mac) }) { Text("Удалить") }
-                }
-            }
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Button(onClick = { onPair(120) }) { Text("Сопряжение 120 с") }
-                FilledTonalButton(onClick = onHide) { Text("Скрыть") }
             }
         }
     }
@@ -819,6 +863,7 @@ fun WifiCard(
     wifiConnected: Boolean,
     wifiSsid: String,
     wifiIp: String,
+    canChangeNetwork: Boolean,
     onConnectWifi: (String, String) -> Unit
 ) {
     var ssid by remember(wifiSsid) { mutableStateOf(wifiSsid) }
@@ -829,18 +874,15 @@ fun WifiCard(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Rounded.Wifi, contentDescription = null)
-                Text("Wi-Fi", style = MaterialTheme.typography.titleMedium)
-            }
             Text(
                 if (wifiConnected) "Подключено: $wifiSsid ($wifiIp)" else "Не подключено",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (!canChangeNetwork) {
+                Text("Подключитесь по Bluetooth для смены сети.", style = MaterialTheme.typography.bodySmall)
+                return@Column
+            }
             OutlinedTextField(
                 value = ssid,
                 onValueChange = { ssid = it },
@@ -852,12 +894,15 @@ fun WifiCard(
                 value = pass,
                 onValueChange = { pass = it },
                 label = { Text("Пароль") },
+                visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            Button(onClick = {
-                if (ssid.isNotBlank()) onConnectWifi(ssid.trim(), pass)
-            }) { Text("Подключить Wi-Fi") }
+            Button(
+                onClick = { onConnectWifi(ssid.trim(), pass) },
+                enabled = ssid.trim().toByteArray(Charsets.UTF_8).size in 1..32 &&
+                    (pass.isEmpty() || pass.toByteArray(Charsets.UTF_8).size in 8..63)
+            ) { Text("Подключить Wi-Fi") }
         }
     }
 }

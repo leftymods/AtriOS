@@ -32,7 +32,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -385,9 +384,6 @@ fun IntegrationsScreen(
             }
         }
 
-        // 3. Smart Home Slot
-        FutureIntegrationRow(Icons.Rounded.Home, "Home Assistant / Умный дом", "Скоро · голосовое управление устройствами")
-
         Spacer(Modifier.height(16.dp))
     }
 
@@ -399,26 +395,6 @@ fun IntegrationsScreen(
             },
             onDismiss = { showYmWebView = false }
         )
-    }
-}
-
-@Composable
-private fun FutureIntegrationRow(icon: ImageVector, title: String, subtitle: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(OledCard.copy(alpha = 0.7f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(18.dp))
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = Color(0xFF707085), modifier = Modifier.size(22.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = Color(0xFF808095), fontSize = 12.sp)
-        }
     }
 }
 

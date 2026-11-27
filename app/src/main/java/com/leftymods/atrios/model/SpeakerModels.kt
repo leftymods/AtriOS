@@ -172,6 +172,18 @@ data class AlarmItem(
     }
 }
 
+enum class VoicePreference(val key: String) {
+    ACTIVATION_CHIME("activation_chime"),
+    CONTINUOUS_DIALOG("continuous_dialog"),
+    QUIET_REPLY("quiet_reply"),
+    ADAPTIVE_REPLY_VOLUME("adaptive_reply_volume"),
+    QUICK_MEDIA("quick_media"),
+    QUICK_TRACKS("quick_tracks"),
+    QUICK_FAVORITES("quick_favorites"),
+    QUICK_VOLUME("quick_volume"),
+    QUICK_BLUETOOTH("quick_bluetooth")
+}
+
 data class AiStatus(
     val enabled: Boolean = false,
     val mode: String = "hybrid",
@@ -182,7 +194,8 @@ data class AiStatus(
     val state: String = "disabled",
     val lastAsr: String = "",
     val lastAnswer: String = "",
-    val error: String = ""
+    val error: String = "",
+    val voicePreferences: Map<VoicePreference, Boolean>? = null
 ) {
     companion object {
         val MODES: List<Pair<String, String>> = listOf(
@@ -227,7 +240,14 @@ data class AiStatus(
                 state = obj.optString("state", "disabled"),
                 lastAsr = obj.optString("last_asr", ""),
                 lastAnswer = obj.optString("last_answer", ""),
-                error = obj.optString("error", "")
+                error = obj.optString("error", ""),
+                voicePreferences = obj.optJSONObject("voice_preferences")?.let { prefs ->
+                    buildMap {
+                        VoicePreference.entries.forEach { preference ->
+                            (prefs.opt(preference.key) as? Boolean)?.let { put(preference, it) }
+                        }
+                    }
+                }
             )
         }
     }
@@ -513,6 +533,8 @@ data class YMusicStatus(
     val prevCoverUrl: String = "",
     val durationMs: Long = 0L,
     val positionMs: Long = 0L,
+    val seekId: String = "",
+    val seekState: String? = null,
     val liked: Boolean = false,
     val repeat: Boolean = false,
     val canPrev: Boolean = false,
@@ -568,6 +590,8 @@ data class YMusicStatus(
                 prevCoverUrl = obj.optString("prev_cover_url", ""),
                 durationMs = obj.optLong("duration_ms", 0L),
                 positionMs = obj.optLong("position_ms", 0L),
+                seekId = obj.optString("seek_id"),
+                seekState = obj.optString("seek_state").takeIf { obj.has("seek_state") },
                 liked = obj.optBoolean("liked", false),
                 repeat = obj.optBoolean("repeat", false),
                 canPrev = obj.optBoolean("can_prev", obj.optString("prev_title", "").isNotBlank()),
@@ -609,13 +633,24 @@ data class EqStatus(
     }
 }
 
+data class NoiseSuppressionStatus(
+    val active: Boolean,
+    val mode: String,
+    val averageMs: Double,
+    val peakMs: Double,
+    val deadlineMisses: Long,
+    val hops: Long
+)
+
 data class VqeStatus(
     val erleDb: Float = 0f,
     val snrDb: Float = 0f,
     val lagMs: Int = 0,
     val bestMic: Int = 0,
     val bargeIn: Boolean = false,
-    val refActive: Boolean = false
+    val refActive: Boolean = false,
+    val sampleAgeMs: Long? = null,
+    val noiseSuppression: NoiseSuppressionStatus? = null
 ) {
     companion object {
         fun fromJson(obj: JSONObject?): VqeStatus {
@@ -626,8 +661,46 @@ data class VqeStatus(
                 lagMs = obj.optInt("lag_ms", 0),
                 bestMic = obj.optInt("best_mic", 0),
                 bargeIn = obj.optBoolean("barge_in", false),
-                refActive = obj.optBoolean("ref_active", false)
+                refActive = obj.optBoolean("ref_active", false),
+                sampleAgeMs = obj.optLong("sample_age_ms").takeIf { obj.has("sample_age_ms") },
+                noiseSuppression = obj.optJSONObject("gtcrn")?.let { ns ->
+                    NoiseSuppressionStatus(
+                        active = ns.optBoolean("active"),
+                        mode = ns.optString("mode"),
+                        averageMs = ns.optDouble("infer_ms_avg", 0.0),
+                        peakMs = ns.optDouble("infer_ms_max", 0.0),
+                        deadlineMisses = ns.optLong("deadline_misses"),
+                        hops = ns.optLong("hops")
+                    )
+                }
             )
+        }
+    }
+}
+
+enum class MusicQuality(val id: String, val label: String) {
+    ECONOMY("economy", "Экономное"),
+    BALANCED("balanced", "Оптимальное"),
+    HIGH("high", "Высокое")
+}
+
+enum class WeatherOption(val key: String, val label: String, val subtitle: String = "") {
+    WIND("wind", "Направление и скорость ветра"),
+    HUMIDITY("humidity", "Влажность"),
+    PRESSURE("pressure", "Атмосферное давление"),
+    UV("uv", "УФ-индекс", "Максимальное значение за день"),
+    WATER("water", "Температура моря", "При наличии данных вблизи города"),
+    SUN("sun", "Восход и закат"),
+    MOON("moon", "Фаза Луны", "Приблизительно"),
+    FEELS_LIKE("feels_like", "Температура по ощущениям")
+}
+
+data class WeatherSettings(val city: String, val options: Set<WeatherOption>) {
+    companion object {
+        fun fromJson(json: JSONObject): WeatherSettings {
+            val flags = json.optJSONObject("options")
+            val options = WeatherOption.entries.filterTo(mutableSetOf()) { flags?.optBoolean(it.key) == true }
+            return WeatherSettings(json.optString("city"), options)
         }
     }
 }
@@ -660,13 +733,25 @@ data class SpeakerStatus(
     val wifiIp: String = "",
     val btSpeakerMode: Boolean = false,
     val btHidden: Boolean = false,
+    val btAvailable: Boolean = false,
     val btDiscoverable: Boolean = false,
     val btPairRemainingSec: Int = 0,
     val pairedDevices: List<String> = emptyList(),
     val ai: AiStatus = AiStatus(),
+    val musicQuality: MusicQuality? = null,
+    val room: String? = null,
+    val weather: WeatherSettings? = null,
     val vqe: VqeStatus = VqeStatus(),
     val eq: EqStatus = EqStatus(),
     val ota: OtaStatus = OtaStatus(),
     val ymusic: YMusicStatus = YMusicStatus(),
     val capabilities: DeviceCapabilities = DeviceCapabilities()
-)
+) {
+    val bluetoothVisibility: String
+        get() = when {
+            !btAvailable -> "Bluetooth недоступен"
+            !btDiscoverable -> "Скрыта из поиска"
+            btPairRemainingSec > 0 -> "Видима ещё $btPairRemainingSec с"
+            else -> "Видима в поиске"
+        }
+}
