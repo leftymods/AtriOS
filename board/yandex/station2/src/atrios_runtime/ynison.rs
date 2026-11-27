@@ -449,6 +449,8 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
     let mut last_pushed_track = String::new();
     let mut last_pushed_paused = true;
     let mut last_local_queue_push_ms: i64 = 0;
+    let mut last_remote_sync_at: Option<Instant> = None;
+    let mut expected_remote_track = String::new();
 
     while !stop_flag.load(Ordering::SeqCst) {
         // Logout completely removes AtriStation from official Yandex Music app via Close(1000)
@@ -491,6 +493,20 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                 ));
             }
             let paused = st.state != "playing" && st.state != "loading";
+            if let Some(sync_at) = last_remote_sync_at {
+                if !expected_remote_track.is_empty() && st.track_id == expected_remote_track {
+                    last_remote_sync_at = None;
+                    expected_remote_track.clear();
+                } else if sync_at.elapsed() < Duration::from_millis(1800) {
+                    // Wait for ymusic daemon to switch to expected_remote_track before pushing status,
+                    // preventing YM app from bouncing back to the previous track!
+                    last_status_push = Instant::now();
+                    continue;
+                } else {
+                    last_remote_sync_at = None;
+                    expected_remote_track.clear();
+                }
+            }
             let local_queue_sig = st.queue_ids.join(",");
             if !paused && !st.track_id.is_empty() && st.mode != "ynison" {
                 let queue_changed = local_queue_sig != last_queue_sig
@@ -709,6 +725,8 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                         last_paused = Some(paused);
                         last_pushed_track = ids[cur_idx as usize].clone();
                         last_pushed_paused = paused;
+                        expected_remote_track = ids[cur_idx as usize].clone();
+                        last_remote_sync_at = Some(Instant::now());
                         let mode_tag = if paused { "pause" } else { "play" };
                         let entity_type = q.get_str("entity_type").unwrap_or("");
                         let entity_id = q.get_str("entity_id").unwrap_or("");
