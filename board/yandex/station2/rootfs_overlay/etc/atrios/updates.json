@@ -1,5 +1,6 @@
 {
   "enabled": true,
+  "repository": "leftymods/AtriOS",
   "manifest_url": "https://ai.leftymods.tech/ota/manifest.json",
   "ca_file": "",
   "channel": "stable",
