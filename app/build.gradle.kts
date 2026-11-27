@@ -12,8 +12,8 @@ android {
         applicationId = "com.leftymods.atrios"
         minSdk = 26
         targetSdk = 34
-        versionCode = 56
-        versionName = "2.7.6.1"
+        versionCode = 57
+        versionName = "2.7.6.2"
     }
 
     signingConfigs {

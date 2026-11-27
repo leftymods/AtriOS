@@ -402,7 +402,8 @@ fun AtriOSApp(
                     ym
                 }
                 val locked = nowMs - lastUserActionRef.get() < 1600L
-                if (!locked || (mergedYm.title.isNotBlank() && mergedYm.title != status.ymusic.title) || mergedYm.state == wantState || isTrackTransitioning) {
+                val leavingLoading = status.ymusic.state == "loading" && mergedYm.state != "loading"
+                if (!locked || leavingLoading || (mergedYm.title.isNotBlank() && mergedYm.title != status.ymusic.title) || mergedYm.state == wantState || isTrackTransitioning) {
                     status = status.copy(ymusic = mergedYm)
                     if (isTrackTransitioning && mergedYm.trackId.isNotBlank() && !mergedYm.trackId.startsWith("opt_") && mergedYm.state != "loading") {
                         isTrackTransitioning = false

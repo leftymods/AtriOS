@@ -172,13 +172,6 @@ fun AtriHomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            runCatching {
-                                context.packageManager.getLaunchIntentForPackage("ru.yandex.music")?.let {
-                                    context.startActivity(it)
-                                }
-                            }
-                        }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
