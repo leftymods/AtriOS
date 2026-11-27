@@ -140,6 +140,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn legacy_station_max_identity_maps_to_canonical_board() {
+        assert_eq!(ota::canonical_device_id("station-max"), "yndxsttion53");
+        assert_eq!(ota::canonical_device_id("yndxsttion53"), "yndxsttion53");
+        assert_eq!(ota::canonical_device_id("other-speaker"), "other-speaker");
+    }
+
+    #[test]
     fn json_roundtrip_and_escapes() {
         let j = json::Json::parse(r#"{"a":"привет\n\"Atri\"","b":true,"n":42}"#).unwrap();
         assert_eq!(j.get_str("a"), Some("привет\n\"Atri\""));
@@ -428,7 +435,7 @@ mod tests {
     #[test]
     fn hardware_manifest_parses_custom_speaker_and_defaults() {
         let def = hardware::HardwareManifest::default();
-        assert_eq!(def.board, "station-max");
+        assert_eq!(def.board, "yndxsttion53");
         assert!(def.has_display());
         assert_eq!((def.display_width, def.display_height, def.ring_leds), (25, 16, 24));
         assert_eq!((def.amp_tweeter_addr, def.amp_woofer_addr), (0x2a, 0x2b));

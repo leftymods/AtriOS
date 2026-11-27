@@ -165,7 +165,7 @@ def test_release_metadata_uses_selected_board_overlay_dtb_and_image(project):
 
 
 def test_current_station_aliases_use_same_reviewed_recipe_without_rewriting_profiles():
-    for board in ("station-max", "yndxsttion53"):
+    for board in ("yndxsttion53",):
         conf = (ROOT / f"config/boards/{board}.conf").read_text()
         assert 'DTS_NAME="meson-sm1-yandex-station-max"' in conf
     profile = (ROOT / "config/bootloaders/meson-sm1-yandex-station-max.conf").read_text()

@@ -55,7 +55,7 @@ impl Drop for E2eeSessionCleanup {
 
 fn read_device_meta() -> (String, String, String, String, String) {
     let mut name = "AtriStation Max".to_string();
-    let mut codename = "station-max".to_string();
+    let mut codename = "yndxsttion53".to_string();
     let mut rev = "rev1.0".to_string();
     let mut os_name = "AtriOS Nebula".to_string();
     let mut fw = "1.0".to_string();

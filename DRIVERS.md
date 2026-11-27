@@ -4,9 +4,9 @@
 
 ---
 
-## Яндекс Станция Макс 53 (`station-max` / `yndxsttion53` / AtriStation Max)
+## Яндекс Станция Макс 53 (`yndxsttion53` / AtriStation Max)
 
-Профили сборки: `config/boards/station-max.conf` и `config/boards/yndxsttion53.conf` (`meson-sm1-yandex-station-max.dts`, Amlogic S905X3 / SM1).
+Профили сборки: `config/boards/yndxsttion53.conf` (`meson-sm1-yandex-station-max.dts`, Amlogic S905X3 / SM1).
 
 ### Работают
 

@@ -35,7 +35,7 @@ impl Default for HardwareManifest {
     fn default() -> Self {
         Self {
             schema: 1,
-            board: "station-max".into(),
+            board: "yndxsttion53".into(),
             name: "Yandex Station Max".into(),
             vendor: "yandex".into(),
             soc: "sm1".into(),

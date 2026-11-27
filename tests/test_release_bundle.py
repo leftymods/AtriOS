@@ -58,7 +58,7 @@ def inputs(tmp_path, rsa_keys):
     (modules / 'modules.order').write_text('kernel/example.ko\n')
     (modules / 'modules.alias').write_text('')
     (modules / 'modules.builtin').write_text('')
-    return dict(board='station-max', version='1.2.3', kernel_release='7.3.1-AtriOS-aml',
+    return dict(board='yndxsttion53', version='1.2.3', kernel_release='7.3.1-AtriOS-aml',
                 kernel=kernel, dtb=dtb, rootfs=rootfs, modules=modules,
                 signing_key=rsa_keys[0], output_dir=tmp_path / 'release')
 
@@ -84,12 +84,12 @@ def test_signed_bundle_is_deterministic_and_has_exact_checksums(inputs, rsa_keys
     first = bundle.read_bytes()
     builder.build_bundle(**inputs)
     assert bundle.read_bytes() == first
-    assert bundle.name == 'AtriOS-station-max-ota.tar.gz'
+    assert bundle.name == 'AtriOS-yndxsttion53-ota.tar.gz'
     assert bundle.with_name(bundle.name + '.sha256').read_text() == hashlib.sha256(first).hexdigest() + '  ' + bundle.name + '\n'
     destination = tmp_path / 'unpacked'
     manifest = unpack_bundle(bundle, destination)
     assert verify_manifest(destination, rsa_keys[1]) == 0
-    assert manifest['schema'] == 1 and manifest['device_id'] == 'station-max'
+    assert manifest['schema'] == 1 and manifest['device_id'] == 'yndxsttion53'
     assert manifest['version'] == '1.2.3' and manifest['kernel_release'] == '7.3.1-AtriOS-aml'
     assert set(manifest['files']) == {'kernel', 'dtb', 'rootfs'}
     for entry in manifest['files'].values():
@@ -111,7 +111,7 @@ def test_runtime_accepts_generated_bundle_and_rejects_tampering(inputs, rsa_keys
     destination = tmp_path / 'runtime-unpacked'; destination.mkdir()
     if ota_path.read_bytes().startswith(b'\x7fELF'):
         manifest = unpack_bundle(bundle, destination)
-        assert manifest['device_id'] == 'station-max'
+        assert manifest['device_id'] == 'yndxsttion53'
         assert verify_manifest(destination, rsa_keys[1]) == 0
         payload = destination / manifest['files']['kernel']['path']
         assert hashlib.sha256(payload.read_bytes()).hexdigest() == manifest['files']['kernel']['sha256']
@@ -123,12 +123,12 @@ def test_runtime_accepts_generated_bundle_and_rejects_tampering(inputs, rsa_keys
     monkeypatch.syspath_prepend(str(library))
     runtime = runpy.run_path(str(ota_path))
     verify = runtime['verify_bundle']
-    monkeypatch.setitem(verify.__globals__, 'device_id', lambda: 'station-max')
+    monkeypatch.setitem(verify.__globals__, 'device_id', lambda: 'yndxsttion53')
     monkeypatch.setitem(verify.__globals__, 'set_error', lambda *a, **kw: None)
     runtime['extract_safe'](bundle, destination)
     config = {'public_key': str(rsa_keys[1])}
     manifest, _ = verify(destination, config)
-    assert manifest['device_id'] == 'station-max'
+    assert manifest['device_id'] == 'yndxsttion53'
     payload = destination / manifest['files']['kernel']['path']
     payload.write_bytes(b'tampered')
     with pytest.raises(ValueError, match='SHA-256 mismatch'):
@@ -150,16 +150,16 @@ def test_wrong_verification_key_and_wrong_device_are_rejected(inputs, rsa_keys, 
     library = ROOT / 'board/yandex/station2/rootfs_overlay/usr/lib/atrios'
     ota_path = library / 'ota'
     if ota_path.read_bytes().startswith(b'\x7fELF'):
-        assert manifest['device_id'] == 'station-max' and manifest['device_id'] != 'yndxsttion53'
+        assert manifest['device_id'] == 'yndxsttion53' and manifest['device_id'] != 'other-speaker'
         return
     monkeypatch.syspath_prepend(str(library))
     verify = runpy.run_path(str(ota_path))['verify_bundle']
-    monkeypatch.setitem(verify.__globals__, 'device_id', lambda: 'yndxsttion53')
+    monkeypatch.setitem(verify.__globals__, 'device_id', lambda: 'other-speaker')
     with pytest.raises(ValueError, match='wrong target device'):
         verify(destination, {'public_key': str(rsa_keys[1])})
 
 
-@pytest.mark.parametrize('field,value', [('board', '../station-max'), ('version', '1.2-beta'),
+@pytest.mark.parametrize('field,value', [('board', '../yndxsttion53'), ('version', '1.2-beta'),
     ('version', 'v1.2.3.4.5'), ('kernel_release', '../../modules')])
 def test_rejects_wrong_identifiers(inputs, field, value):
     inputs[field] = value
@@ -255,7 +255,7 @@ def test_workflow_is_separate_and_all_embedded_shell_is_valid():
     import yaml
     workflow = yaml.safe_load((ROOT / '.github/workflows/release-mainline.yml').read_text())
     assert workflow['permissions'] == {'contents': 'read'}
-    assert set(workflow['jobs']['build']['strategy']['matrix']['board']) == {'station-max', 'yndxsttion53'}
+    assert set(workflow['jobs']['build']['strategy']['matrix']['board']) == {'yndxsttion53'}
     assert workflow['jobs']['publish']['permissions'] == {'contents': 'write'}
     for job in workflow['jobs'].values():
         for step in job['steps']:
@@ -274,7 +274,7 @@ def test_release_stages_normalized_checkout_commands_and_preserves_config_modes(
         path.write_text('fixture'); path.chmod(0o644)
     cfg_path = staging / config; cfg_path.parent.mkdir(parents=True, exist_ok=True)
     cfg_path.write_text('{"repository":"leftymods/AtriOS"}\n'); cfg_path.chmod(0o644)
-    (staging / 'etc/atrios-board').write_text('station-max\n')
+    (staging / 'etc/atrios-board').write_text('yndxsttion53\n')
     (staging / 'etc/atrios-version').write_text('1.2.3\n')
     (staging / 'etc/os-release').write_text('NAME="AtriOS"\nVERSION_ID="1.2.3"\n')
     (staging / 'etc/atrios/ota-public.pem').write_text('-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----\n')
@@ -293,7 +293,7 @@ def test_release_stages_normalized_checkout_commands_and_preserves_config_modes(
     copied = subprocess.run([
         sys.executable, str(ROOT / 'tools/stage_ota_runtime.py'),
         '--source', str(staging), '--destination', str(overlay),
-        '--board', 'station-max', '--version', '1.2.3',
+        '--board', 'yndxsttion53', '--version', '1.2.3',
     ], cwd=tmp_path, capture_output=True, text=True)
     assert copied.returncode == 0, copied.stderr
     inputs['rootfs'] = overlay

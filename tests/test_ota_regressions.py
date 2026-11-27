@@ -89,7 +89,7 @@ def ota(tmp_path, monkeypatch, signing_keys):
     paths["VERSION_FILE"].write_text("1.0\n")
     paths["CONFIG_FILE"].parent.mkdir(parents=True, exist_ok=True)
     paths["CONFIG_FILE"].write_text(json.dumps({"repository": "leftymods/AtriOS", "public_key": str(signing_keys[1])}))
-    monkeypatch.setitem(globals_, "device_id", lambda: "station-max")
+    monkeypatch.setitem(globals_, "device_id", lambda: "yndxsttion53")
     monkeypatch.setitem(globals_, "set_error", lambda *args, **kwargs: None)
     mounts = []
     monkeypatch.setitem(globals_, "ensure_boot_mounted", lambda: mounts.append(True))
@@ -111,7 +111,7 @@ def bundle(ota):
         if payload_override is not None:
             payload = payload_override
         name = "rootfs.tar" if kind == "rootfs" else kind + ".bin"
-        manifest = {"schema": 1, "device_id": "station-max", "version": version,
+        manifest = {"schema": 1, "device_id": "yndxsttion53", "version": version,
                     "files": {kind: {"path": name, "sha256": hashlib.sha256(payload).hexdigest()}}}
         if kind == "kernel":
             manifest["kernel_release"] = os.uname().release
@@ -331,7 +331,7 @@ def test_kernel_install_requires_boot_mount_but_does_not_touch_real_boot(ota, bu
 
 
 def release_response(body=b"download"):
-    name = "AtriOS-station-max-ota.tar.gz"
+    name = "AtriOS-yndxsttion53-ota.tar.gz"
     url = "https://github.com/leftymods/AtriOS/releases/download/v2.0/" + name
     asset = {"name": name, "browser_download_url": url, "size": len(body), "digest": "sha256:" + hashlib.sha256(body).hexdigest()}
     return {"tag_name": "v2.0", "draft": False, "prerelease": False, "assets": [asset]}
@@ -342,7 +342,7 @@ def test_latest_release_selects_exact_board_asset(ota, monkeypatch):
     response["assets"].insert(0, {"name": "AtriOS-other-ota.tar.gz"})
     monkeypatch.setitem(ota.g, "request_json", lambda *a, **kw: response)
     result = ota.g["latest_release"]()
-    assert result["asset"] == "AtriOS-station-max-ota.tar.gz"
+    assert result["asset"] == "AtriOS-yndxsttion53-ota.tar.gz"
     assert result["sha256"] == hashlib.sha256(b"download").hexdigest()
 
 

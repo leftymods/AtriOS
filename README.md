@@ -46,10 +46,10 @@ AtriOS — фреймворк для разработки и сборки Linux-
 ./compile.sh list
 
 # Параметры профиля AtriStation
-./compile.sh info BOARD=station-max
+./compile.sh info BOARD=yndxsttion53
 
 # Собрать полный образ
-./compile.sh BOARD=station-max RELEASE=Nebula TARGET=image
+./compile.sh BOARD=yndxsttion53 RELEASE=Nebula TARGET=image
 ```
 
 Для отдельных этапов используйте `TARGET=kernel`, `TARGET=uboot`, `TARGET=rootfs` или `TARGET=packages`.

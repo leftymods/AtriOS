@@ -101,7 +101,15 @@ fn device_id() -> Result<String, String> {
     if !ok {
         return Err("Unknown device: configure /etc/atrios-board before updating".into());
     }
-    Ok(raw)
+    // station-max was a duplicate profile of the same hardware; yndxsttion53 is canonical.
+    Ok(canonical_device_id(&raw))
+}
+
+pub fn canonical_device_id(raw: &str) -> String {
+    match raw {
+        "station-max" => "yndxsttion53".to_string(),
+        other => other.to_string(),
+    }
 }
 
 fn current_version() -> String {

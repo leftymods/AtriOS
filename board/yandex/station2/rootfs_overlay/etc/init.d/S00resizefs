@@ -8,7 +8,7 @@ fi
 
 # Station Max uses the entire eMMC without reserve
 case "$DEVICE_ID" in
-  station-max)
+  yndxsttion53|station-max)
     RESERVE_SECTORS=0
     ;;
 esac

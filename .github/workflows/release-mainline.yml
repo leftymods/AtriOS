@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: [station-max, yndxsttion53]
+        board: [yndxsttion53]
     env:
       BOARD: ${{ matrix.board }}
       RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
@@ -150,7 +150,7 @@ jobs:
           git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null
           source lib/release-board.sh
           # Explicit release allowlist; new hardware needs a reviewed CI entry.
-          for board in station-max yndxsttion53; do (
+          for board in yndxsttion53; do (
             release_board_config "$board"
             test -s "release-assets/AtriOS-$board-ota.tar.gz"
             test -s "release-assets/$IMAGE_FILENAME"

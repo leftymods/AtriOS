@@ -16,10 +16,10 @@ DEVICE_ACCENT="cyan"
 for compat in $DT_COMPAT; do
     case "$compat" in
         leftymods,station-max|yandex,station-max|yandex,station2)
-            DEVICE_ID="station-max"
+            DEVICE_ID="yndxsttion53"
             DEVICE_NAME="AtriStation Max"
             DEVICE_REV="rev1.0"
-            DEVICE_CODENAME="station-max"
+            DEVICE_CODENAME="yndxsttion53"
             DEVICE_SOC="Amlogic S905X3 (SM1)"
             DEVICE_FEATURES="screen ring als zigbee rotary"
             DEVICE_ACCENT="cyan"

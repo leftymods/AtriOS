@@ -1,10 +1,10 @@
 # Поддерживаемые устройства MainlineAtriOS (`config/boards/`)
 
-**AtriStation** — софт-модификация Яндекс Станции Макс **YNDX-0053 MAX**. Целевая аппаратная версия использует **Amlogic S905X3 (`sm1`) вместо S905X2**. Профиль `station-max`, Device Tree и образы в этом репозитории рассчитаны на вариант с S905X3.
+**AtriStation** — софт-модификация Яндекс Станции Макс **YNDX-0053 MAX**. Целевая аппаратная версия использует **Amlogic S905X3 (`sm1`) вместо S905X2**. Профиль `yndxsttion53`, Device Tree и образы в этом репозитории рассчитаны на вариант с S905X3.
 
 | Board ID | Платформа | Семейство / SoC | Конфиг сборки | Статус |
 |---|---|---|---|---|
-| `station-max` (`yndxsttion53`) | **AtriStation Max** (YNDX-0053 MAX) | `amlogic-meson64` / Amlogic S905X3 (`sm1`), вместо S905X2 | `config/boards/station-max.conf` (`yndxsttion53.conf`) | Полная поддержка |
+| `yndxsttion53` | **AtriStation Max** (YNDX-0053 MAX) | `amlogic-meson64` / Amlogic S905X3 (`sm1`), вместо S905X2 | `config/boards/yndxsttion53.conf` | Полная поддержка |
 | `template` | Шаблон для новой колонки (`new-board`) | Настраивается (`amlogic-meson64` и др.) | `config/boards/template.conf` | Шаблон расширения |
 
 ---
