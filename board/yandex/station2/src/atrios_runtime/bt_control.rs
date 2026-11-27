@@ -531,9 +531,15 @@ fn read_eq_info() -> Json {
 }
 
 fn read_vqe_info() -> Json {
-    if let Ok(txt) = fs::read_to_string("/var/run/atrios/aec_vqe.json") {
-        if let Ok(j) = Json::parse(&txt) {
-            return j;
+    let path = "/var/run/atrios/aec_vqe.json";
+    if let Ok(txt) = fs::read_to_string(path) {
+        if let Ok(Json::Obj(mut fields)) = Json::parse(&txt) {
+            let age = fs::metadata(path).and_then(|meta| meta.modified()).ok()
+                .and_then(|ts| ts.elapsed().ok());
+            if let Some(age) = age {
+                fields.insert("sample_age_ms".into(), Json::Num(age.as_millis() as f64));
+            }
+            return Json::Obj(fields);
         }
     }
     obj(vec![
@@ -1181,7 +1187,7 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
                     ("type", Json::Str("ymusic_control_response".into())),
                     ("success", Json::Bool(true)),
                     ("message", Json::Str(format!("Yandex Music: {action}"))),
-                    ("ymusic", st.to_json()),
+                    ("ymusic", st.to_live_json()),
                 ])),
                 Err(e) => Ok(obj(vec![
                     ("type", Json::Str("ymusic_control_response".into())),
@@ -1197,16 +1203,19 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
                 .and_then(|v| v.as_i64())
                 .unwrap_or(0)
                 .max(0);
-            match crate::ymusic::trigger_seek(pos_ms) {
+            let id = map.get("seek_id").and_then(Json::as_str).unwrap_or("");
+            let track = map.get("track_id").and_then(Json::as_str).unwrap_or("");
+            match crate::ymusic::trigger_seek(pos_ms, id, track) {
                 Ok(st) => Ok(obj(vec![
                     ("type", Json::Str("ymusic_seek_response".into())),
                     ("success", Json::Bool(true)),
-                    ("message", Json::Str(format!("Seek to {pos_ms} ms"))),
-                    ("ymusic", st.to_json()),
+                    ("seek_id", Json::Str(id.into())),
+                    ("ymusic", st.to_live_json()),
                 ])),
                 Err(e) => Ok(obj(vec![
                     ("type", Json::Str("ymusic_seek_response".into())),
                     ("success", Json::Bool(false)),
+                    ("seek_id", Json::Str(id.into())),
                     ("message", Json::Str(e)),
                     ("ymusic", crate::ymusic::read_status_json()),
                 ])),

@@ -299,6 +299,8 @@ pub struct YMusicStatus {
     pub duration_ms: i64,
     pub position_ms: i64,
     pub started_ts: i64,
+    pub seek_id: String,
+    pub seek_state: String,
     pub liked: bool,
     pub repeat: bool,
     pub can_prev: bool,
@@ -338,6 +340,8 @@ impl YMusicStatus {
             duration_ms: 0,
             position_ms: 0,
             started_ts: 0,
+            seek_id: String::new(),
+            seek_state: String::new(),
             liked: false,
             repeat: false,
             can_prev: false,
@@ -394,6 +398,8 @@ impl YMusicStatus {
         if let Some(n) = j.get("started_ts").and_then(|v| v.as_i64()) {
             st.started_ts = n.max(0);
         }
+        st.seek_id = j.get_str("seek_id").unwrap_or("").into();
+        st.seek_state = j.get_str("seek_state").unwrap_or("").into();
         if let Some(b) = j.get("liked").and_then(|v| v.as_bool()) {
             st.liked = b;
         }
@@ -455,6 +461,12 @@ impl YMusicStatus {
         st
     }
 
+    pub fn to_live_json(&self) -> Json {
+        let mut snapshot = self.clone();
+        snapshot.position_ms = position_at(self, now_unix_ms());
+        snapshot.to_json()
+    }
+
     pub fn to_json(&self) -> Json {
         obj(vec![
             ("logged_in", Json::Bool(self.logged_in)),
@@ -478,6 +490,8 @@ impl YMusicStatus {
             ("duration_ms", Json::Num(self.duration_ms as f64)),
             ("position_ms", Json::Num(self.position_ms as f64)),
             ("started_ts", Json::Num(self.started_ts as f64)),
+            ("seek_id", Json::Str(self.seek_id.clone())),
+            ("seek_state", Json::Str(self.seek_state.clone())),
             ("liked", Json::Bool(self.liked)),
             ("repeat", Json::Bool(self.repeat)),
             ("can_prev", Json::Bool(self.can_prev)),
@@ -563,9 +577,7 @@ pub fn read_status() -> YMusicStatus {
 }
 
 pub fn read_status_json() -> Json {
-    let mut st = read_status();
-    st.position_ms = position_at(&st, now_unix_ms());
-    st.to_json()
+    read_status().to_live_json()
 }
 
 pub(crate) fn position_at(st: &YMusicStatus, now_ms: i64) -> i64 {
@@ -2663,6 +2675,7 @@ impl PlayerState {
                     if ready { Ok(()) } else { Err("Track was evicted before seeking".into()) }
                 });
                 if let Err(error) = applied {
+                    self.status.seek_state = "failed".into();
                     self.report_seek_error(error);
                 }
             }
@@ -2877,12 +2890,16 @@ impl PlayerState {
         self.status.started_ts = 0;
         self.status.state = if paused { "paused" } else { "loading" }.into();
         self.status.error = None;
+        self.status.seek_state = "applied".into();
         write_status(&mut self.status);
         println!("[ymusic] Applied seek to {position} ms");
         Ok(true)
     }
 
-    fn seek_to(&mut self, target_ms: i64) {
+    fn seek_to(&mut self, target_ms: i64, seek_id: &str) {
+        if !seek_id.is_empty() && self.status.seek_id == seek_id {
+            return;
+        }
         let Some(track) = self.queue.get(self.index) else { return };
         if track.duration_ms <= 0
             || track.id != self.status.track_id
@@ -2892,14 +2909,19 @@ impl PlayerState {
         }
         let target = target_ms.clamp(0, track.duration_ms.saturating_sub(1));
         let track_id = track.id.clone();
+        self.status.seek_id = seek_id.into();
+        self.status.seek_state = "pending".into();
+        self.status.error = None;
         match self.seek_to_cached(target) {
             Ok(true) => return,
             Err(error) => {
+                self.status.seek_state = "failed".into();
                 self.report_seek_error(error);
                 return;
             }
             Ok(false) => {}
         }
+        write_status(&mut self.status);
         let gen = self.load_gen.load(Ordering::SeqCst);
         if let Some(pending) = self.pending_seek.as_mut() {
             if pending.gen == gen && pending.track_id == track_id {
@@ -2907,7 +2929,11 @@ impl PlayerState {
                 return;
             }
         }
-        let Some(auth) = load_auth() else { return };
+        let Some(auth) = load_auth() else {
+            self.status.seek_state = "failed".into();
+            self.report_seek_error("Yandex Music session unavailable".into());
+            return;
+        };
         self.pending_seek = Some(PendingSeek { gen, track_id: track_id.clone(), target_ms: target });
         let quality = self.playing_quality;
         let cache_key = quality.cache_key(&track_id);
@@ -2999,13 +3025,22 @@ impl PlayerState {
             if let Some((track_id, ms)) = remote.rsplit_once(':') {
                 if track_id == self.status.track_id {
                     if let Ok(ms) = ms.parse() {
-                        self.seek_to(ms);
+                        self.seek_to(ms, "");
+                    }
+                }
+            }
+        } else if let Some(tagged) = cmd.strip_prefix("seek_tagged:") {
+            let mut parts = tagged.splitn(3, ':');
+            if let (Some(ms), Some(id), Some(track)) = (parts.next(), parts.next(), parts.next()) {
+                if track == self.status.track_id && valid_seek_id(id) {
+                    if let Ok(position) = ms.parse() {
+                        self.seek_to(position, id);
                     }
                 }
             }
         } else if let Some(ms_str) = cmd.strip_prefix("seek:") {
             if let Ok(ms) = ms_str.trim().parse::<i64>() {
-                self.seek_to(ms);
+                self.seek_to(ms, "");
             }
         } else if cmd == "next" {
             if self.last_skip_at.map(|t| t.elapsed() < Duration::from_millis(250)).unwrap_or(false) {
@@ -3351,14 +3386,35 @@ pub fn trigger_play(mode: &str, query: Option<&str>) -> Result<YMusicStatus, Str
     Ok(st)
 }
 
-pub fn trigger_seek(position_ms: i64) -> Result<YMusicStatus, String> {
+fn valid_seek_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+}
+
+pub fn trigger_seek(position_ms: i64, id: &str, track: &str) -> Result<YMusicStatus, String> {
     let target = position_ms.max(0);
     let before = read_status();
-    send_or_spawn_command(&format!("seek:{target}"))?;
-    for _ in 0..9 {
+    if before.track_id.is_empty() || before.duration_ms <= 0
+        || !matches!(before.state.as_str(), "playing" | "paused" | "loading")
+    {
+        return Err("Нет трека для перемотки".into());
+    }
+    let command = if id.is_empty() {
+        format!("seek:{target}")
+    } else {
+        if !valid_seek_id(id) || track.len() > 128 || track.chars().any(char::is_control) {
+            return Err("Неверный запрос перемотки".into());
+        }
+        if track != before.track_id {
+            return Err("Трек сменился до перемотки".into());
+        }
+        format!("seek_tagged:{target}:{id}:{track}")
+    };
+    send_or_spawn_command(&command)?;
+    for _ in 0..10 {
         thread::sleep(Duration::from_millis(10));
         let cur = read_status();
-        if cur.seq > before.seq || cur.updated_ms > before.updated_ms {
+        let acknowledged = if id.is_empty() { cur.seq > before.seq } else { cur.seek_id == id };
+        if acknowledged {
             return Ok(cur);
         }
     }
