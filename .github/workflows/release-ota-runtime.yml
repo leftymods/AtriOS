@@ -1,15 +1,17 @@
 name: Release signed runtime OTA
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Build-only tag (e.g. v1.8.0)
+        description: Release tag (e.g. v1.17.3)
         required: true
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-signed-ota:
@@ -113,3 +115,15 @@ jobs:
           path: |
             ${{ runner.temp }}/ota_out/AtriOS-yndxsttion53-ota.tar.gz
             ${{ runner.temp }}/ota_out/AtriOS-yndxsttion53-ota.tar.gz.sha256
+      - name: Publish signed OTA to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          OTA="$RUNNER_TEMP/ota_out/AtriOS-yndxsttion53-ota.tar.gz"
+          SHA="$RUNNER_TEMP/ota_out/AtriOS-yndxsttion53-ota.tar.gz.sha256"
+          gh release create "$RELEASE_TAG" "$OTA" "$SHA" \
+            --title "AtriOS $RELEASE_TAG" \
+            --notes "Signed runtime OTA for yndxsttion53: PBFDAF + GTCRN DSP, endless My Wave + Ynison RADIO sync, instant partial wake-word detection, and leftymods/AtriOS OTA." \
+            || gh release upload "$RELEASE_TAG" "$OTA" "$SHA" --clobber
