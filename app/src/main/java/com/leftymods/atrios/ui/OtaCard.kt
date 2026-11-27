@@ -54,69 +54,70 @@ fun OtaUpdateCard(
         else -> "Ожидание"
     }
 
+    val badgeContainer = when (ota.state) {
+        "available" -> MaterialTheme.colorScheme.primaryContainer
+        "error" -> MaterialTheme.colorScheme.errorContainer
+        "up_to_date", "installed" -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val badgeContent = when (ota.state) {
+        "available" -> MaterialTheme.colorScheme.onPrimaryContainer
+        "error" -> MaterialTheme.colorScheme.onErrorContainer
+        "up_to_date", "installed" -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
     ElevatedCard(shape = RoundedCornerShape(24.dp)) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
-                    Icon(Icons.Rounded.SystemUpdate, contentDescription = null)
+                    Icon(
+                        if (ota.updateAvailable) Icons.Rounded.SystemUpdateAlt else Icons.Rounded.SystemUpdate,
+                        contentDescription = null,
+                        modifier = Modifier.padding(10.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        "Обновление прошивки (OTA)",
+                        "Обновление колонки",
                         style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                    Text(
+                        if (codename.isNotBlank()) "v$displayCurrent · $codename" else "v$displayCurrent",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Surface(
-                    onClick = onRefreshStatus,
                     shape = RoundedCornerShape(99.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = badgeContainer
                 ) {
                     Text(
                         stateLabel,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.SemiBold,
+                        color = badgeContent,
                         maxLines = 1,
                         softWrap = false
                     )
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        "Текущая версия",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(displayCurrent, fontWeight = FontWeight.SemiBold)
-                }
-                if (codename.isNotBlank()) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            "Кодовое имя",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(codename, fontWeight = FontWeight.Medium)
-                    }
-                }
-            }
-
-            if (ota.lastCheckTs > 0L) {
+            if (ota.lastCheckTs > 0L && !ota.isBusy) {
                 val formatted = remember(ota.lastCheckTs) {
                     SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
                         .format(Date(ota.lastCheckTs * 1000L))
@@ -129,25 +130,33 @@ fun OtaUpdateCard(
             }
 
             if (ota.isBusy) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (ota.progress > 0) {
-                        LinearProgressIndicator(
-                            progress = { ota.progress / 100f },
-                            modifier = Modifier.fillMaxWidth()
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (ota.progress > 0) {
+                            LinearProgressIndicator(
+                                progress = { ota.progress / 100f },
+                                modifier = Modifier.fillMaxWidth().height(6.dp)
+                            )
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp))
+                        }
+                        val sizeText = if (ota.assetSize > 0L) {
+                            " · ${formatMb(ota.downloadedBytes)} / ${formatMb(ota.assetSize)}"
+                        } else ""
+                        Text(
+                            "${ota.message.ifBlank { ota.stage }}$sizeText",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    } else {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
-                    val sizeText = if (ota.assetSize > 0L) {
-                        " · ${formatMb(ota.downloadedBytes)} / ${formatMb(ota.assetSize)}"
-                    } else ""
-                    Text(
-                        "${ota.message.ifBlank { ota.stage }}$sizeText",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
-            } else if (ota.message.isNotBlank()) {
+            } else if (ota.message.isNotBlank() && !ota.updateAvailable) {
                 val localizedMsg = when {
                     ota.message.equals("AtriOS is up to date", ignoreCase = true) ||
                         ota.message.equals("Up to date", ignoreCase = true) -> "Установлена актуальная прошивка"
@@ -207,24 +216,47 @@ fun OtaUpdateCard(
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                "Новая версия: ${ota.latestVersion}",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            if (ota.assetSize > 0L) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Text(
-                                    formatMb(ota.assetSize),
-                                    style = MaterialTheme.typography.labelMedium,
+                                    "v$displayCurrent",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                )
+                                Icon(
+                                    Icons.Rounded.ArrowForward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    "v${ota.latestVersion}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
+                            }
+                            if (ota.assetSize > 0L) {
+                                Surface(
+                                    shape = RoundedCornerShape(99.dp),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
+                                ) {
+                                    Text(
+                                        formatMb(ota.assetSize),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
                             }
                         }
                         if (ota.changelog.isNotBlank()) {
@@ -232,7 +264,7 @@ fun OtaUpdateCard(
                                 onClick = { showChangelog = !showChangelog },
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text(if (showChangelog) "Скрыть список изменений" else "Показать список изменений")
+                                Text(if (showChangelog) "Скрыть изменения" else "Что нового")
                             }
                             if (showChangelog) {
                                 Text(
@@ -247,45 +279,63 @@ fun OtaUpdateCard(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (ota.updateAvailable && !ota.isBusy) {
-                    Button(
-                        onClick = { showApplyDialog = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Rounded.Download, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Установить ${ota.latestVersion ?: ""}".trim())
+                when {
+                    ota.isBusy -> {
+                        FilledTonalButton(
+                            onClick = {},
+                            enabled = false,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stateLabel)
+                        }
                     }
-                } else if (ota.rebootRequired && !ota.isBusy) {
-                    Button(
-                        onClick = onRebootNow,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Rounded.RestartAlt, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Перезагрузить")
+                    ota.updateAvailable -> {
+                        Button(
+                            onClick = { showApplyDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Rounded.Download, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Установить v${ota.latestVersion ?: ""}".trim(), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    ota.rebootRequired -> {
+                        Button(
+                            onClick = onRebootNow,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Rounded.RestartAlt, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Перезагрузить колонку", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    else -> {
+                        Button(
+                            onClick = onCheckUpdates,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Проверить обновления", fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
 
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = onCheckUpdates,
-                        enabled = !ota.isBusy
+                if (ota.rollbackAvailable && !ota.isBusy) {
+                    OutlinedButton(
+                        onClick = { showRollbackDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = null)
+                        Icon(Icons.Rounded.History, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("Проверить обновления")
-                    }
-
-                    if (ota.rollbackAvailable && !ota.isBusy) {
-                        OutlinedButton(onClick = { showRollbackDialog = true }) {
-                            Icon(Icons.Rounded.History, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Откат")
-                        }
+                        Text("Откат на прошлую версию")
                     }
                 }
             }
