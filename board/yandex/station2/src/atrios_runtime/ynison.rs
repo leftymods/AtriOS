@@ -448,6 +448,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
     let mut last_status_push = Instant::now();
     let mut last_pushed_track = String::new();
     let mut last_pushed_paused = true;
+    let mut last_local_queue_push_ms: i64 = 0;
 
     while !stop_flag.load(Ordering::SeqCst) {
         // Logout completely removes AtriStation from official Yandex Music app via Close(1000)
@@ -509,6 +510,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                     last_paused = Some(false);
                     last_pushed_track = st.track_id;
                     last_pushed_paused = false;
+                    last_local_queue_push_ms = now_ms();
                 } else if last_status_push.elapsed() >= Duration::from_secs(2) {
                     let pos = if st.started_ts > 0 {
                         st.position_ms + (now_ms() - st.started_ts).max(0)
@@ -565,6 +567,7 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                     last_pushed_track = st.track_id;
                     last_pushed_paused = paused;
                     last_paused = Some(paused);
+                    last_local_queue_push_ms = now_ms();
                 } else if pause_changed || (!paused && last_status_push.elapsed() >= Duration::from_secs(2)) {
                     let _ = ws.send_text(&build_playing_status_msg(
                         device_id,
@@ -669,45 +672,56 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
             .unwrap_or(false);
 
         if let Some(q) = queue {
-            last_server_queue = Some(q.clone());
-            let cur_idx = q
-                .get("current_playable_index")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(-1);
-            let mut ids: Vec<String> = Vec::new();
-            if let Some(arr) = q.get("playable_list").and_then(|v| v.as_arr()) {
-                for item in arr {
-                    if let Some(pid) = item.get_str("playable_id") {
-                        let pid = pid.trim();
-                        if !pid.is_empty() {
-                            ids.push(pid.to_string());
+            let q_ts = q
+                .get("version")
+                .and_then(|v| v.get_str("timestamp_ms"))
+                .and_then(|s| s.parse::<i64>().ok())
+                .unwrap_or(0);
+            // Ignore our own echoed queue OR any stale queue older than our last local push
+            // (prevents Ynison from yanking My Wave back 1-2 tracks during batch replenishment!)
+            let stale_queue = queue_author == device_id
+                || (q_ts > 0 && last_local_queue_push_ms > 0 && q_ts <= last_local_queue_push_ms);
+            if !stale_queue {
+                last_server_queue = Some(q.clone());
+                let cur_idx = q
+                    .get("current_playable_index")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(-1);
+                let mut ids: Vec<String> = Vec::new();
+                if let Some(arr) = q.get("playable_list").and_then(|v| v.as_arr()) {
+                    for item in arr {
+                        if let Some(pid) = item.get_str("playable_id") {
+                            let pid = pid.trim();
+                            if !pid.is_empty() {
+                                ids.push(pid.to_string());
+                            }
                         }
                     }
                 }
-            }
-            if !ids.is_empty() && cur_idx >= 0 && (cur_idx as usize) < ids.len() {
-                let win_start = (cur_idx as usize).saturating_sub(5);
-                let win_end = (win_start + 40).min(ids.len());
-                let rel_idx = (cur_idx as usize) - win_start;
-                let joined = ids[win_start..win_end].join(",");
-                if joined != last_queue_sig || cur_idx != last_idx {
-                    last_queue_sig = joined.clone();
-                    last_idx = cur_idx;
-                    last_paused = Some(paused);
-                    last_pushed_track = ids[cur_idx as usize].clone();
-                    last_pushed_paused = paused;
-                    let mode_tag = if paused { "pause" } else { "play" };
-                    let entity_type = q.get_str("entity_type").unwrap_or("");
-                    let entity_id = q.get_str("entity_id").unwrap_or("");
-                    let cmd = if entity_type == "RADIO" {
-                        let st_id = if entity_id.is_empty() { "user:onyourwave" } else { entity_id };
-                        format!("ynison_sync_radio|{mode_tag}|{st_id}|{rel_idx}|{joined}")
-                    } else {
-                        format!("ynison_sync:{mode_tag}:{rel_idx}:{joined}")
-                    };
-                    println!("[ynison] Syncing queue ({} tracks, idx={rel_idx}, {mode_tag}, type={entity_type})", win_end - win_start);
-                    send_ymusic_cmd(&cmd);
-                    continue;
+                if !ids.is_empty() && cur_idx >= 0 && (cur_idx as usize) < ids.len() {
+                    let win_start = (cur_idx as usize).saturating_sub(5);
+                    let win_end = (win_start + 40).min(ids.len());
+                    let rel_idx = (cur_idx as usize) - win_start;
+                    let joined = ids[win_start..win_end].join(",");
+                    if joined != last_queue_sig || cur_idx != last_idx {
+                        last_queue_sig = joined.clone();
+                        last_idx = cur_idx;
+                        last_paused = Some(paused);
+                        last_pushed_track = ids[cur_idx as usize].clone();
+                        last_pushed_paused = paused;
+                        let mode_tag = if paused { "pause" } else { "play" };
+                        let entity_type = q.get_str("entity_type").unwrap_or("");
+                        let entity_id = q.get_str("entity_id").unwrap_or("");
+                        let cmd = if entity_type == "RADIO" {
+                            let st_id = if entity_id.is_empty() { "user:onyourwave" } else { entity_id };
+                            format!("ynison_sync_radio|{mode_tag}|{st_id}|{rel_idx}|{joined}")
+                        } else {
+                            format!("ynison_sync:{mode_tag}:{rel_idx}:{joined}")
+                        };
+                        println!("[ynison] Syncing queue ({} tracks, idx={rel_idx}, {mode_tag}, type={entity_type})", win_end - win_start);
+                        send_ymusic_cmd(&cmd);
+                        continue;
+                    }
                 }
             }
         }
