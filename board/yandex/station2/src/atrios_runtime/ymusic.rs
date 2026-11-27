@@ -1664,20 +1664,47 @@ struct ActivePipeline {
     started_at: std::time::Instant,
 }
 
+fn mp3_frame_len(hdr: &[u8]) -> Option<usize> {
+    if hdr.len() < 4 || hdr[0] != 0xFF || (hdr[1] & 0xE0) != 0xE0 {
+        return None;
+    }
+    let ver_id = (hdr[1] >> 3) & 0x03; // 3=MPEG1, 2=MPEG2, 0=MPEG2.5
+    let layer = (hdr[1] >> 1) & 0x03;  // 1=Layer III
+    if ver_id == 1 || layer != 1 {
+        return None;
+    }
+    let br_idx = ((hdr[2] >> 4) & 0x0F) as usize;
+    let sr_idx = ((hdr[2] >> 2) & 0x03) as usize;
+    let pad = ((hdr[2] >> 1) & 0x01) as usize;
+    if br_idx == 0 || br_idx == 15 || sr_idx == 3 {
+        return None;
+    }
+    let bitrates_v1: [usize; 16] = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
+    let bitrates_v2: [usize; 16] = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+    let bitrate = if ver_id == 3 { bitrates_v1[br_idx] } else { bitrates_v2[br_idx] } * 1000;
+    let sr = match (ver_id, sr_idx) {
+        (3, 0) => 44100, (3, 1) => 48000, (3, 2) => 32000,
+        (2, 0) => 22050, (2, 1) => 24000, (2, 2) => 16000,
+        (0, 0) => 11025, (0, 1) => 12000, (0, 2) => 8000,
+        _ => return None,
+    };
+    let coeff = if ver_id == 3 { 144 } else { 72 };
+    let flen = coeff * bitrate / sr + pad;
+    if flen < 24 || flen > 2880 { None } else { Some(flen) }
+}
+
 fn find_mp3_frame_sync(bytes: &[u8], start: usize) -> usize {
-    if start == 0 || bytes.len() < 4 {
+    if start == 0 || bytes.len() < 8 {
         return 0;
     }
     let lim = bytes.len().saturating_sub(4);
     let mut i = start.min(lim);
     while i < lim {
-        if bytes[i] == 0xFF
-            && (bytes[i + 1] & 0xE0) == 0xE0
-            && (bytes[i + 1] & 0x18) != 0x08
-            && (bytes[i + 1] & 0x06) != 0x00
-            && (bytes[i + 2] & 0xF0) != 0xF0
-        {
-            return i;
+        if let Some(flen) = mp3_frame_len(&bytes[i..]) {
+            let next = i + flen;
+            if next + 4 <= bytes.len() && mp3_frame_len(&bytes[next..]).is_some() {
+                return i;
+            }
         }
         i += 1;
     }
@@ -1704,6 +1731,8 @@ impl ActivePipeline {
     fn spawn_from_ram_offset(bytes: Vec<u8>, byte_off: usize) -> Result<Self, String> {
         let sync_off = if byte_off == 0 { 0 } else { find_mp3_frame_sync(&bytes, byte_off) };
         let _ = Command::new("pkill").args(["-9", "-x", "atri-mp3dec"]).stdout(Stdio::null()).stderr(Stdio::null()).status();
+        let _ = Command::new("pkill").args(["-9", "-x", "aplay"]).stdout(Stdio::null()).stderr(Stdio::null()).status();
+        thread::sleep(Duration::from_millis(20));
         let mut dec = Command::new("atri-mp3dec")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
