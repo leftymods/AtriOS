@@ -1766,12 +1766,18 @@ impl ActivePipeline {
     }
 
     fn spawn_inner(track_id: &str, url: &str) -> Result<Self, String> {
-        // Ensure zero overlapping decoders from any previous track
+        // Ensure zero overlapping decoders/sinks from any previous track or TTS
         let _ = Command::new("pkill")
             .args(["-9", "-x", "atri-mp3dec"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
+        let _ = Command::new("pkill")
+            .args(["-9", "-x", "aplay"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        thread::sleep(Duration::from_millis(20));
         if bin_exists("ffmpeg") {
             let mut dec = Command::new("ffmpeg")
                 .args([
@@ -1885,25 +1891,37 @@ impl ActivePipeline {
             let prod_s = shared.clone();
             thread::spawn(move || {
                 let mut full_buf: Vec<u8> = Vec::with_capacity(4 * 1024 * 1024);
-                let ok = crate::https::request_stream(
-                    &stream_url,
-                    None,
-                    &[],
-                    None,
-                    120,
-                    64 * 1024 * 1024,
-                    None,
-                    |chunk| {
-                        if full_buf.len() + chunk.len() <= 18 * 1024 * 1024 {
-                            full_buf.extend_from_slice(chunk);
-                        }
-                        let (lk, cv) = &*prod_s;
-                        let mut g = lk.lock().unwrap();
-                        g.0.push_back(chunk.to_vec());
-                        cv.notify_one();
-                        Ok(())
-                    },
-                ).is_ok();
+                let mut ok = false;
+                for attempt in 0..2 {
+                    full_buf.clear();
+                    let res = crate::https::request_stream(
+                        &stream_url,
+                        None,
+                        &[],
+                        None,
+                        45,
+                        64 * 1024 * 1024,
+                        None,
+                        |chunk| {
+                            if full_buf.len() + chunk.len() <= 18 * 1024 * 1024 {
+                                full_buf.extend_from_slice(chunk);
+                            }
+                            let (lk, cv) = &*prod_s;
+                            let mut g = lk.lock().unwrap();
+                            g.0.push_back(chunk.to_vec());
+                            cv.notify_one();
+                            Ok(())
+                        },
+                    );
+                    if res.is_ok() && !full_buf.is_empty() {
+                        ok = true;
+                        break;
+                    }
+                    if !full_buf.is_empty() || attempt == 1 {
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(150));
+                }
                 if ok && !cache_tid.is_empty() && !full_buf.is_empty() {
                     mp3_cache_put(cache_tid, full_buf);
                 }
@@ -2711,6 +2729,8 @@ impl PlayerState {
         if let Some(p) = self.pipeline.take() {
             p.stop();
         }
+        let total_bytes = bytes.len();
+        println!("[ymusic] Seek {} -> {} ms (off={}/{})", cur.id, target, byte_off, total_bytes);
         if let Ok(mut pipe) = ActivePipeline::spawn_from_ram_offset(bytes, byte_off) {
             if was_paused {
                 pipe.set_paused(true);
