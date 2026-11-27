@@ -28,6 +28,63 @@ pub const YMUSIC_CONFIG_FILE: &str = "/var/lib/atrios/ymusic.json";
 pub const YMUSIC_STATUS_FILE: &str = "/var/run/atrios/ymusic_status.json";
 pub const YMUSIC_CMD_SOCK: &str = "/var/run/atrios/ymusic.sock";
 
+const QUALITY_FILE: &str = "/var/lib/atrios/ymusic-quality";
+
+#[derive(Clone, Copy)]
+enum MusicQuality {
+    Economy,
+    Balanced,
+    High,
+}
+
+impl MusicQuality {
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "economy" => Some(Self::Economy),
+            "balanced" => Some(Self::Balanced),
+            "high" => Some(Self::High),
+            _ => None,
+        }
+    }
+
+    fn load() -> Self {
+        fs::read_to_string(QUALITY_FILE).ok()
+            .and_then(|value| Self::parse(value.trim()))
+            .unwrap_or(Self::Balanced)
+    }
+
+    fn id(self) -> &'static str {
+        match self {
+            Self::Economy => "economy",
+            Self::Balanced => "balanced",
+            Self::High => "high",
+        }
+    }
+
+    fn mp3_rating(self, bitrate: i64) -> i64 {
+        match self {
+            Self::Economy if bitrate > 0 => 1000 - bitrate.min(998),
+            Self::Economy => 1,
+            Self::Balanced => match bitrate { 192 => 100, 128 => 90, 320 => 80, _ => 70 },
+            Self::High => 1 + bitrate.clamp(0, 999),
+        }
+    }
+
+    fn cache_key(self, track_id: &str) -> String {
+        format!("{}:{track_id}", self.id())
+    }
+}
+
+pub fn music_quality() -> &'static str {
+    MusicQuality::load().id()
+}
+
+pub fn set_music_quality(value: &str) -> Result<(), String> {
+    let quality = MusicQuality::parse(value).ok_or("Unsupported music quality")?;
+    atomic_write_bytes(Path::new(QUALITY_FILE), quality.id().as_bytes(), 0o600, true)
+        .map_err(|e| format!("Could not save music quality: {e}"))
+}
+
 const API_BASE: &str = "https://api.music.yandex.net";
 const CLIENT_HEADER: (&str, &str) = ("X-Yandex-Music-Client", "YandexMusicAndroid/24023621");
 const LANG_HEADER: (&str, &str) = ("Accept-Language", "ru");
@@ -146,7 +203,7 @@ fn format_avatar_url(avatar_id: Option<&str>) -> String {
     format!("https://avatars.yandex.net/get-yapic/{id}/islands-200")
 }
 
-fn url_encode(s: &str) -> String {
+pub(crate) fn url_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 2);
     for &b in s.as_bytes() {
         if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
@@ -1520,7 +1577,7 @@ pub fn fetch_orbs_json() -> Result<Vec<Json>, String> {
 }
 
 
-fn resolve_track_stream_url(auth: &YMusicAuth, track_id: &str) -> Result<String, String> {
+fn resolve_track_stream_url(auth: &YMusicAuth, track_id: &str, quality: MusicQuality) -> Result<String, String> {
     let ep = format!("/tracks/{}/download-info", url_encode(track_id));
     let resp = api_get_json(&auth.token, &ep)?;
     let infos = resp
@@ -1533,7 +1590,7 @@ fn resolve_track_stream_url(auth: &YMusicAuth, track_id: &str) -> Result<String,
         let url = info.get_str("downloadInfoUrl").filter(|u| !u.is_empty())?;
         let bitrate = info.get("bitrateInKbps").and_then(|v| v.as_i64()).unwrap_or(0);
         let rating = if codec.eq_ignore_ascii_case("mp3") {
-            match bitrate { 192 => 100, 128 => 90, 320 => 80, _ => 70 }
+            quality.mp3_rating(bitrate)
         } else {
             0
         };
@@ -2092,6 +2149,7 @@ enum DaemonEvent {
     StreamResolved {
         gen: u64,
         track_id: String,
+        quality: MusicQuality,
         res: Result<String, String>,
     },
     LikedChecked {
@@ -2126,6 +2184,7 @@ struct PlayerState {
     wave_warm_cache: Arc<std::sync::Mutex<Option<(std::time::Instant, String, Vec<TrackInfo>)>>>,
     index: usize,
     pipeline: Option<ActivePipeline>,
+    playing_quality: MusicQuality,
     prefetch: Arc<std::sync::Mutex<Option<(String, String)>>>,
     pending_play_at: Option<std::time::Instant>,
     pending_seek: Option<PendingSeek>,
@@ -2148,6 +2207,7 @@ impl PlayerState {
             wave_warm_cache: Arc::new(std::sync::Mutex::new(None)),
             index: 0,
             pipeline: None,
+            playing_quality: MusicQuality::load(),
             prefetch: Arc::new(std::sync::Mutex::new(None)),
             pending_play_at: None,
             pending_seek: None,
@@ -2280,19 +2340,21 @@ impl PlayerState {
 
     fn prebuffer_next_in_bg(&self, auth: &YMusicAuth) {
         if let Some(nxt) = self.queue.get(self.index + 1).cloned() {
-            if mp3_cache_get(&nxt.id).is_some() {
+            let quality = MusicQuality::load();
+            let cache_key = quality.cache_key(&nxt.id);
+            if mp3_cache_get(&cache_key).is_some() {
                 return;
             }
             let pf = self.prefetch.clone();
             let auth_c = auth.clone();
             thread::spawn(move || {
-                if let Ok(u) = resolve_track_stream_url(&auth_c, &nxt.id) {
+                if let Ok(u) = resolve_track_stream_url(&auth_c, &nxt.id, quality) {
                     if let Ok(mut g) = pf.lock() {
-                        *g = Some((nxt.id.clone(), u.clone()));
+                        *g = Some((cache_key.clone(), u.clone()));
                     }
                     // Pre-download next track MP3 into RAM cache (like Yandex Music mobile) for <40ms skip!
                     if let Ok(bytes) = request_bytes(&u, None, &[], None, 25, 16 * 1024 * 1024, None) {
-                        mp3_cache_put(nxt.id, bytes);
+                        mp3_cache_put(cache_key, bytes);
                     }
                 }
             });
@@ -2378,8 +2440,11 @@ impl PlayerState {
         self.status.error = None;
         write_status(&mut self.status);
 
+        let quality = MusicQuality::load();
+        self.playing_quality = quality;
+        let cache_key = quality.cache_key(&track.id);
         // Fast path: already in RAM cache (prev OR pre-buffered next track) -> instant <30ms start!
-        if let Some(cached) = mp3_cache_get(&track.id) {
+        if let Some(cached) = mp3_cache_get(&cache_key) {
             let res = ActivePipeline::spawn_from_ram(cached);
             self.finish_starting_pipeline(&track, &auth, res);
             return;
@@ -2387,14 +2452,14 @@ impl PlayerState {
 
         // Fast path 2: stream URL already prefetched -> spawn immediately!
         let cached_url = self.prefetch.lock().ok().and_then(|mut g| {
-            if g.as_ref().map(|(id, _)| id == &track.id).unwrap_or(false) {
+            if g.as_ref().is_some_and(|(key, _)| key == &cache_key) {
                 g.take().map(|(_, u)| u)
             } else {
                 None
             }
         });
         if let Some(url) = cached_url {
-            let res = ActivePipeline::spawn_with_cache(&track.id, &url);
+            let res = ActivePipeline::spawn_with_cache(&cache_key, &url);
             self.finish_starting_pipeline(&track, &auth, res);
             return;
         }
@@ -2403,8 +2468,8 @@ impl PlayerState {
         let tx = self.tx.clone();
         let tid = track.id.clone();
         thread::spawn(move || {
-            let res = resolve_track_stream_url(&auth, &tid);
-            let _ = tx.send(DaemonEvent::StreamResolved { gen, track_id: tid, res });
+            let res = resolve_track_stream_url(&auth, &tid, quality);
+            let _ = tx.send(DaemonEvent::StreamResolved { gen, track_id: tid, quality, res });
         });
     }
 
@@ -2417,12 +2482,14 @@ impl PlayerState {
         thread::spawn(move || {
             if let Ok((bid, tracks)) = fetch_my_wave(&auth, None) {
                 if let Some(first) = tracks.first().cloned() {
-                    if let Ok(u) = resolve_track_stream_url(&auth, &first.id) {
+                    let quality = MusicQuality::load();
+                    let cache_key = quality.cache_key(&first.id);
+                    if let Ok(u) = resolve_track_stream_url(&auth, &first.id, quality) {
                         if let Ok(mut g) = pf.lock() {
-                            *g = Some((first.id.clone(), u.clone()));
+                            *g = Some((cache_key.clone(), u.clone()));
                         }
                         if let Ok(bytes) = request_bytes(&u, None, &[], None, 15, 16 * 1024 * 1024, None) {
-                            mp3_cache_put(first.id, bytes);
+                            mp3_cache_put(cache_key, bytes);
                         }
                     }
                 }
@@ -2571,7 +2638,7 @@ impl PlayerState {
                     }
                 }
             }
-            DaemonEvent::StreamResolved { gen, track_id, res } => {
+            DaemonEvent::StreamResolved { gen, track_id, quality, res } => {
                 if gen != cur_gen {
                     return; // User paused or skipped while URL was resolving!
                 }
@@ -2580,7 +2647,8 @@ impl PlayerState {
                 if track.id != track_id {
                     return;
                 }
-                let pipe_res = res.and_then(|url| ActivePipeline::spawn_with_cache(&track.id, &url));
+                let cache_key = quality.cache_key(&track.id);
+                let pipe_res = res.and_then(|url| ActivePipeline::spawn_with_cache(&cache_key, &url));
                 self.finish_starting_pipeline(&track, &auth, pipe_res);
             }
             DaemonEvent::SeekCacheReady { gen, track_id, result } => {
@@ -2789,7 +2857,7 @@ impl PlayerState {
         let Some(track) = self.queue.get(self.index) else {
             return Ok(false);
         };
-        let Some(bytes) = mp3_cache_get(&track.id) else {
+        let Some(bytes) = mp3_cache_get(&self.playing_quality.cache_key(&track.id)) else {
             return Ok(false);
         };
         let point = mp3_seek_point(&bytes, target_ms).ok_or("No valid MP3 frame for seek")?;
@@ -2841,6 +2909,8 @@ impl PlayerState {
         }
         let Some(auth) = load_auth() else { return };
         self.pending_seek = Some(PendingSeek { gen, track_id: track_id.clone(), target_ms: target });
+        let quality = self.playing_quality;
+        let cache_key = quality.cache_key(&track_id);
         let tx = self.tx.clone();
         let load_gen = self.load_gen.clone();
         thread::spawn(move || {
@@ -2849,12 +2919,12 @@ impl PlayerState {
                 // Let an in-flight playback download fill the cache first.
                 for _ in 0..5 {
                     if cancelled() { return Err("Seek cancelled".into()); }
-                    if mp3_cache_get(&track_id).is_some() { return Ok(()); }
+                    if mp3_cache_get(&cache_key).is_some() { return Ok(()); }
                     thread::sleep(Duration::from_millis(100));
                 }
-                let url = resolve_track_stream_url(&auth, &track_id)?;
+                let url = resolve_track_stream_url(&auth, &track_id, quality)?;
                 let bytes = request_bytes(&url, None, &[], None, 30, MP3_CACHE_LIMIT, Some(&cancelled))?;
-                if mp3_cache_put(track_id.clone(), bytes) {
+                if mp3_cache_put(cache_key, bytes) {
                     Ok(())
                 } else {
                     Err("Seek requires a complete MP3 stream that fits in the cache".into())
@@ -3650,6 +3720,15 @@ mod tests {
         assert_eq!(point.position_ms, 1000);
         assert_eq!(mp3_seek_point(&mp3, 0).unwrap().skip_samples, 0);
         assert!(mp3_seek_point(b"not audio", 1000).is_none());
+    }
+
+    #[test]
+    fn music_quality_changes_stream_priority_and_cache_namespace() {
+        assert!(MusicQuality::parse("lossless").is_none());
+        assert!(MusicQuality::Economy.mp3_rating(128) > MusicQuality::Economy.mp3_rating(320));
+        assert!(MusicQuality::Balanced.mp3_rating(192) > MusicQuality::Balanced.mp3_rating(320));
+        assert!(MusicQuality::High.mp3_rating(320) > MusicQuality::High.mp3_rating(128));
+        assert_ne!(MusicQuality::Balanced.cache_key("10"), MusicQuality::High.cache_key("10"));
     }
 
     #[test]

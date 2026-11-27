@@ -32,6 +32,7 @@ const TIMERS_FILE: &str = "/var/run/atrios/timers.json";
 const ALARMS_FILE: &str = "/var/lib/atrios/alarms.json";
 const BT_ACTIVE_FILE: &str = "/var/run/atrios/bt_active";
 const DEVICE_FILE: &str = "/etc/atrios-device";
+const ROOM_FILE: &str = "/var/lib/atrios/room";
 
 static CLIENT_COUNT: Mutex<usize> = Mutex::new(0);
 static SCREEN_GEN: AtomicU64 = AtomicU64::new(0);
@@ -306,6 +307,7 @@ fn get_ai_info() -> Json {
         ("mode", Json::Str(mode)),
         ("tts_voice", Json::Str(tts_voice)),
         ("tts_emotion", Json::Str(tts_emotion)),
+        ("voice_preferences", crate::atriai::voice_preferences_json()),
         ("state", Json::Str(state)),
         ("last_asr", Json::Str(last_asr)),
         ("last_answer", Json::Str(last_answer)),
@@ -579,6 +581,9 @@ fn build_status_payload() -> Json {
         ),
         ("screen_mode", Json::Str(get_screen_mode())),
         ("ai", get_ai_info()),
+        ("music_quality", Json::Str(crate::ymusic::music_quality().into())),
+        ("room", Json::Str(fs::read_to_string(ROOM_FILE).unwrap_or_default().trim().to_string())),
+        ("weather", crate::weather::settings()),
         ("vqe", read_vqe_info()),
         ("eq", read_eq_info()),
         ("ota", crate::ota::read_ota_status_json()),
@@ -898,6 +903,37 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
                 ("success", Json::Bool(true)),
                 ("message", Json::Str(format!("Ring: {mode}"))),
             ]))
+        }
+        "set_room" => {
+            let room = map.get("room").and_then(Json::as_str).ok_or("Missing room")?.trim();
+            if room.chars().count() > 50 || room.chars().any(char::is_control) {
+                return Err("Название комнаты должно содержать до 50 символов".into());
+            }
+            atomic_write_bytes(Path::new(ROOM_FILE), room.as_bytes(), 0o600, true)
+                .map_err(|error| format!("Could not save room: {error}"))?;
+            Ok(build_status_payload())
+        }
+        "set_weather" => {
+            let city = map.get("city").and_then(Json::as_str).ok_or("Missing city")?;
+            let options = map.get("options").ok_or("Missing weather options")?;
+            crate::weather::save(city, options)?;
+            Ok(build_status_payload())
+        }
+        "get_weather" => {
+            let forecast = crate::weather::forecast(None)
+                .map_err(|error| {
+                    eprintln!("[weather] {error}");
+                    if error.starts_with("Выберите город") { error } else { "Не удалось получить данные о погоде.".to_string() }
+                })?;
+            Ok(obj(vec![("type", Json::Str("weather_forecast".into())), ("forecast", Json::Str(forecast))]))
+        }
+        "set_music_quality" => {
+            crate::ymusic::set_music_quality(map.get("quality").and_then(Json::as_str).ok_or("Missing music quality")?)?;
+            Ok(build_status_payload())
+        }
+        "set_voice_preferences" => {
+            crate::atriai::set_voice_preferences(map.get("preferences").ok_or("Missing voice preferences")?)?;
+            Ok(build_status_payload())
         }
         "set_ai" => {
             if let Some(srv) = map.get("server").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty()) {
@@ -1674,6 +1710,18 @@ fn spawn_wifi_relay_worker() {
                 }
                 if let Some(entry) = pairs.iter_mut().find(|(k, _)| k.as_str() == "eq") {
                     *entry.1 = live_eq;
+                }
+                for (key, value) in [
+                    ("music_quality", Json::Str(crate::ymusic::music_quality().into())),
+                    ("room", Json::Str(fs::read_to_string(ROOM_FILE).unwrap_or_default().trim().to_string())),
+                    ("weather", crate::weather::settings()),
+                ] {
+                    if let Some(cached) = pairs.get_mut(key) {
+                        *cached = value;
+                    }
+                }
+                if let Some(Json::Obj(ai)) = pairs.get_mut("ai") {
+                    ai.insert("voice_preferences".into(), crate::atriai::voice_preferences_json());
                 }
                 if let Some((_, Json::Obj(ref mut audio_pairs))) = pairs.iter_mut().find(|(k, _)| k.as_str() == "audio") {
                     if let Some(ve) = audio_pairs.iter_mut().find(|(k, _)| k.as_str() == "volume") {

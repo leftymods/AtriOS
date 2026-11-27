@@ -38,6 +38,118 @@ const PID_FILE: &str = "/var/run/atrios/atriai.pid";
 const BT_CMD_SOCK: &str = "/var/run/atrios/bt_cmd.sock";
 const VOLUME_FILE: &str = "/var/lib/atrios/volume";
 
+const VOICE_PREFERENCES_FILE: &str = "/var/lib/atrios/voice-preferences.json";
+
+#[derive(Default)]
+struct VoicePreferences {
+    overrides: BTreeMap<String, Json>,
+}
+
+impl VoicePreferences {
+    const FIELDS: [(&'static str, bool); 9] = [
+        ("activation_chime", true),
+        ("continuous_dialog", true),
+        ("quiet_reply", false),
+        ("adaptive_reply_volume", false),
+        ("quick_media", false),
+        ("quick_tracks", false),
+        ("quick_favorites", false),
+        ("quick_volume", false),
+        ("quick_bluetooth", true),
+    ];
+
+    fn load() -> Self {
+        let overrides = fs::read_to_string(VOICE_PREFERENCES_FILE)
+            .ok()
+            .and_then(|data| match Json::parse(&data).ok()? {
+                Json::Obj(map) => Some(map),
+                _ => None,
+            })
+            .unwrap_or_default();
+        Self { overrides }
+    }
+
+    fn enabled(&self, key: &str) -> bool {
+        if let Some(Json::Bool(value)) = self.overrides.get(key) {
+            return *value;
+        }
+        Self::FIELDS.iter().any(|&(field, value)| field == key && value)
+    }
+
+    fn to_json(&self) -> Json {
+        obj(Self::FIELDS.iter()
+            .map(|&(key, _)| (key, Json::Bool(self.enabled(key))))
+            .collect())
+    }
+
+    fn apply(&mut self, patch: &Json) -> Result<(), String> {
+        let changes = patch.as_obj().filter(|map| !map.is_empty())
+            .ok_or("Voice preferences must be a nonempty object")?;
+        if changes.iter().any(|(key, value)| {
+            !matches!(value, Json::Bool(_)) || !Self::FIELDS.iter().any(|&(field, _)| field == key)
+        }) {
+            return Err("Unknown voice preference or non-boolean value".into());
+        }
+        self.overrides.extend(changes.clone());
+        Ok(())
+    }
+}
+
+thread_local! {
+    static REPLY_GAIN: Cell<f64> = const { Cell::new(1.0) };
+}
+
+struct ReplyGain(f64);
+
+impl ReplyGain {
+    fn set(gain: f64) -> Self {
+        Self(REPLY_GAIN.with(|current| current.replace(gain)))
+    }
+}
+
+impl Drop for ReplyGain {
+    fn drop(&mut self) {
+        REPLY_GAIN.with(|current| current.set(self.0));
+    }
+}
+
+fn reply_gain(preferences: &VoicePreferences, speech_rms: f64, noise_rms: f64) -> f64 {
+    if preferences.enabled("quiet_reply") && (60.0..=520.0).contains(&speech_rms)
+        && speech_rms >= noise_rms * 1.35
+    {
+        return 0.48;
+    }
+    if preferences.enabled("adaptive_reply_volume") {
+        return (0.78 + (noise_rms - 120.0).max(0.0) * 0.0006).min(1.18);
+    }
+    1.0
+}
+
+fn adjust_pcm16_gain(pcm: &mut [u8], gain: f64) {
+    if gain == 1.0 {
+        return;
+    }
+    for pair in pcm.chunks_exact_mut(2) {
+        let sample = i16::from_le_bytes([pair[0], pair[1]]);
+        let adjusted = (sample as f64 * gain).round().clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+        pair.copy_from_slice(&adjusted.to_le_bytes());
+    }
+}
+
+pub fn voice_preferences_json() -> Json {
+    VoicePreferences::load().to_json()
+}
+
+pub fn set_voice_preferences(patch: &Json) -> Result<(), String> {
+    static LOCK: Mutex<()> = Mutex::new(());
+    let _lock = LOCK.lock().map_err(|_| "Voice preferences lock unavailable")?;
+    let mut prefs = VoicePreferences::load();
+    prefs.apply(patch)?;
+    atomic_write_bytes(
+        Path::new(VOICE_PREFERENCES_FILE), prefs.to_json().to_string_compact().as_bytes(), 0o600, true,
+    ).map_err(|e| format!("Could not save voice preferences: {e}"))
+}
+
 static BUTTON_TRIGGERED: AtomicBool = AtomicBool::new(false);
 static WAKE_TRIGGERED: AtomicBool = AtomicBool::new(false);
 static VOICE_STOPPED: AtomicBool = AtomicBool::new(false);
@@ -555,6 +667,8 @@ pub enum DeviceCommand {
     PrevTrack,
     Pause,
     Play,
+    LikeTrack,
+    DislikeTrack,
     VolumeUp(i32),
     VolumeDown(i32),
     VolumeSet(i32),
@@ -841,6 +955,26 @@ pub fn is_direct_bluetooth_command(text: &str) -> Option<DeviceCommand> {
         return Some(DeviceCommand::BluetoothOn);
     }
     None
+}
+
+fn quick_command(text: &str, preferences: &VoicePreferences) -> Option<DeviceCommand> {
+    let words = normalize_text(text);
+    let phrase = words.join(" ");
+    match phrase.as_str() {
+        "тише" | "потише" | "громче" | "погромче" if preferences.enabled("quick_volume") => {
+            local_command(&phrase, "")
+        }
+        "пауза" | "на паузу" | "продолжи" | "играй" | "сними с паузы"
+            if preferences.enabled("quick_media") => local_command(&phrase, ""),
+        "следующий трек" | "предыдущий трек" | "дальше" | "назад"
+            if preferences.enabled("quick_tracks") => local_command(&phrase, ""),
+        "лайк" if preferences.enabled("quick_favorites") => Some(DeviceCommand::LikeTrack),
+        "дизлайк" if preferences.enabled("quick_favorites") => Some(DeviceCommand::DislikeTrack),
+        _ if preferences.enabled("quick_bluetooth") && words.len() == 2 => {
+            is_direct_bluetooth_command(text)
+        }
+        _ => None,
+    }
 }
 
 static REMOTE_DOWN_UNTIL: AtomicI64 = AtomicI64::new(0);
@@ -1367,9 +1501,19 @@ fn play_audio_bytes(
         return Ok(true);
     }
     let is_wav = data.starts_with(b"RIFF");
-    if is_wav {
-        parse_wav(data)?;
-    }
+    let sample_range = if is_wav {
+        let info = parse_wav(data)?;
+        info.data_offset..info.data_offset + info.data_len
+    } else {
+        0..data.len()
+    };
+    let gain = REPLY_GAIN.with(Cell::get);
+    let adjusted = (gain != 1.0).then(|| {
+        let mut audio = data.to_vec();
+        adjust_pcm16_gain(&mut audio[sample_range], gain);
+        audio
+    });
+    let data = adjusted.as_deref().unwrap_or(data);
     let tmp_path = format!(
         "/tmp/atrios-tts-{}.{}",
         std::process::id(),
@@ -1916,6 +2060,7 @@ fn stream_tts_and_play(
             if aligned.is_empty() {
                 return Ok(());
             }
+            adjust_pcm16_gain(&mut aligned, REPLY_GAIN.with(Cell::get));
             let mut sq = 0.0f64;
             let n_samp = aligned.len() / 2;
             for pair in aligned.chunks_exact(2) {
@@ -2172,6 +2317,12 @@ fn execute_device_command(cmd: DeviceCommand) {
             show_music_icon_async(icon);
             play_command_chime(ch);
         }
+        DeviceCommand::LikeTrack | DeviceCommand::DislikeTrack => {
+            let action = if cmd == DeviceCommand::LikeTrack { "like" } else { "dislike" };
+            if let Err(error) = crate::ymusic::trigger_control(action) {
+                eprintln!("[ymusic] voice command {action}: {error}");
+            }
+        }
         DeviceCommand::VolumeUp(step) => {
             let cur = fs::read_to_string(VOLUME_FILE)
                 .ok()
@@ -2346,6 +2497,7 @@ fn send_phrase_to_server(
     wake_word: &str,
     force_active: bool,
     streamed_command: Option<(String, bool)>,
+    levels: Option<(f64, f64)>,
 ) -> Result<(String, String, bool), String> {
     VOICE_STOPPED.store(false, Ordering::SeqCst);
     if pcm.len() > SR * 2 * 30 || pcm.len() % 2 != 0 {
@@ -2369,6 +2521,9 @@ fn send_phrase_to_server(
         set_vad_visual("idle", false, "default");
         return Ok((String::new(), String::new(), false));
     }
+    let preferences = VoicePreferences::load();
+    let _gain = levels.map(|(speech_rms, noise_rms)| ReplyGain::set(reply_gain(&preferences, speech_rms, noise_rms)));
+    let continuous_dialog = preferences.enabled("continuous_dialog");
     let base = server_url.trim_end_matches('/').to_string();
     let mut keep_listening = false;
     let mut user_addressed = force_active || wake_word.is_empty();
@@ -2450,14 +2605,24 @@ fn send_phrase_to_server(
             return Ok((text, String::new(), false));
         }
 
-        // Direct Bluetooth fast-path: bypasses wake-word loss, mini-AI, and remote LLM completely (<100ms).
-        if let Some(bt_cmd) = is_direct_bluetooth_command(&text) {
-            user_addressed = true;
-            println!("[atriai] direct fast-path bluetooth command ({text:?}) -> {bt_cmd:?}");
-            execute_device_command(bt_cmd);
-            set_error("voice", None, "", 15);
-            keep_listening = false;
-            return Ok((text, String::new(), false));
+        if !user_addressed && !had_unk {
+            if let Some(cmd) = quick_command(&text, &preferences) {
+                let media_command = matches!(
+                    cmd, DeviceCommand::NextTrack | DeviceCommand::PrevTrack | DeviceCommand::Pause | DeviceCommand::Play
+                );
+                let favorites_command = matches!(cmd, DeviceCommand::LikeTrack | DeviceCommand::DislikeTrack);
+                if (!media_command || crate::ymusic::is_active()
+                    || crate::light::is_bt_active() || playback_running())
+                    && (!favorites_command || crate::ymusic::now_playing().is_some())
+                    && (!use_local_stt || crate::local_stt::transcribe_pcm16(pcm)
+                        .is_ok_and(|full| quick_command(&full, &preferences) == Some(cmd)))
+                {
+                    user_addressed = true;
+                    execute_device_command(cmd);
+                    set_error("voice", None, "", 15);
+                    return Ok((text, String::new(), false));
+                }
+            }
         }
 
         if text.is_empty() && !(use_local_stt && !wake_word.is_empty()) {
@@ -2509,9 +2674,11 @@ fn send_phrase_to_server(
             println!("[wake] activated ({text:?}) -> ActiveCommand (7s)");
             send_bt_cmd("duck");
             set_vad_visual("vad", false, "default");
-            play_command_chime("wake");
-            voice_timing("wake_chime_finished");
-            drain_capture_fd_now();
+            if preferences.enabled("activation_chime") {
+                play_command_chime("wake");
+                voice_timing("wake_chime_finished");
+                drain_capture_fd_now();
+            }
             set_error("voice", None, "", 15);
             return Ok((text, String::new(), true));
         }
@@ -2522,6 +2689,27 @@ fn send_phrase_to_server(
             play_command_chime("cancel");
             set_error("voice", None, "", 15);
             return Ok((text, String::new(), false));
+        }
+        if !had_unk && crate::weather::is_query(&clean_query) {
+            let answer = match voice_call(|cancel| crate::weather::forecast(Some(cancel))) {
+                Ok(answer) => answer,
+                Err(error) if error.starts_with("InterruptedError") => {
+                    return Ok((text, String::new(), false));
+                }
+                Err(error) if error.starts_with("Выберите город") => error,
+                Err(error) => {
+                    eprintln!("[weather] {error}");
+                    "Не удалось получить данные о погоде.".to_string()
+                }
+            };
+            if !speak_via_remote_tts(&answer, "neutral", false) {
+                play_command_chime("offline");
+            }
+            keep_listening = continuous_dialog && !has_trailing_stop && !VOICE_STOPPED.load(Ordering::SeqCst);
+            if keep_listening {
+                set_vad_visual("vad", false, "default");
+            }
+            return Ok((text, answer, keep_listening));
         }
         if let Some(intent) = crate::local_ai::parse_local_intent(&text, wake_word) {
             let is_timer_ui = matches!(
@@ -2538,7 +2726,7 @@ fn send_phrase_to_server(
                 keep_listening = false;
                 return Ok((text, String::new(), false));
             }
-            if !has_trailing_stop && force_active {
+            if continuous_dialog && !has_trailing_stop && force_active {
                 keep_listening = true;
                 set_vad_visual("vad", false, "default");
                 return Ok((text, String::new(), true));
@@ -2557,7 +2745,7 @@ fn send_phrase_to_server(
             crate::ymusic::execute_voice_command(ym_cmd);
             play_command_chime("play");
             set_error("voice", None, "", 15);
-            if !has_trailing_stop && force_active {
+            if continuous_dialog && !has_trailing_stop && force_active {
                 keep_listening = true;
                 set_vad_visual("vad", false, "default");
                 return Ok((ym_text, String::new(), true));
@@ -2577,7 +2765,7 @@ fn send_phrase_to_server(
         if let Some(cmd) = local_command(&text, wake_word) {
             execute_device_command(cmd);
             set_error("voice", None, "", 15);
-            if !has_trailing_stop && force_active {
+            if continuous_dialog && !has_trailing_stop && force_active {
                 keep_listening = true;
                 set_vad_visual("vad", false, "default");
                 return Ok((text, String::new(), true));
@@ -2678,7 +2866,7 @@ fn send_phrase_to_server(
         if !completed {
             return Ok((text, String::new(), false));
         }
-        if !has_trailing_stop {
+        if continuous_dialog && !has_trailing_stop {
             keep_listening = true;
             set_vad_visual("vad", false, "default");
             Ok((text, answer, true))
@@ -2896,6 +3084,42 @@ impl VadProcessor {
             }
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn reply_volume_respects_quiet_speech_without_changing_default() {
+    let mut prefs = VoicePreferences::default();
+    assert_eq!(reply_gain(&prefs, 230.0, 100.0), 1.0);
+    prefs.apply(&Json::parse(r#"{"quiet_reply":true,"adaptive_reply_volume":true}"#).unwrap()).unwrap();
+    assert_eq!(reply_gain(&prefs, 230.0, 100.0), 0.48);
+    assert!(reply_gain(&prefs, 1300.0, 800.0) > 1.0);
+    let mut pcm = i16::MAX.to_le_bytes();
+    adjust_pcm16_gain(&mut pcm, 1.18);
+    assert_eq!(i16::from_le_bytes(pcm), i16::MAX);
+}
+
+#[cfg(test)]
+#[test]
+fn voice_preferences_validate_patches_and_gate_full_phrase_commands() {
+    let mut preferences = VoicePreferences::default();
+    assert!(preferences.enabled("activation_chime"));
+    assert!(preferences.enabled("continuous_dialog"));
+    assert_eq!(quick_command("тише", &preferences), None);
+    assert_eq!(quick_command("включи блютуз", &preferences), Some(DeviceCommand::BluetoothOn));
+    let patch = Json::parse(r#"{"quick_volume":true,"quick_tracks":true,"quick_favorites":true,"quick_bluetooth":false}"#).unwrap();
+    preferences.apply(&patch).unwrap();
+    assert_eq!(quick_command("громче", &preferences), Some(DeviceCommand::VolumeUp(10)));
+    assert_eq!(quick_command("далеко не все говорят громче", &preferences), None);
+    assert_eq!(quick_command("следующий трек", &preferences), Some(DeviceCommand::NextTrack));
+    assert_eq!(quick_command("лайк", &preferences), Some(DeviceCommand::LikeTrack));
+    assert_eq!(quick_command("пауза", &preferences), None);
+    assert_eq!(quick_command("включи блютуз", &preferences), None);
+    assert!(is_immediate_stop("Стоп", "Атри"));
+    let bad_patch = Json::parse(r#"{"quick_volume":false,"quick_media":1}"#).unwrap();
+    assert!(preferences.apply(&bad_patch).is_err());
+    assert!(preferences.enabled("quick_volume"));
+    assert_eq!(preferences.to_json().get("quick_tracks"), Some(&Json::Bool(true)));
 }
 
 #[cfg(test)]
@@ -3342,7 +3566,7 @@ fn run_daemon() -> i32 {
                 set_vad_visual("thinking", false, "default");
             }
             let ww = if force_active { "" } else { ww_cfg.as_str() };
-            match send_phrase_to_server(&cfg.server, &buf, ww, force_active, streamed_command) {
+            match send_phrase_to_server(&cfg.server, &buf, ww, force_active, streamed_command, Some((mean_rms, vad.noise_rms))) {
                 Ok((asr, ans, stay_active)) => {
                     let drain_ms = if stay_active && ans.is_empty() {
                         30
@@ -3505,7 +3729,7 @@ pub fn run(args: &[String]) -> i32 {
                     }
                 }
             }
-            match send_phrase_to_server(&cfg.server, &raw, &cfg.wake_word, false, None) {
+            match send_phrase_to_server(&cfg.server, &raw, &cfg.wake_word, false, None, None) {
                 Ok((asr, ans, _)) => {
                     println!(
                         "{}",
