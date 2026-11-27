@@ -25,7 +25,7 @@ data class AppReleaseInfo(
 )
 
 object AppUpdater {
-    private const val RELEASES_API = "https://api.github.com/repos/leftymods/AtriOS/releases?per_page=15"
+    private const val RELEASES_API = "https://api.github.com/repos/leftymods/AtriOS/releases?per_page=10"
     private const val RELEASES_HTML = "https://github.com/leftymods/AtriOS/releases"
 
     fun currentVersionName(context: Context): String {
@@ -66,8 +66,8 @@ object AppUpdater {
         try {
             val conn = (URL(RELEASES_API).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 8000
-                readTimeout = 8000
+                connectTimeout = 4000
+                readTimeout = 4000
                 setRequestProperty("Accept", "application/vnd.github+json")
                 setRequestProperty("User-Agent", "AtriOS-Control")
             }
@@ -124,8 +124,8 @@ object AppUpdater {
         try {
             val conn = (URL(RELEASES_HTML).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
-                connectTimeout = 8000
-                readTimeout = 8000
+                connectTimeout = 4000
+                readTimeout = 4000
                 setRequestProperty("User-Agent", "AtriOS-Control")
             }
             if (conn.responseCode != 200) {

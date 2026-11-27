@@ -32,6 +32,13 @@ fun OtaUpdateCard(
     var autoReboot by remember { mutableStateOf(true) }
     var showChangelog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(ota.isBusy) {
+        while (ota.isBusy) {
+            kotlinx.coroutines.delay(1000L)
+            onRefreshStatus()
+        }
+    }
+
     val displayCurrent = ota.currentVersion.ifBlank { fwVersion.ifBlank { "—" } }
     val stateLabel = when (ota.state) {
         "checking" -> "Проверка…"
