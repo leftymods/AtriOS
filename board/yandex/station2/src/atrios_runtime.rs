@@ -22,6 +22,8 @@ mod local_tts;
 mod npu;
 #[path = "atrios_runtime/local_ai.rs"]
 mod local_ai;
+#[path = "atrios_runtime/mini_brain.rs"]
+mod mini_brain;
 #[path = "atrios_runtime/weather.rs"]
 mod weather;
 #[path = "atrios_runtime/atriai.rs"]

@@ -2335,6 +2335,7 @@ fn execute_device_command(cmd: DeviceCommand) {
                 .stderr(Stdio::null())
                 .status();
             println!("[atriai] volume: {cur}% -> {nxt}%");
+            crate::mini_brain::record_last_action(crate::mini_brain::LastAction::VolumeUp(step));
             play_volume_chime(cur, nxt);
         }
         DeviceCommand::VolumeDown(step) => {
@@ -2349,6 +2350,7 @@ fn execute_device_command(cmd: DeviceCommand) {
                 .stderr(Stdio::null())
                 .status();
             println!("[atriai] volume: {cur}% -> {nxt}%");
+            crate::mini_brain::record_last_action(crate::mini_brain::LastAction::VolumeDown(step));
             play_volume_chime(cur, nxt);
         }
         DeviceCommand::VolumeSet(target) => {
@@ -2774,6 +2776,65 @@ fn send_phrase_to_server(
             return Ok((text, String::new(), false));
         }
 
+        // Contour 1: Hybrid Mini-Brain (compound commands, encrypted 2-copy vector memory, math, seek, context)
+        match crate::mini_brain::try_handle_local_brain(&clean_query) {
+            crate::mini_brain::BrainOutcome::Compound(parts) => {
+                println!("[mini-brain] compound command: {parts:?}");
+                let mut spoken: Vec<String> = Vec::new();
+                for part in parts {
+                    if let Some(intent) = crate::local_ai::parse_local_intent(&part, wake_word) {
+                        crate::local_ai::execute_local_intent(intent);
+                    } else if let Some(ym_cmd) = crate::ymusic::parse_ymusic_voice_command(&part, wake_word) {
+                        crate::ymusic::execute_voice_command(ym_cmd);
+                    } else if let Some(cmd) = local_command(&part, wake_word) {
+                        execute_device_command(cmd);
+                    } else if let crate::mini_brain::BrainOutcome::Handled { answer, chime } =
+                        crate::mini_brain::try_handle_local_brain(&part)
+                    {
+                        if let Some(a) = answer {
+                            spoken.push(a);
+                        } else if let Some(c) = chime {
+                            play_command_chime(c);
+                        }
+                    }
+                }
+                if !spoken.is_empty() {
+                    let joined = spoken.join(" ");
+                    let _ = speak_via_remote_tts(&joined, "neutral", false);
+                }
+                set_error("voice", None, "", 15);
+                if continuous_dialog && !has_trailing_stop && force_active {
+                    keep_listening = true;
+                    set_vad_visual("vad", false, "default");
+                    return Ok((text, String::new(), true));
+                }
+                keep_listening = false;
+                return Ok((text, String::new(), false));
+            }
+            crate::mini_brain::BrainOutcome::Handled { answer, chime } => {
+                println!("[mini-brain] handled locally: answer={answer:?} chime={chime:?}");
+                if let Some(ans) = answer {
+                    write_status("speaking", &text, &ans, "");
+                    if !speak_via_remote_tts(&ans, "neutral", false) {
+                        if let Some(c) = chime {
+                            play_command_chime(c);
+                        }
+                    }
+                } else if let Some(c) = chime {
+                    play_command_chime(c);
+                }
+                set_error("voice", None, "", 15);
+                if continuous_dialog && !has_trailing_stop && force_active {
+                    keep_listening = true;
+                    set_vad_visual("vad", false, "default");
+                    return Ok((text, String::new(), true));
+                }
+                keep_listening = false;
+                return Ok((text, String::new(), false));
+            }
+            crate::mini_brain::BrainOutcome::Escalate => {}
+        }
+
         let now_unix = now_unix_i64();
         let remote_backed_off = now_unix < REMOTE_DOWN_UNTIL.load(Ordering::Relaxed);
         if !has_remote || remote_backed_off {
@@ -2812,15 +2873,21 @@ fn send_phrase_to_server(
                 h.push(("Authorization", auth.as_str()));
             }
             let ca = if ca2.is_empty() { None } else { Some(ca2.as_str()) };
-            let payload = obj(vec![("text", Json::Str(q_text))]);
+            let ctx_json = crate::mini_brain::build_chat_context_json(&q_text);
+            let payload = obj(vec![
+                ("text", Json::Str(q_text.clone())),
+                ("context", ctx_json),
+            ]);
             request_json(&format!("{base2}/chat"), Some(&payload), &h, ca, 25, 1024 * 1024, Some(cancel))
         })?;
+        crate::mini_brain::execute_server_actions(&chat);
         let answer = chat
             .get_str("text")
             .map(str::to_string)
             .filter(|s| !s.trim().is_empty())
             .ok_or("Empty or invalid chat response")?;
         let emotion = chat.get_str("emotion").unwrap_or("neutral").to_string();
+        crate::mini_brain::record_dialog_turn(&text, &answer);
         println!("[chat] answer={answer:?} emotion={emotion}");
 
         write_status("speaking", &text, &answer, "");
