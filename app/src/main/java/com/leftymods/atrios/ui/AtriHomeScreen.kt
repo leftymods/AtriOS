@@ -144,24 +144,25 @@ fun AtriHomeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .heightIn(min = 165.dp),
+                .heightIn(min = 150.dp)
+                .clip(RoundedCornerShape(30.dp))
+                .clickable { onBlobTap() },
             contentAlignment = Alignment.Center
         ) {
-            YandexVibeBlobCanvas(
-                accent = palette.accent,
-                aura2 = palette.aura2,
-                aura3 = palette.aura3,
-                isPlaying = isPlaying,
-                volume = (volumePct / 100f).coerceIn(0.2f, 1f),
+            SingleLiquidBlobShaderAura(
+                isPlaying = isPlaying || isLoading,
+                palette = palette,
+                coverUrl = ym.coverUrl,
+                audioBass = ym.audioBass,
+                audioMid = ym.audioMid,
+                audioHigh = ym.audioHigh,
+                audioEnergy = ym.audioEnergy,
+                audioBeat = ym.audioBeat,
                 modifier = Modifier.fillMaxSize()
             )
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .clickable { onBlobTap() }
-                    .padding(horizontal = 24.dp, vertical = 14.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

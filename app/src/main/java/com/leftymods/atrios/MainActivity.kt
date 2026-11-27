@@ -1314,7 +1314,7 @@ fun AtriOSApp(
                                                                 .fillMaxWidth()
                                                                 .clickable {
                                                                     settingsPage = page
-                                                                    if (page == SettingsPage.ABOUT) client.otaStatus()
+                                                                    if (page == SettingsPage.UPDATES) client.otaStatus()
                                                                 }
                                                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                                                             verticalAlignment = Alignment.CenterVertically,
