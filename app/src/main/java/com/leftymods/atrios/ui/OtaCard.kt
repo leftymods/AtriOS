@@ -31,11 +31,32 @@ fun OtaUpdateCard(
     var showRollbackDialog by remember { mutableStateOf(false) }
     var autoReboot by remember { mutableStateOf(true) }
     var showChangelog by remember { mutableStateOf(false) }
+    var localChecking by remember { mutableStateOf(false) }
 
-    LaunchedEffect(ota.isBusy) {
-        while (ota.isBusy) {
-            kotlinx.coroutines.delay(2500L)
-            onRefreshStatus()
+    // Clear localChecking as soon as speaker settles into a terminal state
+    LaunchedEffect(ota.state, ota.updateAvailable, ota.lastCheckTs) {
+        if (ota.state != "checking" && (ota.updateAvailable || ota.state in setOf("up_to_date", "available", "error", "installed", "rolled_back"))) {
+            localChecking = false
+        }
+    }
+
+    // Bounded polling: max 6 polls (15s) for "checking", max 60 polls (150s) for download/install.
+    // Never loops forever without user interaction.
+    val isCheckingNow = localChecking || ota.state == "checking"
+    LaunchedEffect(ota.state, localChecking) {
+        if (isCheckingNow && !ota.updateAvailable) {
+            repeat(6) {
+                kotlinx.coroutines.delay(2500L)
+                if (ota.updateAvailable || (ota.state != "checking" && !localChecking)) return@LaunchedEffect
+                onRefreshStatus()
+            }
+            localChecking = false
+        } else if (ota.isBusy && ota.state != "checking") {
+            repeat(60) {
+                kotlinx.coroutines.delay(2500L)
+                if (!ota.isBusy) return@LaunchedEffect
+                onRefreshStatus()
+            }
         }
     }
 
@@ -280,7 +301,7 @@ fun OtaUpdateCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
-                    ota.isBusy -> {
+                    ota.isBusy || localChecking -> {
                         FilledTonalButton(
                             onClick = {},
                             enabled = false,
@@ -289,7 +310,7 @@ fun OtaUpdateCard(
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
-                            Text(stateLabel)
+                            Text(if (localChecking && !ota.isBusy) "Проверка…" else stateLabel)
                         }
                     }
                     ota.updateAvailable -> {
@@ -316,7 +337,12 @@ fun OtaUpdateCard(
                     }
                     else -> {
                         Button(
-                            onClick = onCheckUpdates,
+                            onClick = {
+                                if (!localChecking && !ota.isBusy) {
+                                    localChecking = true
+                                    onCheckUpdates()
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp)
                         ) {
