@@ -35,6 +35,10 @@
 #define GTCRN_TRA_LEN     (2 * 3 * 1 * 1 * 16)
 #define GTCRN_INTER_LEN   (2 * 1 * 33 * 16)
 #define GTCRN_MAX_OVERRUN 8
+#define GTCRN_RETRY_US 5000000.0
+#define GTCRN_MAX_RETRY_US 60000000.0
+#define GTCRN_RECOVERY_BLEND_HOPS 6
+#define GTCRN_STABLE_HOPS 250
 
 #define DEFAULT_ORT_LIB   "/usr/lib/atrios/libonnxruntime.so"
 #define DEFAULT_MODEL     "/usr/share/atrios/models/gtcrn/gtcrn_simple.onnx"
@@ -90,6 +94,10 @@ static double g_infer_us_max = 0.0;
 static uint64_t g_deadline_misses = 0;
 static uint64_t g_consec_misses = 0;
 static uint64_t g_fallback_events = 0;
+static double g_retry_at_us = 0.0;
+static double g_retry_delay_us = GTCRN_RETRY_US;
+static int g_good_hops = 0;
+static int g_recovery_blend = 0;
 
 static inline double now_us(void) {
     struct timespec ts;
@@ -192,6 +200,10 @@ int gtcrn_ns_init(void) {
     g_deadline_misses = 0;
     g_consec_misses = 0;
     g_fallback_events = 0;
+    g_retry_at_us = 0.0;
+    g_retry_delay_us = GTCRN_RETRY_US;
+    g_good_hops = 0;
+    g_recovery_blend = 0;
     g_active = 0;
     g_stream_started = 0;
     g_wet_mix = GTCRN_DEFAULT_WET;
@@ -374,18 +386,24 @@ static int gtcrn_run_hop(const float *hop_in_s16, float *hop_out_s16) {
     g_infer_us_sum += dt;
     if (dt > g_infer_us_max) g_infer_us_max = dt;
     if (dt > GTCRN_HOP_US) {
+        g_good_hops = 0;
         g_deadline_misses++;
         g_consec_misses++;
         if (g_consec_misses >= GTCRN_MAX_OVERRUN) {
             g_active = 0;
             g_fallback_events++;
             snprintf(g_mode, sizeof(g_mode), "%s", "fallback_overrun");
+            g_retry_at_us = now_us() + g_retry_delay_us;
+            g_retry_delay_us = fmin(g_retry_delay_us * 2.0, GTCRN_MAX_RETRY_US);
             fprintf(stderr, "[gtcrn] real-time overrun (%llu consecutive hops > 16ms, last=%.2fms); engaging fallback to AEC/BNR\n",
                     (unsigned long long)g_consec_misses, dt / 1000.0);
             return 0;
         }
     } else {
         g_consec_misses = 0;
+        if (g_good_hops < GTCRN_STABLE_HOPS && ++g_good_hops == GTCRN_STABLE_HOPS) {
+            g_retry_delay_us = GTCRN_RETRY_US;
+        }
     }
 
     /* Reconstruct Hermitian spectrum & run 512-pt IFFT + sqrt-Hann 50% OLA */
@@ -415,9 +433,31 @@ static int gtcrn_run_hop(const float *hop_in_s16, float *hop_out_s16) {
 }
 
 static void gtcrn_render_hop(const float *in, float *out) {
+    if (!g_active && g_retry_at_us > 0.0 && now_us() >= g_retry_at_us) {
+        // Restart the model state, keeping the input and output ring buffers aligned.
+        memset(g_in_win, 0, sizeof(g_in_win));
+        memset(g_ola_tail, 0, sizeof(g_ola_tail));
+        memset(g_conv_buf, 0, sizeof(g_conv_buf));
+        memset(g_tra_buf, 0, sizeof(g_tra_buf));
+        memset(g_inter_buf, 0, sizeof(g_inter_buf));
+        g_ping = 0;
+        g_pre_gain = g_prev_gain = 1.0f;
+        g_consec_misses = 0;
+        g_good_hops = 0;
+        g_retry_at_us = 0.0;
+        g_recovery_blend = GTCRN_RECOVERY_BLEND_HOPS;
+        g_active = 1;
+        snprintf(g_mode, sizeof(g_mode), "%s", "active");
+        fprintf(stderr, "[gtcrn] retrying after real-time overrun\n");
+    }
     if (g_active && gtcrn_run_hop(in, out)) {
+        float wet = g_wet_mix;
+        if (g_recovery_blend > 0) {
+            wet *= (GTCRN_RECOVERY_BLEND_HOPS - g_recovery_blend) / (float)GTCRN_RECOVERY_BLEND_HOPS;
+            g_recovery_blend--;
+        }
         for (int i = 0; i < GTCRN_HOP; i++) {
-            out[i] = g_wet_mix * out[i] + (1.0f - g_wet_mix) * g_prev_dry[i];
+            out[i] = wet * out[i] + (1.0f - wet) * g_prev_dry[i];
         }
     } else {
         memcpy(out, g_prev_dry, sizeof(g_prev_dry));
