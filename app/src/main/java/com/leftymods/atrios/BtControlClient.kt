@@ -214,7 +214,7 @@ class BtControlClient(
         if (token.isNotBlank()) relayToken = token.trim()
     }
 
-    val btLastAttemptFailed = AtomicBoolean(false)
+    val btLastAttemptFailed = java.util.concurrent.atomic.AtomicBoolean(false)
 
     @SuppressLint("MissingPermission")
     fun connect(device: BluetoothDevice, failFast: Boolean = false) {
