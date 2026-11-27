@@ -1787,6 +1787,7 @@ fn spawn_wifi_relay_worker() {
 }
 
 pub fn run(_args: &[String]) -> i32 {
+    crate::ymusic::ensure_daemon_if_logged_in();
     spawn_wifi_relay_worker();
     let server_fd = unsafe { socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM) };
     if server_fd < 0 {

@@ -3055,6 +3055,26 @@ fn send_cmd_only(cmd: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+pub fn ensure_daemon_if_logged_in() {
+    if load_auth().is_none() || !crate::ynison::is_ynison_enabled() {
+        return;
+    }
+    if send_cmd_only("ping").is_ok() {
+        return;
+    }
+    let bin = if Path::new("/usr/lib/atrios/atrios-runtime").exists() {
+        "/usr/lib/atrios/atrios-runtime"
+    } else {
+        "/usr/lib/atrios/ymusic"
+    };
+    let _ = Command::new(bin)
+        .args(["ymusic", "daemon"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+}
+
 fn send_or_spawn_command(cmd: &str) -> Result<(), String> {
     if send_cmd_only(cmd).is_ok() {
         return Ok(());

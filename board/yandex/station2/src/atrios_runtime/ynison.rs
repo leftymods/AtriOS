@@ -449,9 +449,6 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
     let mut last_pushed_track = String::new();
     let mut last_pushed_paused = true;
     let mut last_local_queue_push_ms: i64 = 0;
-    let mut last_remote_sync_at: Option<Instant> = None;
-    let mut last_remote_status_ts: i64 = 0;
-    let mut expected_remote_track = String::new();
 
     while !stop_flag.load(Ordering::SeqCst) {
         // Logout completely removes AtriStation from official Yandex Music app via Close(1000)
@@ -494,20 +491,6 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                 ));
             }
             let paused = st.state != "playing" && st.state != "loading";
-            if let Some(sync_at) = last_remote_sync_at {
-                if !expected_remote_track.is_empty() && st.track_id == expected_remote_track {
-                    last_remote_sync_at = None;
-                    expected_remote_track.clear();
-                } else if sync_at.elapsed() < Duration::from_millis(1000) {
-                    // Wait for ymusic daemon to switch to expected_remote_track before pushing status,
-                    // preventing YM app from bouncing back to the previous track!
-                    last_status_push = Instant::now();
-                    continue;
-                } else {
-                    last_remote_sync_at = None;
-                    expected_remote_track.clear();
-                }
-            }
             let local_queue_sig = st.queue_ids.join(",");
             if !paused && !st.track_id.is_empty() && st.mode != "ynison" {
                 let queue_changed = local_queue_sig != last_queue_sig
@@ -726,8 +709,6 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                         last_paused = Some(paused);
                         last_pushed_track = ids[cur_idx as usize].clone();
                         last_pushed_paused = paused;
-                        expected_remote_track = ids[cur_idx as usize].clone();
-                        last_remote_sync_at = Some(Instant::now());
                         let mode_tag = if paused { "pause" } else { "play" };
                         let entity_type = q.get_str("entity_type").unwrap_or("");
                         let entity_id = q.get_str("entity_id").unwrap_or("");
@@ -740,34 +721,6 @@ fn run_ynison_session(token: &str, device_id: &str, stop_flag: &'static AtomicBo
                         println!("[ynison] Syncing queue ({} tracks, idx={rel_idx}, {mode_tag}, type={entity_type})", win_end - win_start);
                         send_ymusic_cmd(&cmd);
                         continue;
-                    }
-                }
-            }
-        }
-
-        if status_author != device_id && !status_author.is_empty() {
-            let status_ts = status
-                .and_then(|s| s.get("version"))
-                .and_then(|v| v.get_str("timestamp_ms"))
-                .and_then(|v| v.parse::<i64>().ok())
-                .unwrap_or(0);
-            if status_ts > last_remote_status_ts {
-                last_remote_status_ts = status_ts;
-                if let Some(rpos) = status
-                    .and_then(|s| s.get_str("progress_ms"))
-                    .and_then(|v| v.parse::<i64>().ok())
-                {
-                    let cur_st = crate::ymusic::read_status();
-                    if !cur_st.track_id.is_empty()
-                        && cur_st.duration_ms > 0
-                        && (rpos - cur_st.position_ms).abs() > 3000
-                    {
-                        println!(
-                            "[ynison] Remote seek -> {rpos} ms (local was {} ms)",
-                            cur_st.position_ms
-                        );
-                        send_ymusic_cmd(&format!("seek:{rpos}"));
-                        last_status_push = Instant::now();
                     }
                 }
             }
