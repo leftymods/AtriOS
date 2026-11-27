@@ -528,6 +528,19 @@ pub(crate) fn voice_endpoint_silence_ms(wake_mode: bool, utterance_ms: f64, musi
     }
 }
 
+pub(crate) fn wake_early_endpoint_ready(
+    partial_text: &str,
+    wake_word: &str,
+    stable_hits: u8,
+    silence_ms: f64,
+    music_on: bool,
+) -> bool {
+    let min_silence = if music_on { 96.0 } else { 64.0 };
+    stable_hits >= 2
+        && silence_ms >= min_silence
+        && is_wake_word_only(partial_text, wake_word)
+}
+
 fn is_wake_word_only(text: &str, wake_word: &str) -> bool {
     let ww = wake_word.trim().to_lowercase();
     if ww.is_empty() || matches!(ww.as_str(), "off" | "none" | "false") {
@@ -3063,6 +3076,9 @@ fn run_daemon() -> i32 {
         let mut last_start_thr = vad_thr;
         let mut frame_idx = 0usize;
         let mut music_on = false;
+        let mut partial_wake_hits: u8 = 0;
+        let mut partial_wake_visual = false;
+        let mut last_partial_text = String::new();
 
         if force_active {
             set_vad_visual("vad", false, "default");
@@ -3166,9 +3182,22 @@ fn run_daemon() -> i32 {
                         buf.extend_from_slice(&chunk);
                         utt_rms.push(rms);
                         silence_ms = 0.0;
+                        partial_wake_hits = 0;
+                        partial_wake_visual = false;
+                        last_partial_text.clear();
                         voice_timing("vad_start");
-                        wake_stream_started = crate::local_stt::reset_command_stream()
-                            && crate::local_stt::feed_command_stream(&buf);
+                        let (ok, partial_opt) = if crate::local_stt::reset_command_stream() {
+                            crate::local_stt::feed_command_stream_with_partial(&buf)
+                        } else {
+                            (false, None)
+                        };
+                        wake_stream_started = ok;
+                        if let Some(pt) = partial_opt {
+                            if wake_required && mode == PipelineMode::WakeSpotter && matches_wake_word(&pt, &ww_cfg) {
+                                partial_wake_hits = 1;
+                            }
+                            last_partial_text = pt;
+                        }
                         if force_active || !wake_required {
                             set_vad_visual("vad", false, "default");
                         }
@@ -3199,7 +3228,23 @@ fn run_daemon() -> i32 {
                     if mode == PipelineMode::ActiveCommand && buf.len() > SR * 2 * 14 / 10 {
                         wake_stream_started = false;
                     } else {
-                        wake_stream_started = crate::local_stt::feed_command_stream(&chunk);
+                        let (ok, partial_opt) = crate::local_stt::feed_command_stream_with_partial(&chunk);
+                        wake_stream_started = ok;
+                        if wake_required && mode == PipelineMode::WakeSpotter {
+                            if let Some(pt) = partial_opt {
+                                if matches_wake_word(&pt, &ww_cfg) {
+                                    partial_wake_hits = partial_wake_hits.saturating_add(1);
+                                    if partial_wake_hits >= 2 && !partial_wake_visual {
+                                        partial_wake_visual = true;
+                                        voice_timing("wake_partial_hit");
+                                        set_vad_visual("vad", false, "default");
+                                    }
+                                } else {
+                                    partial_wake_hits = 0;
+                                }
+                                last_partial_text = pt;
+                            }
+                        }
                     }
                 }
                 if rms > utt_peak {
@@ -3214,6 +3259,20 @@ fn run_daemon() -> i32 {
                     silence_ms += frame_ms;
                 }
                 let utt_ms = (buf.len() as f64) / ((SR * 2) as f64) * 1000.0;
+                let early_wake = wake_required
+                    && mode == PipelineMode::WakeSpotter
+                    && buf.len() >= min_bytes
+                    && wake_early_endpoint_ready(
+                        &last_partial_text,
+                        &ww_cfg,
+                        partial_wake_hits,
+                        silence_ms,
+                        music_on,
+                    );
+                if early_wake {
+                    voice_timing("wake_early_endpoint");
+                    break;
+                }
                 let eff_end_silence_ms = voice_endpoint_silence_ms(
                     wake_required && mode == PipelineMode::WakeSpotter,
                     utt_ms - silence_ms, music_on, end_silence_ms,
@@ -3228,6 +3287,9 @@ fn run_daemon() -> i32 {
                     utt_rms.clear();
                     silence_ms = 0.0;
                     wake_stream_started = false;
+                    partial_wake_hits = 0;
+                    partial_wake_visual = false;
+                    last_partial_text.clear();
                 } else if utt_ms >= max_utt_ms {
                     hit_max_utt = true;
                     break;

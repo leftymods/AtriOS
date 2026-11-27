@@ -27,7 +27,7 @@ const MODEL_PATHS: &[&str] = &[
 // shares the same loaded VoskModel). Keep common near-misses in the
 // vocabulary so they can be decoded as themselves and rejected by the caller.
 const CMD_GRAMMAR: &str = r#"[
-  "арти", "атриум", "астры", "натрий", "а три",
+  "атри", "арти", "а три", "атриум", "астры", "натрий", "утро", "отряд", "смотри",
   "привет", "слушай", "эй",
   "блютуз", "блютус", "колонка", "колонку", "колонки", "сопряжение", "поиск", "подключи", "отключи", "видимость",
   "включи", "включить", "вруби", "запусти", "активируй", "открой",
@@ -80,6 +80,7 @@ struct VoskFns {
     vosk_recognizer_accept_waveform: unsafe extern "C" fn(*mut c_void, *const c_char, c_int) -> c_int,
     vosk_recognizer_final_result: unsafe extern "C" fn(*mut c_void) -> *const c_char,
     vosk_recognizer_result: Option<unsafe extern "C" fn(*mut c_void) -> *const c_char>,
+    vosk_recognizer_partial_result: Option<unsafe extern "C" fn(*mut c_void) -> *const c_char>,
     vosk_recognizer_reset: unsafe extern "C" fn(*mut c_void),
 }
 
@@ -90,6 +91,7 @@ struct VoskEngine {
     cmd_rec: *mut c_void,
     stop_rec: *mut c_void,
     cmd_prev_sample: f64,
+    cmd_agc_env: f64,
     cmd_completed_text: String,
 }
 
@@ -164,6 +166,7 @@ fn load_engine() -> Option<Mutex<VoskEngine>> {
                 vosk_recognizer_accept_waveform: sym(handle, "vosk_recognizer_accept_waveform")?,
                 vosk_recognizer_final_result: sym(handle, "vosk_recognizer_final_result")?,
                 vosk_recognizer_result: sym_opt(handle, "vosk_recognizer_result"),
+                vosk_recognizer_partial_result: sym_opt(handle, "vosk_recognizer_partial_result"),
                 vosk_recognizer_reset: sym(handle, "vosk_recognizer_reset")?,
             })
         })() {
@@ -208,6 +211,7 @@ fn load_engine() -> Option<Mutex<VoskEngine>> {
             cmd_rec,
             stop_rec,
             cmd_prev_sample: 0.0,
+            cmd_agc_env: 2400.0,
             cmd_completed_text: String::new(),
         }))
     }
@@ -234,6 +238,7 @@ pub fn reset_command_stream() -> bool {
     }
     unsafe { (guard.fns.vosk_recognizer_reset)(guard.cmd_rec) };
     guard.cmd_prev_sample = 0.0;
+    guard.cmd_agc_env = 2400.0;
     guard.cmd_completed_text.clear();
     true
 }
@@ -246,6 +251,14 @@ fn result_text(raw_ptr: *const c_char) -> Option<String> {
     Some(Json::parse(&json).ok()?.get_str("text")?.trim().to_string())
 }
 
+fn partial_text(raw_ptr: *const c_char) -> Option<String> {
+    if raw_ptr.is_null() {
+        return None;
+    }
+    let json = unsafe { CStr::from_ptr(raw_ptr) }.to_string_lossy();
+    Some(Json::parse(&json).ok()?.get_str("partial")?.trim().to_string())
+}
+
 fn append_text(out: &mut String, text: &str) {
     if !text.is_empty() {
         if !out.is_empty() {
@@ -255,46 +268,64 @@ fn append_text(out: &mut String, text: &str) {
     }
 }
 
-/// Feed live PCM without treating a provisional transcript as a wake event.
-pub fn feed_command_stream(pcm: &[u8]) -> bool {
-    let Some(Some(mtx)) = ENGINE.get().map(|o| o.as_ref()) else {
-        return false;
-    };
-    let Ok(mut guard) = mtx.lock() else {
-        return false;
-    };
-    let Some(result) = guard.fns.vosk_recognizer_result else {
-        return false;
-    };
-    if guard.cmd_rec.is_null() {
-        return false;
-    }
+/// Smooth stateful AGC + mild pre-emphasis for live streaming chunks.
+/// Avoids per-chunk gain pumping on quiet pauses while keeping speech crisp.
+pub(crate) fn condition_stream_chunk(
+    pcm: &[u8],
+    prev_sample: &mut f64,
+    agc_env: &mut f64,
+) -> Vec<u8> {
     let samples = pcm.chunks_exact(2)
         .map(|b| i16::from_le_bytes([b[0], b[1]]) as f64)
         .collect::<Vec<_>>();
     if samples.is_empty() {
-        return false;
+        return Vec::new();
     }
     let mean = samples.iter().sum::<f64>() / samples.len() as f64;
-    let mut conditioned = Vec::with_capacity(samples.len() * 2);
     let mut peak = 0.0f64;
     let mut values = Vec::with_capacity(samples.len());
     for sample in samples {
         let raw = sample - mean;
-        let emph = raw - 0.90 * guard.cmd_prev_sample;
-        guard.cmd_prev_sample = raw;
+        let emph = raw - 0.90 * *prev_sample;
+        *prev_sample = raw;
         let value = 0.55 * raw + 0.45 * emph;
         peak = peak.max(value.abs());
         values.push(value);
     }
-    let gain = if (80.0..14000.0).contains(&peak) {
-        (14000.0 / peak).min(8.0)
-    } else {
-        1.0
-    };
+    // Fast attack, slow release envelope with noise floor clamp (prevents 8x noise pumping)
+    let env_target = peak.max(600.0);
+    let alpha = if env_target > *agc_env { 0.35 } else { 0.04 };
+    *agc_env = *agc_env + alpha * (env_target - *agc_env);
+    let gain = (12000.0 / (*agc_env).max(600.0)).clamp(1.0, 5.0);
+    let mut conditioned = Vec::with_capacity(values.len() * 2);
     for value in values {
         let sample = (value * gain).round().clamp(-32767.0, 32767.0) as i16;
         conditioned.extend_from_slice(&sample.to_le_bytes());
+    }
+    conditioned
+}
+
+/// Feed live PCM into the constrained recognizer and return (ok, live_partial_transcript).
+pub fn feed_command_stream_with_partial(pcm: &[u8]) -> (bool, Option<String>) {
+    let Some(Some(mtx)) = ENGINE.get().map(|o| o.as_ref()) else {
+        return (false, None);
+    };
+    let Ok(mut guard) = mtx.lock() else {
+        return (false, None);
+    };
+    let Some(result) = guard.fns.vosk_recognizer_result else {
+        return (false, None);
+    };
+    if guard.cmd_rec.is_null() {
+        return (false, None);
+    }
+    let mut prev = guard.cmd_prev_sample;
+    let mut env = guard.cmd_agc_env;
+    let conditioned = condition_stream_chunk(pcm, &mut prev, &mut env);
+    guard.cmd_prev_sample = prev;
+    guard.cmd_agc_env = env;
+    if conditioned.is_empty() {
+        return (false, None);
     }
     let accepted = unsafe {
         (guard.fns.vosk_recognizer_accept_waveform)(
@@ -304,16 +335,29 @@ pub fn feed_command_stream(pcm: &[u8]) -> bool {
         )
     };
     if accepted < 0 {
-        return false;
+        return (false, None);
     }
     if accepted > 0 {
         // Keep each Vosk segment before the next chunk starts a new one.
         let Some(text) = result_text(unsafe { result(guard.cmd_rec) }) else {
-            return false;
+            return (false, None);
         };
         append_text(&mut guard.cmd_completed_text, &text);
     }
-    true
+    let mut live = guard.cmd_completed_text.clone();
+    if let Some(partial_fn) = guard.fns.vosk_recognizer_partial_result {
+        if let Some(p) = partial_text(unsafe { partial_fn(guard.cmd_rec) }) {
+            append_text(&mut live, &p);
+        }
+    }
+    let clean: Vec<&str> = live.split_whitespace().filter(|w| *w != "[unk]").collect();
+    let live_opt = if clean.is_empty() { None } else { Some(clean.join(" ")) };
+    (true, live_opt)
+}
+
+/// Feed live PCM without treating a provisional transcript as a wake event.
+pub fn feed_command_stream(pcm: &[u8]) -> bool {
+    feed_command_stream_with_partial(pcm).0
 }
 
 /// Finish the live constrained-recognizer pass and return its final transcript.
@@ -330,6 +374,7 @@ pub fn finish_command_stream() -> Option<(String, bool)> {
     let tail = result_text(raw_ptr);
     unsafe { (guard.fns.vosk_recognizer_reset)(guard.cmd_rec) };
     guard.cmd_prev_sample = 0.0;
+    guard.cmd_agc_env = 2400.0;
     let mut raw = std::mem::take(&mut guard.cmd_completed_text);
     append_text(&mut raw, &tail?);
     let mut had_unk = false;

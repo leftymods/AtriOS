@@ -147,6 +147,38 @@ mod tests {
     }
 
     #[test]
+    fn smooth_stream_agc_avoids_quiet_noise_pumping() {
+        let mut prev = 0.0;
+        let mut env = 2400.0;
+        let quiet: Vec<u8> = (0..512).flat_map(|i| {
+            let s: i16 = if i % 2 == 0 { 90 } else { -90 };
+            s.to_le_bytes()
+        }).collect();
+        let out = local_stt::condition_stream_chunk(&quiet, &mut prev, &mut env);
+        let max_amp = out.chunks_exact(2)
+            .map(|b| i16::from_le_bytes([b[0], b[1]]).unsigned_abs())
+            .max()
+            .unwrap_or(0);
+        // Must stay bounded (~5x max), never blasted by 8x per-chunk pumping
+        assert!(max_amp <= 700, "quiet chunk over-amplified: {max_amp}");
+    }
+
+    #[test]
+    fn wake_early_endpoint_fires_only_on_stable_standalone_wake() {
+        assert!(atriai::wake_early_endpoint_ready("а три", "Atri", 2, 64.0, false));
+        assert!(atriai::wake_early_endpoint_ready("арти", "Atri", 2, 96.0, true));
+        // Not ready before 2 stable chunks or before silence threshold
+        assert!(!atriai::wake_early_endpoint_ready("а три", "Atri", 1, 64.0, false));
+        assert!(!atriai::wake_early_endpoint_ready("а три", "Atri", 2, 32.0, false));
+        assert!(!atriai::wake_early_endpoint_ready("а три", "Atri", 2, 64.0, true));
+        // Must NOT cut off one-breath commands or trigger on distractors
+        assert!(!atriai::wake_early_endpoint_ready("а три сделай громче", "Atri", 3, 96.0, false));
+        assert!(!atriai::wake_early_endpoint_ready("атриум", "Atri", 3, 96.0, false));
+        assert!(!atriai::wake_early_endpoint_ready("утро", "Atri", 3, 96.0, false));
+        assert!(!atriai::wake_early_endpoint_ready("три", "Atri", 3, 96.0, false));
+    }
+
+    #[test]
     fn json_roundtrip_and_escapes() {
         let j = json::Json::parse(r#"{"a":"привет\n\"Atri\"","b":true,"n":42}"#).unwrap();
         assert_eq!(j.get_str("a"), Some("привет\n\"Atri\""));
