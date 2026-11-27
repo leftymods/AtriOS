@@ -602,6 +602,17 @@ fun AtriOSApp(
         if (hasPerms && adapter != null) adapter.bondedDevices.toList() else emptyList()
     }
 
+    // Auto-poll while speaker reports "loading" so UI immediately transitions to "playing" without needing a tap
+    LaunchedEffect(connected, status.ymusic.state) {
+        if (connected && status.ymusic.state == "loading") {
+            repeat(15) {
+                delay(800L)
+                if (!connected || status.ymusic.state != "loading") return@LaunchedEffect
+                client.ymusicStatus()
+            }
+        }
+    }
+
     // System Back gesture navigates cleanly inside the app instead of closing it!
     BackHandler(enabled = connected && (showVolumeSheet || showEqSheet || settingsPage != SettingsPage.ROOT || selectedTab != AppTab.HOME)) {
         when {
@@ -1004,14 +1015,12 @@ fun AtriOSApp(
                                 progressFrac = homeProgress,
                                 orbs = ymOrbs,
                                 onBlobTap = {
-                                    if (status.ymusic.state == "playing") {
-                                        dispatchYMusicControl("pause")
-                                    } else if (status.ymusic.title.isNotBlank()) {
-                                        dispatchYMusicControl("play")
-                                    } else if (status.ymusic.loggedIn) {
-                                        dispatchYMusicPlay("wave", null)
-                                    } else {
-                                        selectedTab = AppTab.INTEGRATIONS
+                                    when {
+                                        status.ymusic.state == "loading" -> client.ymusicStatus()
+                                        status.ymusic.state == "playing" -> dispatchYMusicControl("pause")
+                                        status.ymusic.title.isNotBlank() -> dispatchYMusicControl("play")
+                                        status.ymusic.loggedIn -> dispatchYMusicPlay("wave", null)
+                                        else -> selectedTab = AppTab.INTEGRATIONS
                                     }
                                 },
                                 onPrev = { dispatchYMusicControl("prev") },
