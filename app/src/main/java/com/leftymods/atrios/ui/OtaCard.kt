@@ -246,40 +246,46 @@ fun OtaUpdateCard(
                 }
             }
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onCheckUpdates,
-                    enabled = !ota.isBusy
-                ) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Проверить обновления")
-                }
-
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (ota.updateAvailable && !ota.isBusy) {
-                    FilledTonalButton(onClick = { showApplyDialog = true }) {
+                    Button(
+                        onClick = { showApplyDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Icon(Icons.Rounded.Download, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Установить ${ota.latestVersion ?: ""}".trim())
                     }
-                }
-
-                if (ota.rebootRequired) {
-                    Button(onClick = onRebootNow) {
+                } else if (ota.rebootRequired && !ota.isBusy) {
+                    Button(
+                        onClick = onRebootNow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Icon(Icons.Rounded.RestartAlt, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Перезагрузить")
                     }
                 }
 
-                if (ota.rollbackAvailable && !ota.isBusy) {
-                    OutlinedButton(onClick = { showRollbackDialog = true }) {
-                        Icon(Icons.Rounded.History, contentDescription = null)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilledTonalButton(
+                        onClick = onCheckUpdates,
+                        enabled = !ota.isBusy
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null)
                         Spacer(Modifier.width(6.dp))
-                        Text("Откат")
+                        Text("Проверить обновления")
+                    }
+
+                    if (ota.rollbackAvailable && !ota.isBusy) {
+                        OutlinedButton(onClick = { showRollbackDialog = true }) {
+                            Icon(Icons.Rounded.History, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Откат")
+                        }
                     }
                 }
             }
