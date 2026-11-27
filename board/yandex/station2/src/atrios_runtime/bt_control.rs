@@ -23,6 +23,7 @@ const MAX_CLIENTS: usize = 4;
 const MAX_LINE_BYTES: usize = 8192;
 const IDLE_TIMEOUT_SECS: u64 = 300;
 const VOLUME_FILE: &str = "/var/lib/atrios/volume";
+const PRE_MUTE_VOLUME_FILE: &str = "/var/lib/atrios/volume-before-mute";
 const BT_PAIRED_FILE: &str = "/var/lib/atrios/bt_paired";
 const BT_PAIR_UNTIL_FILE: &str = "/var/run/atrios-bt-pair-until";
 const BUTTONS_STATE_FILE: &str = "/var/run/atrios/buttons.json";
@@ -35,6 +36,7 @@ const DEVICE_FILE: &str = "/etc/atrios-device";
 const ROOM_FILE: &str = "/var/lib/atrios/room";
 
 static CLIENT_COUNT: Mutex<usize> = Mutex::new(0);
+static BT_VISIBILITY_LOCK: Mutex<()> = Mutex::new(());
 static SCREEN_GEN: AtomicU64 = AtomicU64::new(0);
 static SCREEN_LOCK: Mutex<()> = Mutex::new(());
 static E2EE_USED_IVS: OnceLock<Mutex<HashMap<String, Vec<[u8; 12]>>>> = OnceLock::new();
@@ -106,6 +108,7 @@ fn is_mac(s: &str) -> bool {
 }
 
 struct BtPrivacy {
+    available: bool,
     discoverable: bool,
     hidden: bool,
     paired_devices: Vec<String>,
@@ -131,13 +134,45 @@ fn get_bt_privacy() -> BtPrivacy {
             }
         }
     }
-    let discoverable = Command::new("hciconfig")
-        .arg("hci0")
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).contains("ISCAN"))
-        .unwrap_or(false);
-    let hidden = !paired.is_empty() && !discoverable && pair_remaining == 0;
-    BtPrivacy { discoverable, hidden, paired_devices: paired, pair_remaining_sec: pair_remaining }
+    let controller = Command::new("hciconfig").arg("hci0").output().ok()
+        .filter(|out| out.status.success());
+    let discoverable = controller.as_ref()
+        .is_some_and(|out| String::from_utf8_lossy(&out.stdout).split_whitespace().any(|flag| flag == "ISCAN"));
+    let available = controller.as_ref()
+        .is_some_and(|out| String::from_utf8_lossy(&out.stdout).split_whitespace().any(|flag| flag == "UP"));
+    BtPrivacy {
+        available,
+        discoverable,
+        hidden: available && !discoverable,
+        paired_devices: paired,
+        pair_remaining_sec: if discoverable { pair_remaining } else { 0 },
+    }
+}
+
+fn write_bt_privacy(fields: &mut std::collections::BTreeMap<String, Json>) {
+    let state = get_bt_privacy();
+    fields.extend([
+        ("available".into(), Json::Bool(state.available)),
+        ("discoverable".into(), Json::Bool(state.discoverable)),
+        ("hidden".into(), Json::Bool(state.hidden)),
+        ("pair_remaining_sec".into(), Json::Num(state.pair_remaining_sec as f64)),
+        ("paired_devices".into(), Json::Arr(state.paired_devices.into_iter().map(Json::Str).collect())),
+    ]);
+}
+
+fn set_bt_visibility(action: &str, duration: Option<i64>) -> Result<Json, String> {
+    let _lock = BT_VISIBILITY_LOCK.lock().map_err(|_| "Bluetooth is busy")?;
+    let mut cmd = Command::new("/usr/lib/atrios/wireless");
+    cmd.args(["bt", action]);
+    if let Some(seconds) = duration {
+        cmd.arg(seconds.to_string());
+    }
+    let output = cmd.output().map_err(|_| "Не удалось запустить управление Bluetooth")?;
+    if !output.status.success() {
+        return Err(if action == "hide" { "Колонка не смогла скрыться из поиска Bluetooth" }
+            else { "Не удалось открыть окно сопряжения Bluetooth" }.into());
+    }
+    Ok(build_status_payload())
 }
 
 fn get_cpu_temp() -> f64 {
@@ -514,7 +549,6 @@ fn read_vqe_info() -> Json {
 fn build_status_payload() -> Json {
     let vol = get_current_volume();
     let (dev_name, codename, rev, os_name, fw_ver) = read_device_meta();
-    let bt_priv = get_bt_privacy();
     unsafe { tzset() };
     let tz_name = fs::canonicalize("/etc/localtime")
         .ok()
@@ -528,6 +562,13 @@ fn build_status_payload() -> Json {
     let (ip, ssid, wifi_conn) = get_wifi_info();
     let (ap, mm) = get_buttons_state();
     let bt_spk = crate::light::is_bt_active() || !crate::tools::dbus_bluealsa_pcms().is_empty();
+    let mut bt = std::collections::BTreeMap::from([
+        ("adapter".into(), Json::Str("hci0".into())),
+        ("name".into(), Json::Str(dev_name.clone())),
+        ("transport".into(), Json::Str("RFCOMM SPP (Channel 1)".into())),
+        ("is_speaker_mode".into(), Json::Bool(bt_spk)),
+    ]);
+    write_bt_privacy(&mut bt);
 
     obj(vec![
         ("errors", errors_json_value()),
@@ -588,19 +629,7 @@ fn build_status_payload() -> Json {
         ("eq", read_eq_info()),
         ("ota", crate::ota::read_ota_status_json()),
         ("ymusic", crate::ymusic::read_status_json()),
-        (
-            "bluetooth",
-            obj(vec![
-                ("adapter", Json::Str("hci0".into())),
-                ("name", Json::Str(dev_name)),
-                ("transport", Json::Str("RFCOMM SPP (Channel 1)".into())),
-                ("is_speaker_mode", Json::Bool(bt_spk)),
-                ("discoverable", Json::Bool(bt_priv.discoverable)),
-                ("hidden", Json::Bool(bt_priv.hidden)),
-                ("paired_devices", Json::Arr(bt_priv.paired_devices.into_iter().map(Json::Str).collect())),
-                ("pair_remaining_sec", Json::Num(bt_priv.pair_remaining_sec as f64)),
-            ]),
-        ),
+        ("bluetooth", Json::Obj(bt)),
     ])
 }
 
@@ -699,11 +728,26 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
                 .or_else(|| map.get("mute"))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
-            set_system_volume(if is_mute { 0 } else { 50 });
+            static MUTE_LOCK: Mutex<()> = Mutex::new(());
+            let _lock = MUTE_LOCK.lock().map_err(|_| "Volume is busy")?;
+            let current = get_current_volume();
+            if is_mute && current > 0 {
+                atomic_write_bytes(Path::new(PRE_MUTE_VOLUME_FILE), current.to_string().as_bytes(), 0o600, false)
+                    .map_err(|err| format!("Could not save previous volume: {err}"))?;
+                set_system_volume(0);
+            } else if !is_mute && current == 0 {
+                let previous = fs::read_to_string(PRE_MUTE_VOLUME_FILE).ok()
+                    .and_then(|value| value.trim().parse::<i32>().ok())
+                    .filter(|value| (1..=100).contains(value))
+                    .unwrap_or(10);
+                set_system_volume(previous);
+            }
+            let current = get_current_volume();
             Ok(obj(vec![
                 ("type", Json::Str("mute_response".into())),
                 ("success", Json::Bool(true)),
-                ("mute", Json::Bool(get_current_volume() == 0)),
+                ("volume", Json::Num(current as f64)),
+                ("mute", Json::Bool(current == 0)),
             ]))
         }
         "set_eq" => {
@@ -975,8 +1019,7 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
         }
         "bt_pair" => {
             let secs = map.get("seconds").and_then(|v| v.as_i64()).unwrap_or(120).clamp(10, 300);
-            let _ = Command::new("/usr/bin/atrios").args(["bt", "pair", &secs.to_string()]).status();
-            Ok(build_status_payload())
+            set_bt_visibility("pair", Some(secs))
         }
         "bt_speaker" => {
             let enabled = map.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
@@ -1382,10 +1425,7 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
                 ("alarms", Json::Arr(alarms)),
             ]))
         }
-        "bt_hide" => {
-            let _ = Command::new("/usr/bin/atrios").args(["bt", "hide"]).status();
-            Ok(build_status_payload())
-        }
+        "bt_hide" => set_bt_visibility("hide", None),
         "bt_unpair" => {
             let mac = map.get("mac").and_then(|v| v.as_str()).unwrap_or("all");
             let _ = Command::new("/usr/bin/atrios").args(["bt", "unpair", mac]).status();
@@ -1719,6 +1759,9 @@ fn spawn_wifi_relay_worker() {
                     if let Some(cached) = pairs.get_mut(key) {
                         *cached = value;
                     }
+                }
+                if let Some(Json::Obj(bt)) = pairs.get_mut("bluetooth") {
+                    write_bt_privacy(bt);
                 }
                 if let Some(Json::Obj(ai)) = pairs.get_mut("ai") {
                     ai.insert("voice_preferences".into(), crate::atriai::voice_preferences_json());

@@ -17,7 +17,7 @@ import shlex
 import tempfile
 
 RUNTIME_FILES = (
-    'usr/bin/atrios', 'usr/bin/atri-mp3dec',
+    'usr/bin/atrios', 'usr/bin/atri-mp3dec', 'usr/sbin/bt-speaker-daemon',
     *('usr/lib/atrios/' + name for name in (
         'atrios-runtime', 'atri-aec', 'atriai', 'bt-agent', 'bt-control',
         'bt-volume-sync', 'hardware', 'light', 'micprobe', 'ntp', 'ota',

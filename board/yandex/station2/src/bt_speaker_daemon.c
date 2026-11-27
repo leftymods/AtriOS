@@ -112,6 +112,7 @@ static int hci_cmd_sync(int dd, uint16_t opcode, const void *param, uint8_t plen
 
 #define BT_PAIRED_FILE "/var/lib/atrios/bt_paired"
 #define BT_PAIR_UNTIL_FILE "/var/run/atrios-bt-pair-until"
+#define BT_HIDDEN_FILE "/var/lib/atrios/bt_hidden"
 
 static void bt_read_device_name(char *buf, size_t len) {
     snprintf(buf, len, "AtriStation Max");
@@ -155,16 +156,17 @@ static bool bt_pairing_window_active(void) {
     bool ok = (fscanf(f, "%lld", &until_ts) == 1);
     fclose(f);
     if (!ok) return false;
-    if ((long long)time(NULL) < until_ts) return true;
-    unlink(BT_PAIR_UNTIL_FILE);
-    return false;
+    return (long long)time(NULL) < until_ts;
 }
 
 static uint8_t bt_desired_scan_mode(void) {
-    if (bt_pairing_window_active() || !bt_has_paired_devices()) {
-        return 0x03; /* Inquiry Scan + Page Scan (discoverable) */
+    if (bt_pairing_window_active()) {
+        return SCAN_PAGE | SCAN_INQUIRY;
     }
-    return 0x02; /* Page Scan only (hidden identifier, connectable by paired devices) */
+    if (access(BT_HIDDEN_FILE, F_OK) == 0 || bt_has_paired_devices()) {
+        return SCAN_PAGE;
+    }
+    return SCAN_PAGE | SCAN_INQUIRY;
 }
 
 static void bt_record_paired_device(const char *bdaddr) {

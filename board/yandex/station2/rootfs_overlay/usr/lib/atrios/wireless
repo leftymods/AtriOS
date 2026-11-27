@@ -125,6 +125,8 @@ case "$CMD" in
 
   bt|bluetooth)
     SUBCMD="${2:-status}"
+    BT_HIDDEN_FILE=/var/lib/atrios/bt_hidden
+    BT_PAIR_UNTIL_FILE=/var/run/atrios-bt-pair-until
     BT_TTY=""
     for t in /dev/ttyS1 /dev/ttyAML1; do
       if [ -c "$t" ]; then
@@ -155,7 +157,7 @@ case "$CMD" in
           fi
           hciconfig hci0 name "$DEV_NAME" 2>/dev/null || true
           hciconfig hci0 class 0x240414 2>/dev/null || true
-          if [ -s /var/lib/atrios/bt_paired ]; then
+          if [ -f "$BT_HIDDEN_FILE" ] || [ -s /var/lib/atrios/bt_paired ]; then
             hciconfig hci0 pscan 2>/dev/null || true
           else
             hciconfig hci0 piscan 2>/dev/null || true
@@ -248,10 +250,16 @@ case "$CMD" in
           hciconfig hci0 up 2>/dev/null || true
           hciconfig hci0 class 0x240414 2>/dev/null || true
           hciconfig hci0 name "$DEV_NAME" 2>/dev/null || true
-          hciconfig hci0 piscan 2>/dev/null || true
+          BT_DISCOVERABLE=true
+          if [ -f "$BT_HIDDEN_FILE" ]; then
+            BT_DISCOVERABLE=false
+            hciconfig hci0 pscan 2>/dev/null || true
+          else
+            hciconfig hci0 piscan 2>/dev/null || true
+          fi
           command -v gdbus >/dev/null 2>&1 && {
             gdbus call --system --dest org.bluez --object-path /org/bluez/hci0 --method org.freedesktop.DBus.Properties.Set org.bluez.Adapter1 Pairable '<true>' >/dev/null 2>&1 || true
-            gdbus call --system --dest org.bluez --object-path /org/bluez/hci0 --method org.freedesktop.DBus.Properties.Set org.bluez.Adapter1 Discoverable '<true>' >/dev/null 2>&1 || true
+            gdbus call --system --dest org.bluez --object-path /org/bluez/hci0 --method org.freedesktop.DBus.Properties.Set org.bluez.Adapter1 Discoverable "<$BT_DISCOVERABLE>" >/dev/null 2>&1 || true
           }
           if [ -x /usr/sbin/bt-speaker-daemon ]; then
             if ! pgrep -f /usr/sbin/bt-speaker-daemon >/dev/null 2>&1; then
@@ -314,19 +322,28 @@ case "$CMD" in
       fi
     elif [ "$SUBCMD" = "pair" ]; then
       SECS="${3:-60}"
+      case "$SECS" in
+        ''|*[!0-9]*) echo "Invalid pairing duration" >&2; exit 1 ;;
+      esac
+      [ "$SECS" -ge 10 ] && [ "$SECS" -le 300 ] || exit 1
       UNTIL=$(( $(date +%s) + SECS ))
-      mkdir -p /var/run
-      echo "$UNTIL" > /var/run/atrios-bt-pair-until
-      hciconfig hci0 piscan 2>/dev/null || true
+      mkdir -p /var/run || exit 1
+      TEMP_UNTIL=$(mktemp /var/run/.atrios-bt-pair-until.XXXXXX) || exit 1
+      if ! printf '%s\n' "$UNTIL" > "$TEMP_UNTIL" || ! mv -f "$TEMP_UNTIL" "$BT_PAIR_UNTIL_FILE"; then
+        rm -f "$TEMP_UNTIL"
+        exit 1
+      fi
+      if ! hciconfig hci0 piscan; then
+        rm -f "$BT_PAIR_UNTIL_FILE"
+        exit 1
+      fi
       echo "Bluetooth discoverable for ${SECS}s (pairing window open)."
     elif [ "$SUBCMD" = "hide" ]; then
-      rm -f /var/run/atrios-bt-pair-until
-      if [ -s /var/lib/atrios/bt_paired ]; then
-        hciconfig hci0 pscan 2>/dev/null || true
-        echo "Bluetooth identifier hidden (Page Scan only; paired devices can still connect)."
-      else
-        echo "No paired devices yet; keeping discoverable so you can pair."
-      fi
+      mkdir -p /var/lib/atrios || exit 1
+      (umask 077; touch "$BT_HIDDEN_FILE") || exit 1
+      rm -f "$BT_PAIR_UNTIL_FILE" || exit 1
+      hciconfig hci0 pscan || exit 1
+      echo "Bluetooth hidden from discovery."
     elif [ "$SUBCMD" = "paired" ]; then
       if [ -s /var/lib/atrios/bt_paired ]; then
         cat /var/lib/atrios/bt_paired
@@ -336,9 +353,11 @@ case "$CMD" in
     elif [ "$SUBCMD" = "unpair" ]; then
       TARGET="${3:-all}"
       if [ "$TARGET" = "all" ]; then
-        rm -f /var/lib/atrios/bt_paired /var/run/atrios-bt-pair-until
-        hciconfig hci0 piscan 2>/dev/null || true
-        echo "All paired devices cleared; speaker is discoverable again."
+        rm -f /var/lib/atrios/bt_paired "$BT_PAIR_UNTIL_FILE"
+        if [ ! -f "$BT_HIDDEN_FILE" ]; then
+          hciconfig hci0 piscan 2>/dev/null || true
+        fi
+        echo "Cleared the list of previously connected devices."
       else
         if [ -f /var/lib/atrios/bt_paired ]; then
           grep -ivF "$TARGET" /var/lib/atrios/bt_paired > /var/lib/atrios/bt_paired.tmp 2>/dev/null || true
@@ -346,7 +365,9 @@ case "$CMD" in
         fi
         if [ ! -s /var/lib/atrios/bt_paired ]; then
           rm -f /var/lib/atrios/bt_paired
-          hciconfig hci0 piscan 2>/dev/null || true
+          if [ ! -f "$BT_HIDDEN_FILE" ]; then
+            hciconfig hci0 piscan 2>/dev/null || true
+          fi
         fi
         echo "Removed $TARGET from paired list."
       fi
