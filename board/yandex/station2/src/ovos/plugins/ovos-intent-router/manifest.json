@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "ovos-intent-router",
+  "name": "OVOS Intent Router (RU)",
+  "version": "0.1.0",
+  "api_version": 1,
+  "binary": "ovos-intent-router",
+  "capabilities": ["intent"],
+  "default_enabled": true
+}

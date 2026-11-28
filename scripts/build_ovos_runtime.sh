@@ -45,6 +45,11 @@ install -d "$STAGE_DIR/usr/lib/atrios/ovos/plugins" \
   "$STAGE_DIR/usr/share/doc/atrios/ovos" "$STAGE_DIR/etc/init.d"
 install -m 755 "$BIN_DIR/ovos_messagebus" "$STAGE_DIR/usr/lib/atrios/ovos-messagebus"
 install -m 755 "$BIN_DIR/atrios-ovos-plugin-manager" "$STAGE_DIR/usr/lib/atrios/atrios-ovos-plugin-manager"
+for plug in ovos-dinkum-listener ovos-intent-router ovos-tts-audio; do
+  install -m 755 "$BIN_DIR/$plug" "$STAGE_DIR/usr/lib/atrios/ovos/plugins/$plug"
+  install -m 644 "$PROJECT_ROOT/board/yandex/station2/src/ovos/plugins/$plug/manifest.json" \
+    "$STAGE_DIR/usr/share/atrios/ovos/plugins.d/$plug.json"
+done
 install -m 755 "$PROJECT_ROOT/board/yandex/station2/rootfs_overlay/etc/init.d/S58ovos-messagebus" \
   "$STAGE_DIR/etc/init.d/S58ovos-messagebus"
 install -m 755 "$PROJECT_ROOT/board/yandex/station2/rootfs_overlay/etc/init.d/S59ovos-plugin-manager" \

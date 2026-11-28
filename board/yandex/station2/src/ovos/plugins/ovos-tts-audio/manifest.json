@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "ovos-tts-audio",
+  "name": "OVOS TTS & Audio Output",
+  "version": "0.1.0",
+  "api_version": 1,
+  "binary": "ovos-tts-audio",
+  "capabilities": ["tts", "audio.playback"],
+  "default_enabled": true
+}

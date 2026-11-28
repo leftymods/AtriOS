@@ -301,6 +301,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "ovos-dinkum-listener"
+version = "0.1.0"
+dependencies = [
+ "atrios-ovos-plugin-sdk",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "ovos-intent-router"
+version = "0.1.0"
+dependencies = [
+ "atrios-ovos-plugin-sdk",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "ovos-tts-audio"
+version = "0.1.0"
+dependencies = [
+ "atrios-ovos-plugin-sdk",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ovos_messagebus"
 version = "2.2.0"
 dependencies = [

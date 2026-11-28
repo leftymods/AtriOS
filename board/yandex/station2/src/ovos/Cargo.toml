@@ -1,3 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["messagebus", "plugin-manager", "plugin-sdk"]
+members = [
+    "messagebus",
+    "plugin-manager",
+    "plugin-sdk",
+    "plugins/ovos-dinkum-listener",
+    "plugins/ovos-intent-router",
+    "plugins/ovos-tts-audio",
+]

@@ -1,0 +1,12 @@
+[package]
+name = "ovos-dinkum-listener"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+atrios-ovos-plugin-sdk = { path = "../../plugin-sdk" }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

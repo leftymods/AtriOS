@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "ovos-dinkum-listener",
+  "name": "OVOS Dinkum Listener (AEC + VAD + Vosk)",
+  "version": "0.1.0",
+  "api_version": 1,
+  "binary": "ovos-dinkum-listener",
+  "capabilities": ["audio.capture", "vad", "wake_word", "stt"],
+  "default_enabled": true
+}

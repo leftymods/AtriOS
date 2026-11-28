@@ -54,6 +54,10 @@ jobs:
             "$STAGE/usr/share/doc/atrios/ovos" "$STAGE/etc/init.d"
           install -m 755 "$BIN/ovos_messagebus" "$STAGE/usr/lib/atrios/ovos-messagebus"
           install -m 755 "$BIN/atrios-ovos-plugin-manager" "$STAGE/usr/lib/atrios/atrios-ovos-plugin-manager"
+          for plug in ovos-dinkum-listener ovos-intent-router ovos-tts-audio; do
+            install -m 755 "$BIN/$plug" "$STAGE/usr/lib/atrios/ovos/plugins/$plug"
+            install -m 644 "board/yandex/station2/src/ovos/plugins/$plug/manifest.json" "$STAGE/usr/share/atrios/ovos/plugins.d/$plug.json"
+          done
           install -m 755 board/yandex/station2/rootfs_overlay/etc/init.d/S58ovos-messagebus "$STAGE/etc/init.d/S58ovos-messagebus"
           install -m 755 board/yandex/station2/rootfs_overlay/etc/init.d/S59ovos-plugin-manager "$STAGE/etc/init.d/S59ovos-plugin-manager"
           install -m 644 board/yandex/station2/src/ovos/plugins.d.README "$STAGE/usr/share/atrios/ovos/plugins.d/README"
@@ -150,7 +154,9 @@ jobs:
           set -euo pipefail
           OTA="$RUNNER_TEMP/ota_out/AtriOS-yndxsttion53-ota.tar.gz"
           SHA="$RUNNER_TEMP/ota_out/AtriOS-yndxsttion53-ota.tar.gz.sha256"
-          gh release create "$RELEASE_TAG" "$OTA" "$SHA" \
+          PRE_FLAG=""
+          case "$RELEASE_TAG" in *-beta*|*-rc*) PRE_FLAG="--prerelease" ;; esac
+          gh release create "$RELEASE_TAG" "$OTA" "$SHA" $PRE_FLAG \
             --title "AtriOS $RELEASE_TAG" \
             --notes "Signed runtime OTA for yndxsttion53: PBFDAF + GTCRN DSP, endless My Wave + Ynison RADIO sync, instant partial wake-word detection, and leftymods/AtriOS OTA." \
             || gh release upload "$RELEASE_TAG" "$OTA" "$SHA" --clobber
