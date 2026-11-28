@@ -2615,7 +2615,7 @@ fn send_phrase_to_server(
         }
 
         if use_local_stt && text.is_empty() && pcm.len() <= SR * 2 * 22 / 10 {
-            if let Ok((recovered, r_unk)) = crate::local_stt::transcribe_command_pcm16(pcm) {
+            if let Ok((recovered, r_unk)) = crate::local_stt::transcribe_whisper_command_pcm16(pcm) {
                 if !recovered.is_empty() {
                     println!("[local-stt] whisper peak-normalized recovery: {recovered:?} (unk={r_unk})");
                     text = recovered;

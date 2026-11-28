@@ -28,7 +28,7 @@
 #define GTCRN_HOP         256
 #define GTCRN_BINS        257
 #define GTCRN_BLOCK       128
-#define GTCRN_DEFAULT_WET 0.72f
+#define GTCRN_DEFAULT_WET 0.52f
 #define GTCRN_HOP_US      16000.0
 #define GTCRN_MIX_LEN     (GTCRN_BINS * 2)
 #define GTCRN_CONV_LEN    (2 * 1 * 16 * 16 * 33)

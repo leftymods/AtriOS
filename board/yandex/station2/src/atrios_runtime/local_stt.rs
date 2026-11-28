@@ -468,6 +468,73 @@ pub fn detects_stop(pcm: &[u8]) -> bool {
     decoded.is_ok_and(|text| matches!(text.as_str(), "стоп" | "с топ" | "stop" | "атри стоп" | "а три стоп"))
 }
 
+fn condition_whisper_pcm16_for_vosk(pcm: &[u8]) -> Vec<u8> {
+    let pad_samples = 1280usize; // 80 ms @ 16 kHz
+    let samples: Vec<i16> = pcm
+        .chunks_exact(2)
+        .map(|b| i16::from_le_bytes([b[0], b[1]]))
+        .collect();
+    if samples.is_empty() {
+        return Vec::new();
+    }
+    let mean = samples.iter().map(|&s| s as f64).sum::<f64>() / (samples.len() as f64);
+    let mut peak = 0.0f64;
+    let mut centered = Vec::with_capacity(samples.len());
+    let mut prev = 0.0f64;
+    for &s in &samples {
+        let raw = (s as f64) - mean;
+        // Stronger pre-emphasis lifts unvoiced whisper consonants ("ш", "с", "т", "п", "г", "р")
+        let emph = raw - 0.92 * prev;
+        prev = raw;
+        let v = 0.30 * raw + 0.70 * emph;
+        let av = v.abs();
+        if av > peak {
+            peak = av;
+        }
+        centered.push(v);
+    }
+    let gain = if peak >= 35.0 && peak < 18000.0 {
+        (18000.0 / peak).clamp(1.0, 28.0)
+    } else {
+        1.0
+    };
+    let mut out = vec![0u8; (pad_samples * 2 + centered.len()) * 2];
+    for (idx, v) in centered.into_iter().enumerate() {
+        let s = (v * gain).round().clamp(-32767.0, 32767.0) as i16;
+        let off = (pad_samples + idx) * 2;
+        out[off..off + 2].copy_from_slice(&s.to_le_bytes());
+    }
+    out
+}
+
+pub fn transcribe_whisper_command_pcm16(pcm: &[u8]) -> Result<(String, bool), String> {
+    let eng_opt = ENGINE.get_or_init(load_engine);
+    let Some(ref mtx) = eng_opt else {
+        return Err("Local Vosk STT not available".into());
+    };
+    let conditioned = condition_whisper_pcm16_for_vosk(pcm);
+    if conditioned.is_empty() {
+        return Ok((String::new(), false));
+    }
+    let guard = mtx.lock().map_err(|_| "Local STT mutex poisoned")?;
+    let target_rec = if !guard.cmd_rec.is_null() {
+        guard.cmd_rec
+    } else {
+        guard.rec
+    };
+    let raw = unsafe { decode_with_rec(&guard.fns, target_rec, &conditioned)? };
+    let mut had_unk = false;
+    let mut clean_words = Vec::new();
+    for tok in raw.split_whitespace() {
+        if tok == "[unk]" {
+            had_unk = true;
+        } else {
+            clean_words.push(tok);
+        }
+    }
+    Ok((clean_words.join(" "), had_unk))
+}
+
 pub fn transcribe_command_pcm16(pcm: &[u8]) -> Result<(String, bool), String> {
     let eng_opt = ENGINE.get_or_init(load_engine);
     let Some(ref mtx) = eng_opt else {
