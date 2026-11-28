@@ -8,7 +8,11 @@ data class OvosPluginInfo(
     val name: String,
     val version: String,
     val capabilities: List<String>,
-    val enabled: Boolean
+    val enabled: Boolean,
+    val running: Boolean = false,
+    val restarts: Int = 0,
+    val lastError: String = "",
+    val settings: Map<String, String> = emptyMap()
 ) {
     companion object {
         fun fromJsonArray(array: JSONArray?): List<OvosPluginInfo> {
@@ -19,6 +23,16 @@ data class OvosPluginInfo(
                     val id = item.optString("id").trim()
                     if (id.isEmpty()) continue
                     val caps = item.optJSONArray("capabilities") ?: JSONArray()
+                    val cfgObj = item.optJSONObject("settings")
+                    val cfgMap = buildMap {
+                        if (cfgObj != null) {
+                            val keys = cfgObj.keys()
+                            while (keys.hasNext()) {
+                                val k = keys.next()
+                                put(k, cfgObj.opt(k)?.toString() ?: "")
+                            }
+                        }
+                    }
                     add(OvosPluginInfo(
                         id = id,
                         name = item.optString("name", id),
@@ -29,7 +43,11 @@ data class OvosPluginInfo(
                                 if (cap.isNotEmpty()) add(cap)
                             }
                         },
-                        enabled = item.optBoolean("enabled", false)
+                        enabled = item.optBoolean("enabled", false),
+                        running = item.optBoolean("running", false),
+                        restarts = item.optInt("restarts", 0),
+                        lastError = item.optString("last_error", "").trim(),
+                        settings = cfgMap
                     ))
                 }
             }

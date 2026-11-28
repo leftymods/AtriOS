@@ -1585,11 +1585,57 @@ fun AtriOSApp(
                                                                             fontSize = 12.sp
                                                                         )
                                                                     }
+                                                                    val runtimeText = when {
+                                                                        !plugin.enabled -> "Отключён"
+                                                                        plugin.running -> "Работает" + if (plugin.restarts > 0) " · перезапусков: ${plugin.restarts}" else ""
+                                                                        else -> "Разрешён к запуску (ожидание)"
+                                                                    }
                                                                     Text(
-                                                                        if (plugin.enabled) "Разрешён к запуску" else "Отключён",
-                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                        runtimeText,
+                                                                        color = if (plugin.running) Color(0xFF4ADE80) else MaterialTheme.colorScheme.onSurfaceVariant,
                                                                         fontSize = 12.sp
                                                                     )
+                                                                    if (plugin.lastError.isNotEmpty()) {
+                                                                        Text(
+                                                                            "Ошибка: ${plugin.lastError}",
+                                                                            color = Color(0xFFF87171),
+                                                                            fontSize = 12.sp
+                                                                        )
+                                                                    }
+                                                                    if (plugin.id == "ovos-dinkum-listener") {
+                                                                        val whisperOn = plugin.settings["whisper_enabled"] != "false"
+                                                                        Row(
+                                                                            modifier = Modifier.fillMaxWidth(),
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                                        ) {
+                                                                            Text("Распознавание шёпота", color = Color.White, fontSize = 13.sp)
+                                                                            Switch(
+                                                                                checked = whisperOn,
+                                                                                onCheckedChange = {
+                                                                                    client.setOvosPluginSetting(plugin.id, "whisper_enabled", it.toString())
+                                                                                },
+                                                                                enabled = !client.isRelayActive()
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                    if (plugin.id == "ovos-tts-audio") {
+                                                                        val fastSpeech = (plugin.settings["speed"]?.toIntOrNull() ?: 155) >= 175
+                                                                        Row(
+                                                                            modifier = Modifier.fillMaxWidth(),
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            horizontalArrangement = Arrangement.SpaceBetween
+                                                                        ) {
+                                                                            Text("Ускоренная речь TTS", color = Color.White, fontSize = 13.sp)
+                                                                            Switch(
+                                                                                checked = fastSpeech,
+                                                                                onCheckedChange = {
+                                                                                    client.setOvosPluginSetting(plugin.id, "speed", if (it) "180" else "155")
+                                                                                },
+                                                                                enabled = !client.isRelayActive()
+                                                                            )
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
                                                         }

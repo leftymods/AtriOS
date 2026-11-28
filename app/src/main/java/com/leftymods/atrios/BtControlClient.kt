@@ -557,6 +557,14 @@ class BtControlClient(
         JSONObject().put("cmd", "set_ovos_plugin").put("id", id).put("enabled", enabled)
     )
 
+    fun setOvosPluginSetting(id: String, key: String, value: String) = sendCommand(
+        JSONObject()
+            .put("cmd", "set_ovos_plugin_setting")
+            .put("id", id)
+            .put("key", key)
+            .put("value", value)
+    )
+
     fun setVolume(volume: Int) = sendCommand(
         JSONObject().put("cmd", "set_volume").put("volume", volume.coerceIn(0, 100))
     )
