@@ -56,6 +56,7 @@ jobs:
           install -m 755 "$RUNNER_TEMP/atri-mp3dec" "$RUNNER_TEMP/stage/usr/bin/atri-mp3dec"
           install -D -m 755 "$RUNNER_TEMP/bt-speaker-daemon" "$RUNNER_TEMP/stage/usr/sbin/bt-speaker-daemon"
           install -m 755 board/yandex/station2/rootfs_overlay/usr/lib/atrios/wireless "$RUNNER_TEMP/stage/usr/lib/atrios/wireless"
+          install -D -m 644 board/yandex/station2/rootfs_overlay/usr/share/atrios/models/silero/silero_vad.onnx "$RUNNER_TEMP/stage/usr/share/atrios/models/silero/silero_vad.onnx"
 
           python3 - "$VER" "$RUNNER_TEMP/stage" "$RUNNER_TEMP/ota-signing.pem" "$RUNNER_TEMP/ota_out" <<'PY'
           import hashlib, json, os, subprocess, sys, tarfile
