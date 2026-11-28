@@ -1,6 +1,6 @@
 use atrios_ovos_plugin_sdk::{
     bus_channel, load_plugin_settings, run_service_plugin, BusSender, OvosMessage, OvosPlugin,
-    MSG_AUDIO_OUTPUT_END, MSG_AUDIO_OUTPUT_START, MSG_PLUGIN_ERROR, MSG_SPEAK, MSG_STOP,
+    MSG_AUDIO_OUTPUT_END, MSG_AUDIO_OUTPUT_START, MSG_SPEAK, MSG_STOP,
     MSG_WAKEWORD,
 };
 use serde_json::json;

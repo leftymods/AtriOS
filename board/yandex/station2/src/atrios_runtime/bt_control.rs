@@ -764,6 +764,41 @@ fn set_ovos_plugin(
     get_ovos_plugins()
 }
 
+fn set_ovos_plugin_setting(
+    command: &BTreeMap<String, Json>,
+    connection_id: Option<&str>,
+) -> Result<Json, String> {
+    if connection_id.is_none() {
+        return Err("Plugin settings can only be changed over a local Bluetooth connection".into());
+    }
+    let id = command.get("id").and_then(Json::as_str).unwrap_or("");
+    let key = command.get("key").and_then(Json::as_str).unwrap_or("");
+    let val = command.get("value").and_then(Json::as_str).unwrap_or("");
+    let valid_tok = |s: &str, max: usize| {
+        !s.is_empty()
+            && s.len() <= max
+            && s.as_bytes()[0].is_ascii_alphanumeric()
+            && s.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.'))
+    };
+    if !valid_tok(id, 64) || !valid_tok(key, 64) || val.len() > 256 {
+        return Err("Invalid OVOS plugin setting parameters".into());
+    }
+    let output = Command::new("/usr/lib/atrios/atrios-ovos-plugin-manager")
+        .args(["--set-setting", id, key, val])
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| format!("Could not update OVOS plugin setting: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "Could not update OVOS plugin setting".into()
+        } else {
+            stderr
+        });
+    }
+    get_ovos_plugins()
+}
+
 fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -> Result<Json, String> {
     let Some(map) = cmd_obj.as_obj() else {
         return Err("Command must be a JSON object".into());
@@ -777,6 +812,7 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
         "get_status" | "status" => Ok(build_status_payload()),
         "get_ovos_plugins" => get_ovos_plugins(),
         "set_ovos_plugin" => set_ovos_plugin(map, connection_id),
+        "set_ovos_plugin_setting" => set_ovos_plugin_setting(map, connection_id),
         "get_relay_info" => {
             let cfg = crate::atriai::load_config();
             let id_pub = crate::e2ee::ensure_station_identity_pub_b64().unwrap_or_default();

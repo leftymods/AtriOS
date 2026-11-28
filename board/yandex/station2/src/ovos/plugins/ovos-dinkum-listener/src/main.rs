@@ -1,6 +1,6 @@
 use atrios_ovos_plugin_sdk::{
     bus_channel, load_plugin_settings, run_service_plugin, BusSender, OvosMessage, OvosPlugin,
-    MSG_AUDIO_OUTPUT_END, MSG_AUDIO_OUTPUT_START, MSG_PLUGIN_ERROR, MSG_RECORD_BEGIN,
+    MSG_AUDIO_OUTPUT_END, MSG_AUDIO_OUTPUT_START, MSG_RECORD_BEGIN,
     MSG_RECORD_END, MSG_STOP, MSG_UTTERANCE, MSG_WAKEWORD,
 };
 use serde_json::json;
@@ -86,7 +86,7 @@ impl VoskEngine {
         macro_rules! sym {
             ($name:expr) => {{
                 let c = CString::new($name).unwrap();
-                let ptr = unsafe { dlsym(handle, c.as_ptr()) };
+                let ptr = dlsym(handle, c.as_ptr());
                 if ptr.is_null() {
                     return Err(format!("missing symbol {}", $name));
                 }
