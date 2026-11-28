@@ -1777,6 +1777,36 @@ fn ring_amber(duration: f64) {
     ring_send_frame(&vec![0u8; RING_SIZE]);
 }
 
+fn ring_amber_thinking(duration: f64) {
+    println!("[Ring] Running amber + dark-orange thinking runner animation...");
+    let start = Instant::now();
+    let mut pos = 0.0f64;
+    let half = (RING_LEDS as f64) * 0.5;
+    while duration <= 0.0 || start.elapsed().as_secs_f64() < duration {
+        if Path::new(RING_OVERRIDE_FILE).exists() {
+            return;
+        }
+        let mut frame = vec![0u8; RING_SIZE];
+        for i in 0..RING_LEDS {
+            let fi = i as f64;
+            let n = RING_LEDS as f64;
+            let d1 = (fi - pos).abs().min(n - (fi - pos).abs());
+            let pos2 = (pos + half) % n;
+            let d2 = (fi - pos2).abs().min(n - (fi - pos2).abs());
+            let d = d1.min(d2);
+            let dark = (1.0 - d / 2.6).max(0.0).powi(2);
+            // Bright warm amber base (255, 150, 10) with deep dark-orange runners (185, 28, 0)
+            frame[i * 3] = (255.0 * (1.0 - dark) + 185.0 * dark) as u8;
+            frame[i * 3 + 1] = (150.0 * (1.0 - dark) + 28.0 * dark) as u8;
+            frame[i * 3 + 2] = (10.0 * (1.0 - dark)) as u8;
+        }
+        ring_send_frame(&frame);
+        pos = (pos + 0.55) % (RING_LEDS as f64);
+        thread::sleep(Duration::from_millis(40));
+    }
+    ring_send_frame(&vec![0u8; RING_SIZE]);
+}
+
 fn ring_amber_green(duration: f64) {
     println!("[Ring] Running amber+green runner animation...");
     let start = Instant::now();
@@ -1897,6 +1927,7 @@ pub fn run(args: &[String]) -> i32 {
                 "green" => ring_fill(0, 255, 0),
                 "rainbow" => ring_rainbow(),
                 "amber" => ring_amber(vals.first().and_then(|s| s.parse().ok()).unwrap_or(8.0)),
+                "amber_thinking" => ring_amber_thinking(vals.first().and_then(|s| s.parse().ok()).unwrap_or(30.0)),
                 "amber_green" => ring_amber_green(vals.first().and_then(|s| s.parse().ok()).unwrap_or(15.0)),
                 "volume" => ring_volume(vals.first().and_then(|s| s.parse().ok()).unwrap_or(50)),
                 "fill" => ring_fill(

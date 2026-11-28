@@ -1062,8 +1062,8 @@ pub fn set_vad_visual(phase: &str, force: bool, variant: &str) {
             "ai",
         ),
         "thinking" => (
-            "amber",
-            vec!["ring", "amber", "30"],
+            "amber_thinking",
+            vec!["ring", "amber_thinking", "30"],
             "eyes_thinking".into(),
             vec!["screen".into(), "eyes".into(), "thinking".into()],
             "ai",
@@ -2659,17 +2659,15 @@ fn send_phrase_to_server(
                 let favorites_command = matches!(cmd, DeviceCommand::LikeTrack | DeviceCommand::DislikeTrack);
                 // Skip blocking 500ms unconstrained Vosk pass when constrained grammar already matched
                 // a clean, short (<= 1.5s) quick command with no [unk] tokens (Yandex-style instant command spotter!)
-                let full_ok = if !use_local_stt || used_gigaam || pcm.len() <= SR * 2 * 15 / 10 {
+                // Counter-activation for wake-wordless quick commands:
+                // GigaAM is already unconstrained full Russian, but constrained Vosk grammar can
+                // map "пиши/дыши/гром/короче" -> "тише/громче", so verify with unconstrained Vosk.
+                let full_ok = if !use_local_stt || used_gigaam {
                     true
                 } else {
                     match crate::local_stt::transcribe_pcm16(pcm) {
-                        Ok(full) => {
-                            let fw = normalize_text(&full);
-                            quick_command(&full, &preferences) == Some(cmd)
-                                || fw.is_empty()
-                                || (fw.len() <= 2 && full.chars().count() <= 14)
-                        }
-                        Err(_) => true,
+                        Ok(full) => quick_command(&full, &preferences) == Some(cmd),
+                        Err(_) => false,
                     }
                 };
                 if (!media_command || crate::ymusic::is_active()
@@ -3648,7 +3646,7 @@ fn run_daemon() -> i32 {
                                     if partial_wake_hits >= 2 && !partial_wake_visual {
                                         partial_wake_visual = true;
                                         voice_timing("wake_partial_hit");
-                                        set_vad_visual("vad", false, "default");
+                                        // Do NOT show eyes/ring until wake word is strictly confirmed!
                                     }
                                 } else {
                                     partial_wake_hits = 0;
