@@ -51,10 +51,10 @@ impl VoicePreferences {
         ("continuous_dialog", true),
         ("quiet_reply", false),
         ("adaptive_reply_volume", false),
-        ("quick_media", false),
-        ("quick_tracks", false),
-        ("quick_favorites", false),
-        ("quick_volume", false),
+        ("quick_media", true),
+        ("quick_tracks", true),
+        ("quick_favorites", true),
+        ("quick_volume", true),
         ("quick_bluetooth", true),
     ];
 
@@ -961,15 +961,22 @@ fn quick_command(text: &str, preferences: &VoicePreferences) -> Option<DeviceCom
     let words = normalize_text(text);
     let phrase = words.join(" ");
     match phrase.as_str() {
-        "тише" | "потише" | "громче" | "погромче" if preferences.enabled("quick_volume") => {
-            local_command(&phrase, "")
-        }
-        "пауза" | "на паузу" | "продолжи" | "играй" | "сними с паузы"
-            if preferences.enabled("quick_media") => local_command(&phrase, ""),
-        "следующий трек" | "предыдущий трек" | "дальше" | "назад"
-            if preferences.enabled("quick_tracks") => local_command(&phrase, ""),
-        "лайк" if preferences.enabled("quick_favorites") => Some(DeviceCommand::LikeTrack),
-        "дизлайк" if preferences.enabled("quick_favorites") => Some(DeviceCommand::DislikeTrack),
+        "тише" | "потише" | "сделай тише" | "сделай потише" | "убавь звук"
+            if preferences.enabled("quick_volume") => Some(DeviceCommand::VolumeDown(10)),
+        "громче" | "погромче" | "сделай громче" | "сделай погромче" | "прибавь звук"
+            if preferences.enabled("quick_volume") => Some(DeviceCommand::VolumeUp(10)),
+        "стоп" | "хватит" | "пауза" | "на паузу" | "поставь на паузу" | "останови музыку" | "выключи музыку"
+            if preferences.enabled("quick_media") => Some(DeviceCommand::Pause),
+        "продолжи" | "продолжай" | "играй" | "возобнови" | "сними с паузы"
+            if preferences.enabled("quick_media") => Some(DeviceCommand::Play),
+        "дальше" | "вперед" | "следующий" | "следующая" | "следующий трек" | "следующая песня" | "другой трек"
+            if preferences.enabled("quick_tracks") => Some(DeviceCommand::NextTrack),
+        "назад" | "предыдущий" | "предыдущая" | "предыдущий трек" | "предыдущая песня" | "прошлый трек"
+            if preferences.enabled("quick_tracks") => Some(DeviceCommand::PrevTrack),
+        "лайк" | "лайкни" | "нравится"
+            if preferences.enabled("quick_favorites") => Some(DeviceCommand::LikeTrack),
+        "дизлайк" | "не нравится"
+            if preferences.enabled("quick_favorites") => Some(DeviceCommand::DislikeTrack),
         _ if preferences.enabled("quick_bluetooth") && words.len() == 2 => {
             is_direct_bluetooth_command(text)
         }
@@ -3104,7 +3111,8 @@ impl VadProcessor {
     }
 
     fn adapt_rejected(&mut self, mean_rms: f64) {
-        self.noise_rms = (self.noise_rms * 0.70 + mean_rms * 0.30).clamp(60.0, 1800.0);
+        // Gentle adaptation (10%) prevents a single missed quiet wake-word from spiking noise_rms into a shouting spiral
+        self.noise_rms = (self.noise_rms * 0.90 + mean_rms * 0.10).clamp(50.0, 1200.0);
     }
 
     fn thresholds(
@@ -3117,15 +3125,15 @@ impl VadProcessor {
         match mode {
             PipelineMode::WakeSpotter => {
                 let (start_gain, start_offset, start_floor, start_ceiling) = if music_on {
-                    // The AEC residual still contains music. Use a lower, bounded
-                    // onset threshold and let wake-word recognition reject lyrics.
-                    (1.35, 80.0, vad_thr * 0.65, 1700.0)
+                    // Lower onset over AEC residual so normal voice triggers wake/quick-commands during music
+                    (1.18, 45.0, vad_thr * 0.45, 1400.0)
                 } else {
-                    (1.80, 70.0, vad_thr * 0.55, 2300.0)
+                    // Conversational volume from 2-3m in a quiet room without shouting
+                    (1.42, 40.0, vad_thr * 0.38, 1800.0)
                 };
-                let keep_gain = if music_on { 0.95 } else { 1.25 };
-                let keep_offset = if music_on { 40.0 } else { 60.0 };
-                let keep_floor = vad_thr * 0.45;
+                let keep_gain = if music_on { 0.88 } else { 1.05 };
+                let keep_offset = if music_on { 25.0 } else { 30.0 };
+                let keep_floor = vad_thr * 0.30;
                 let start = (self.noise_rms * start_gain + start_offset)
                     .clamp(start_floor, start_ceiling);
                 let keep_ceiling = start * 0.80;
@@ -3172,9 +3180,12 @@ fn voice_preferences_validate_patches_and_gate_full_phrase_commands() {
     let mut preferences = VoicePreferences::default();
     assert!(preferences.enabled("activation_chime"));
     assert!(preferences.enabled("continuous_dialog"));
-    assert_eq!(quick_command("тише", &preferences), None);
+    assert_eq!(quick_command("тише", &preferences), Some(DeviceCommand::VolumeDown(10)));
+    assert_eq!(quick_command("дальше", &preferences), Some(DeviceCommand::NextTrack));
+    assert_eq!(quick_command("назад", &preferences), Some(DeviceCommand::PrevTrack));
+    assert_eq!(quick_command("стоп", &preferences), Some(DeviceCommand::Pause));
     assert_eq!(quick_command("включи блютуз", &preferences), Some(DeviceCommand::BluetoothOn));
-    let patch = Json::parse(r#"{"quick_volume":true,"quick_tracks":true,"quick_favorites":true,"quick_bluetooth":false}"#).unwrap();
+    let patch = Json::parse(r#"{"quick_volume":true,"quick_tracks":true,"quick_favorites":true,"quick_media":false,"quick_bluetooth":false}"#).unwrap();
     preferences.apply(&patch).unwrap();
     assert_eq!(quick_command("громче", &preferences), Some(DeviceCommand::VolumeUp(10)));
     assert_eq!(quick_command("далеко не все говорят громче", &preferences), None);
@@ -3239,16 +3250,16 @@ fn is_valid_speech(
                 && max_r >= min_r * 1.12
         }
         (PipelineMode::WakeSpotter, true) => {
-            // Playback raises the broadband floor; look for a distinct near-field
-            // rise instead of demanding a large absolute jump over that floor.
-            max_r >= start_thr * 0.95
-                && max_r >= noise_rms * 1.15 + 60.0
-                && max_r >= min_r * 1.15
+            // Sensitive rise detection over AEC residual during music playback
+            max_r >= start_thr * 0.88
+                && max_r >= noise_rms * 1.08 + 30.0
+                && max_r >= min_r * 1.08
         }
         (PipelineMode::WakeSpotter, false) => {
-            max_r >= start_thr * 1.04
-                && max_r >= noise_rms * 1.60 + 50.0
-                && max_r >= min_r * 1.25
+            // Normal conversational speech in a quiet room without shouting
+            max_r >= start_thr * 0.96
+                && max_r >= noise_rms * 1.30 + 30.0
+                && max_r >= min_r * 1.15
         }
     }
 }

@@ -133,13 +133,29 @@ fn fnv1a_64(bytes: &[u8]) -> u64 {
     h
 }
 
+fn is_ru_stopword(w: &str) -> bool {
+    matches!(
+        w,
+        "что" | "как" | "где" | "когда" | "почему" | "зачем" | "кто" | "какой" | "какая"
+            | "какое" | "какие" | "про" | "о" | "об" | "у" | "в" | "во" | "на" | "с" | "со"
+            | "к" | "ко" | "по" | "из" | "от" | "для" | "и" | "а" | "но" | "или" | "да"
+            | "это" | "мне" | "меня" | "мой" | "моя" | "мое" | "моего" | "моей" | "мои"
+            | "нужно" | "надо" | "сделать" | "делать" | "скажи" | "подскажи" | "пожалуйста"
+            | "ты" | "я" | "мы" | "вы" | "он" | "она" | "они" | "его" | "ее" | "их" | "бы"
+            | "ли" | "же" | "вот" | "тут" | "там" | "еще" | "уже" | "очень"
+    )
+}
+
 pub fn embed_text(text: &str) -> [f32; VEC_DIM] {
     let norm = normalize_ru(text);
     let mut v = [0.0f32; VEC_DIM];
     if norm.is_empty() {
         return v;
     }
-    for word in norm.split_whitespace() {
+    let all_words: Vec<&str> = norm.split_whitespace().collect();
+    let content_words: Vec<&str> = all_words.iter().copied().filter(|w| !is_ru_stopword(w)).collect();
+    let active_words = if content_words.is_empty() { &all_words } else { &content_words };
+    for &word in active_words {
         let stem = stem_ru(word);
         // Word-level stemmed feature (higher weight)
         let hw = fnv1a_64(stem.as_bytes());
@@ -324,6 +340,17 @@ fn ensure_loaded_locked(rt: &mut BrainRuntime) {
     }
 }
 
+static DISK_SAVE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn persist_two_copies_async(primary: PathBuf, backup: PathBuf, entries: Vec<MemoryEntry>, key: [u8; 32]) {
+    std::thread::spawn(move || {
+        let _guard = DISK_SAVE_LOCK.get_or_init(|| Mutex::new(())).lock();
+        if let Ok(blob) = save_two_copies(&primary, &backup, &entries, &key) {
+            sync_encrypted_blob_to_server_async(blob);
+        }
+    });
+}
+
 /// Non-blocking encrypted mirror upload to leftymods.tech so the AI server can keep a remote backup copy.
 fn sync_encrypted_blob_to_server_async(blob: Vec<u8>) {
     let cfg = crate::atriai::load_config();
@@ -363,16 +390,14 @@ pub fn remember(kind: &str, text: &str) -> u64 {
     let vec = embed_text(clean);
     let ts = now_unix_i64();
     let key = derive_ai_memory_key();
-    let (id, blob_opt) = {
+    let (id, p1, p2, snap) = {
         let mut rt = brain().lock().unwrap();
         ensure_loaded_locked(&mut rt);
         // Deduplicate near-identical entries (cosine > 0.94)
-        if let Some(existing) = rt.memories.iter_mut().find(|m| m.kind == kind && cosine_sim(&m.vec, &vec) > 0.94) {
+        let eid = if let Some(existing) = rt.memories.iter_mut().find(|m| m.kind == kind && cosine_sim(&m.vec, &vec) > 0.94) {
             existing.text = clean.to_string();
             existing.ts = ts;
-            let eid = existing.id;
-            let blob = save_two_copies(&rt.primary_path, &rt.backup_path, &rt.memories, &key).ok();
-            (eid, blob)
+            existing.id
         } else {
             let next_id = rt.memories.iter().map(|m| m.id).max().unwrap_or(0) + 1;
             rt.memories.push(MemoryEntry {
@@ -383,20 +408,17 @@ pub fn remember(kind: &str, text: &str) -> u64 {
                 vec,
             });
             while rt.memories.len() > MAX_MEMORIES {
-                // Evict oldest dialog entry first, else oldest overall
                 if let Some(pos) = rt.memories.iter().position(|m| m.kind == "dialog") {
                     rt.memories.remove(pos);
                 } else {
                     rt.memories.remove(0);
                 }
             }
-            let blob = save_two_copies(&rt.primary_path, &rt.backup_path, &rt.memories, &key).ok();
-            (next_id, blob)
-        }
+            next_id
+        };
+        (eid, rt.primary_path.clone(), rt.backup_path.clone(), rt.memories.clone())
     };
-    if let Some(blob) = blob_opt {
-        sync_encrypted_blob_to_server_async(blob);
-    }
+    persist_two_copies_async(p1, p2, snap, key);
     id
 }
 

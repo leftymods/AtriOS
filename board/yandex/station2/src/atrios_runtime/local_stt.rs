@@ -27,7 +27,7 @@ const MODEL_PATHS: &[&str] = &[
 // shares the same loaded VoskModel). Keep common near-misses in the
 // vocabulary so they can be decoded as themselves and rejected by the caller.
 const CMD_GRAMMAR: &str = r#"[
-  "атри", "арти", "а три", "атриум", "астры", "натрий", "утро", "отряд", "смотри",
+  "атри", "арти", "а три", "атриум", "астры", "атли", "атре", "отри", "этри", "натрий", "утро", "отряд", "смотри",
   "привет", "слушай", "эй",
   "блютуз", "блютус", "колонка", "колонку", "колонки", "сопряжение", "поиск", "подключи", "отключи", "видимость",
   "включи", "включить", "вруби", "запусти", "активируй", "открой",
@@ -238,7 +238,7 @@ pub fn reset_command_stream() -> bool {
     }
     unsafe { (guard.fns.vosk_recognizer_reset)(guard.cmd_rec) };
     guard.cmd_prev_sample = 0.0;
-    guard.cmd_agc_env = 2400.0;
+    guard.cmd_agc_env = 1600.0;
     guard.cmd_completed_text.clear();
     true
 }
@@ -292,11 +292,11 @@ pub(crate) fn condition_stream_chunk(
         peak = peak.max(value.abs());
         values.push(value);
     }
-    // Fast attack, slow release envelope with noise floor clamp (prevents 8x noise pumping)
+    // Fast attack, smooth release envelope with noise floor clamp (crisp far-field speech without noise pumping)
     let env_target = peak.max(600.0);
-    let alpha = if env_target > *agc_env { 0.35 } else { 0.04 };
+    let alpha = if env_target > *agc_env { 0.35 } else { 0.05 };
     *agc_env = *agc_env + alpha * (env_target - *agc_env);
-    let gain = (12000.0 / (*agc_env).max(600.0)).clamp(1.0, 5.0);
+    let gain = (13500.0 / (*agc_env).max(600.0)).clamp(1.0, 5.5);
     let mut conditioned = Vec::with_capacity(values.len() * 2);
     for value in values {
         let sample = (value * gain).round().clamp(-32767.0, 32767.0) as i16;
@@ -374,7 +374,7 @@ pub fn finish_command_stream() -> Option<(String, bool)> {
     let tail = result_text(raw_ptr);
     unsafe { (guard.fns.vosk_recognizer_reset)(guard.cmd_rec) };
     guard.cmd_prev_sample = 0.0;
-    guard.cmd_agc_env = 2400.0;
+    guard.cmd_agc_env = 1600.0;
     let mut raw = std::mem::take(&mut guard.cmd_completed_text);
     append_text(&mut raw, &tail?);
     let mut had_unk = false;
