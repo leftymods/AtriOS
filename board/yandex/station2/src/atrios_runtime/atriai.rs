@@ -985,7 +985,6 @@ fn quick_command(text: &str, preferences: &VoicePreferences) -> Option<DeviceCom
 }
 
 static REMOTE_DOWN_UNTIL: AtomicI64 = AtomicI64::new(0);
-static LAST_WHISPER_CLOUD_TS: AtomicI64 = AtomicI64::new(0);
 
 // --- Visuals ---
 struct VisualState {
@@ -2615,42 +2614,25 @@ fn send_phrase_to_server(
             return Ok((text, String::new(), false));
         }
 
-        if use_local_stt && text.is_empty() && pcm.len() <= SR * 2 * 22 / 10 {
-            if let Ok((recovered, r_unk)) = crate::local_stt::transcribe_whisper_command_pcm16(pcm) {
-                if !recovered.is_empty() {
-                    println!("[local-stt] whisper peak-normalized recovery: {recovered:?} (unk={r_unk})");
-                    text = recovered;
-                    had_unk = r_unk;
+        if use_local_stt && text.is_empty() && pcm.len() <= SR * 2 * 4 {
+            if pcm.len() <= SR * 2 * 22 / 10 {
+                if let Ok((recovered, r_unk)) = crate::local_stt::transcribe_whisper_command_pcm16(pcm) {
+                    if !recovered.is_empty() {
+                        println!("[local-stt] whisper peak-normalized recovery: {recovered:?} (unk={r_unk})");
+                        text = recovered;
+                        had_unk = r_unk;
+                    }
                 }
             }
-            // Pure unvoiced whisper fallback: Kaldi/Vosk cannot decode voiceless breath,
-            // so forward short Silero-confirmed quiet clips (from clean vqe_0) to GPU Whisper /asr (3s cooldown).
-            let now_s = now_unix_i64();
-            let last_w = LAST_WHISPER_CLOUD_TS.load(Ordering::Relaxed);
-            if text.is_empty()
-                && has_remote
-                && now_s >= REMOTE_DOWN_UNTIL.load(Ordering::Relaxed)
-                && now_s - last_w >= 3
-                && !playback_running()
-            {
-                LAST_WHISPER_CLOUD_TS.store(now_s, Ordering::Relaxed);
-                let wav = prepare_asr_wav(pcm);
-                let auth = format!("Bearer {}", cfg.token);
-                let mut h = vec![("Content-Type", "audio/wav"), ("Accept", "application/json")];
-                if !cfg.token.is_empty() {
-                    h.push(("Authorization", &auth));
-                }
-                let ca_opt = if cfg.ca_file.is_empty() { None } else { Some(cfg.ca_file.as_str()) };
-                if let Ok(raw_asr) = request_bytes(&format!("{base}/asr"), Some(&wav), &h, ca_opt, 4, 65536, None) {
-                    if let Ok(s) = String::from_utf8(raw_asr) {
-                        if let Ok(j) = Json::parse(&s) {
-                            let wtxt = j.get_str("text").unwrap_or("").trim().to_string();
-                            if !wtxt.is_empty() {
-                                println!("[whisper-asr] cloud Whisper recovered pure whisper: {wtxt:?}");
-                                text = wtxt;
-                                had_unk = false;
-                            }
-                        }
+            // 100% local on-device neural whisper fallback (GigaAM-v2-CTC INT8 ONNX):
+            // Kaldi/Vosk cannot decode unvoiced breath, so decode clean vqe_0 locally on S905X3.
+            if text.is_empty() && !playback_running() {
+                if let Ok(wtxt) = crate::gigaam_asr::transcribe_pcm16(pcm) {
+                    let wtxt = wtxt.trim().to_string();
+                    if !wtxt.is_empty() {
+                        println!("[gigaam-asr] local neural ASR recovered whisper: {wtxt:?}");
+                        text = wtxt;
+                        had_unk = false;
                     }
                 }
             }
@@ -3419,6 +3401,7 @@ fn run_daemon() -> i32 {
         let mut buf: Vec<u8> = Vec::new();
         let mut utt_rms: Vec<f64> = Vec::new();
         let _silero_ready = crate::silero_vad::init();
+        crate::gigaam_asr::ensure_model_downloaded_bg();
         crate::silero_vad::reset();
         let mut pre_roll: VecDeque<(Vec<u8>, f64)> = VecDeque::with_capacity(9);
         let mut speaking = false;
