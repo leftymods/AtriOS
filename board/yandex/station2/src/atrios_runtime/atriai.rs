@@ -2630,15 +2630,14 @@ fn send_phrase_to_server(
                     cmd, DeviceCommand::NextTrack | DeviceCommand::PrevTrack | DeviceCommand::Pause | DeviceCommand::Play
                 );
                 let favorites_command = matches!(cmd, DeviceCommand::LikeTrack | DeviceCommand::DislikeTrack);
-                let full_ok = if !use_local_stt {
+                // Skip blocking 500ms unconstrained Vosk pass when constrained grammar already matched
+                // a clean, short (<= 1.5s) quick command with no [unk] tokens (Yandex-style instant command spotter!)
+                let full_ok = if !use_local_stt || pcm.len() <= SR * 2 * 15 / 10 {
                     true
                 } else {
                     match crate::local_stt::transcribe_pcm16(pcm) {
                         Ok(full) => {
                             let fw = normalize_text(&full);
-                            // Trust exact constrained-grammar match on whispers/short 1-word commands
-                            // (unconstrained Vosk often returns "" on whispers); only reject if full STT
-                            // clearly heard a longer sentence (>= 4 words) or a different non-empty phrase.
                             quick_command(&full, &preferences) == Some(cmd)
                                 || fw.is_empty()
                                 || (fw.len() <= 2 && full.chars().count() <= 14)
@@ -2683,7 +2682,11 @@ fn send_phrase_to_server(
                 set_error("voice", None, "", 15);
                 return Ok((text, String::new(), false));
             }
-            if use_local_stt {
+            let confident_fast_wake = fast_match
+                && !had_unk
+                && is_wake_word_only(&text, wake_word)
+                && pcm.len() <= SR * 2 * 15 / 10;
+            if use_local_stt && !confident_fast_wake {
                 let full_text = crate::local_stt::transcribe_pcm16(pcm)?;
                 used_full_stt = true;
                 voice_timing("stt_verification_final");
