@@ -2540,6 +2540,7 @@ fn send_phrase_to_server(
     let res: Result<(String, String, bool), String> = (|| {
         let mut had_unk = false;
         let mut used_full_stt = false;
+        let mut used_gigaam = false;
         let mut text = if use_local_stt {
             let t0 = Instant::now();
             let (t, unk) = if force_active || wake_word.is_empty() {
@@ -2626,13 +2627,20 @@ fn send_phrase_to_server(
             }
             // 100% local on-device neural whisper fallback (GigaAM-v2-CTC INT8 ONNX):
             // Kaldi/Vosk cannot decode unvoiced breath, so decode clean vqe_0 locally on S905X3.
-            if text.is_empty() && !playback_running() {
-                if let Ok(wtxt) = crate::gigaam_asr::transcribe_pcm16(pcm) {
-                    let wtxt = wtxt.trim().to_string();
-                    if !wtxt.is_empty() {
-                        println!("[gigaam-asr] local neural ASR recovered whisper: {wtxt:?}");
-                        text = wtxt;
-                        had_unk = false;
+            // Skip <=300ms transient clicks/volume-beeps so rapid volume commands never stall.
+            if text.is_empty() && !playback_running() && pcm.len() >= SR * 2 * 32 / 100 {
+                match crate::gigaam_asr::transcribe_pcm16(pcm) {
+                    Ok(wtxt) => {
+                        let wtxt = wtxt.trim().to_string();
+                        if !wtxt.is_empty() {
+                            println!("[gigaam-asr] local neural ASR recovered whisper: {wtxt:?}");
+                            text = wtxt;
+                            had_unk = false;
+                            used_gigaam = true;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[gigaam-asr] error: {e}");
                     }
                 }
             }
@@ -2646,7 +2654,7 @@ fn send_phrase_to_server(
                 let favorites_command = matches!(cmd, DeviceCommand::LikeTrack | DeviceCommand::DislikeTrack);
                 // Skip blocking 500ms unconstrained Vosk pass when constrained grammar already matched
                 // a clean, short (<= 1.5s) quick command with no [unk] tokens (Yandex-style instant command spotter!)
-                let full_ok = if !use_local_stt || pcm.len() <= SR * 2 * 15 / 10 {
+                let full_ok = if !use_local_stt || used_gigaam || pcm.len() <= SR * 2 * 15 / 10 {
                     true
                 } else {
                     match crate::local_stt::transcribe_pcm16(pcm) {
@@ -2700,7 +2708,7 @@ fn send_phrase_to_server(
                 && !had_unk
                 && is_wake_word_only(&text, wake_word)
                 && pcm.len() <= SR * 2 * 15 / 10;
-            if use_local_stt && !confident_fast_wake {
+            if use_local_stt && !confident_fast_wake && !used_gigaam {
                 let full_text = crate::local_stt::transcribe_pcm16(pcm)?;
                 used_full_stt = true;
                 voice_timing("stt_verification_final");

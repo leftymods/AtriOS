@@ -315,9 +315,9 @@ impl GigaAmSession {
             env,
             sess,
             mem_info,
-            in_audio_name: CString::new("audio_signal").unwrap(),
-            in_len_name: CString::new("length").unwrap(),
-            out_logprobs_name: CString::new("logprobs").unwrap(),
+            in_audio_name: CString::new("features").unwrap(),
+            in_len_name: CString::new("feature_lengths").unwrap(),
+            out_logprobs_name: CString::new("log_probs").unwrap(),
         })
     }
 
