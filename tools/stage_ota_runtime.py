@@ -25,6 +25,7 @@ RUNTIME_FILES = (
         'wifi-scan', 'wireless', 'ymusic', 'console.sh',
         'libonnxruntime.so', 'LICENSE.onnxruntime')),
     'usr/share/atrios/models/gtcrn/gtcrn_simple.onnx',
+    'usr/share/atrios/models/silero/silero_vad.onnx',
     'usr/share/atrios/models/gtcrn/LICENSE',
     'etc/atrios/ota-public.pem', 'etc/atrios/updates.json',
     'etc/atrios/hardware.json', 'etc/os-release',

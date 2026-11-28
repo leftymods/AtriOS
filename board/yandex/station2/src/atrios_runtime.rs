@@ -24,6 +24,8 @@ mod npu;
 mod local_ai;
 #[path = "atrios_runtime/mini_brain.rs"]
 mod mini_brain;
+#[path = "atrios_runtime/silero_vad.rs"]
+mod silero_vad;
 #[path = "atrios_runtime/weather.rs"]
 mod weather;
 #[path = "atrios_runtime/atriai.rs"]

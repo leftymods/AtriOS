@@ -1690,7 +1690,7 @@ fn play_audio_bytes(
                         let rms = pcm16_rms(&chunk);
                         if !armed {
                             bg_rms = (bg_rms * 0.90 + rms * 0.10).clamp(180.0, 1600.0);
-                            if pre_roll.len() == 8 {
+                            if pre_roll.len() == 12 {
                                 pre_roll.pop_front();
                             }
                             pre_roll.push_back(chunk);
@@ -1720,7 +1720,7 @@ fn play_audio_bytes(
                                 bg_rms = (bg_rms * 0.94 + rms * 0.06).clamp(180.0, 1600.0);
                                 barge_hits = barge_hits.saturating_sub(1);
                             }
-                            if pre_roll.len() == 8 {
+                            if pre_roll.len() == 12 {
                                 pre_roll.pop_front();
                             }
                             pre_roll.push_back(chunk);
@@ -3351,9 +3351,14 @@ fn run_daemon() -> i32 {
         let mut raw = vec![0u8; read_bytes];
         let mut buf: Vec<u8> = Vec::new();
         let mut utt_rms: Vec<f64> = Vec::new();
-        let mut pre_roll: VecDeque<(Vec<u8>, f64)> = VecDeque::with_capacity(8);
+        let _silero_ready = crate::silero_vad::init();
+        crate::silero_vad::reset();
+        let mut pre_roll: VecDeque<(Vec<u8>, f64)> = VecDeque::with_capacity(12);
         let mut speaking = false;
         let mut utt_peak = 0.0f64;
+        let mut utt_peak_prob = 0.0f32;
+        let mut utt_used_silero = false;
+        let mut idle_silero_frames = 0usize;
         let mut speech_hits = 0usize;
         let mut hit_max_utt = false;
         let mut warmup_frames = if first_start { 15usize } else { 0 };
@@ -3441,7 +3446,7 @@ fn run_daemon() -> i32 {
             if warmup_frames > 0 {
                 warmup_frames -= 1;
                 vad.warmup(rms);
-                if pre_roll.len() == 8 {
+                if pre_roll.len() == 12 {
                     pre_roll.pop_front();
                 }
                 pre_roll.push_back((chunk, rms));
@@ -3454,29 +3459,38 @@ fn run_daemon() -> i32 {
             let (start_thr, keep_thr, max_utt_ms, end_silence_ms) =
                 vad.thresholds(mode, vad_thr, cfg.silence_ms, music_on);
             last_start_thr = start_thr;
+            let silero_prob = crate::silero_vad::process_pcm16(&chunk);
+            let sp = crate::silero_vad::profile_for(mode == PipelineMode::WakeSpotter, music_on, cfg.silence_ms);
 
             if !speaking {
                 if vad.wait_quiet_frames > 0 && !force_active {
                     vad.update_noise(rms);
-                    // A continuous music bed may never drop below keep_thr.
-                    // During playback use a bounded cooldown instead.
-                    if music_on || rms < keep_thr {
+                    let quiet_now = silero_prob.map(|p| p < sp.keep_prob).unwrap_or(rms < keep_thr);
+                    if music_on || quiet_now {
                         vad.wait_quiet_frames -= 1;
                     } else {
                         vad.wait_quiet_frames = 10;
                     }
-                    if pre_roll.len() == 8 {
+                    if pre_roll.len() == 12 {
                         pre_roll.pop_front();
                     }
                     pre_roll.push_back((chunk, rms));
                     continue;
                 }
-                if rms >= start_thr {
+                let (onset_hit, req_hits) = if let Some(prob) = silero_prob {
+                    (prob >= sp.start_prob, sp.min_start_hits)
+                } else {
+                    (rms >= start_thr, 2usize)
+                };
+                if onset_hit {
+                    idle_silero_frames = 0;
                     speech_hits += 1;
-                    if speech_hits >= 2 {
+                    if speech_hits >= req_hits {
                         speaking = true;
                         utt_rms.clear();
                         utt_peak = pre_roll.iter().map(|(_, r)| *r).fold(rms, f64::max);
+                        utt_used_silero = silero_prob.is_some();
+                        utt_peak_prob = silero_prob.unwrap_or(0.0);
                         for (p, r) in pre_roll.drain(..) {
                             buf.extend_from_slice(&p);
                             utt_rms.push(r);
@@ -3508,6 +3522,13 @@ fn run_daemon() -> i32 {
                 } else {
                     vad.update_noise(rms);
                     speech_hits = speech_hits.saturating_sub(1);
+                    if silero_prob.is_some() {
+                        idle_silero_frames += 1;
+                        if idle_silero_frames >= 85 {
+                            crate::silero_vad::reset();
+                            idle_silero_frames = 0;
+                        }
+                    }
                     if force_active {
                         wait_speech_ms += frame_ms;
                         if wait_speech_ms >= 7000.0 {
@@ -3516,7 +3537,7 @@ fn run_daemon() -> i32 {
                         }
                     }
                 }
-                if pre_roll.len() == 8 {
+                if pre_roll.len() == 12 {
                     pre_roll.pop_front();
                 }
                 pre_roll.push_back((chunk, rms));
@@ -3552,13 +3573,24 @@ fn run_daemon() -> i32 {
                 if rms > utt_peak {
                     utt_peak = rms;
                 }
-                // A loud first syllable must not set a floor that cuts a
-                // quieter word later in the same utterance.
-                let eff_keep_thr = keep_thr.max((utt_peak * 0.10).min(keep_thr * 1.45));
-                if rms >= eff_keep_thr {
-                    silence_ms = 0.0;
+                if let Some(prob) = silero_prob {
+                    utt_used_silero = true;
+                    if prob > utt_peak_prob {
+                        utt_peak_prob = prob;
+                    }
+                    if prob >= sp.keep_prob {
+                        silence_ms = 0.0;
+                    } else {
+                        silence_ms += frame_ms;
+                    }
                 } else {
-                    silence_ms += frame_ms;
+                    // RMS fallback: a loud first syllable must not cut a quieter word later
+                    let eff_keep_thr = keep_thr.max((utt_peak * 0.10).min(keep_thr * 1.45));
+                    if rms >= eff_keep_thr {
+                        silence_ms = 0.0;
+                    } else {
+                        silence_ms += frame_ms;
+                    }
                 }
                 let utt_ms = (buf.len() as f64) / ((SR * 2) as f64) * 1000.0;
                 let early_wake = wake_required
@@ -3575,9 +3607,14 @@ fn run_daemon() -> i32 {
                     voice_timing("wake_early_endpoint");
                     break;
                 }
+                let base_end_silence = if silero_prob.is_some() {
+                    sp.end_silence_ms
+                } else {
+                    end_silence_ms
+                };
                 let eff_end_silence_ms = voice_endpoint_silence_ms(
                     wake_required && mode == PipelineMode::WakeSpotter,
-                    utt_ms - silence_ms, music_on, end_silence_ms,
+                    utt_ms - silence_ms, music_on, base_end_silence,
                 );
                 if silence_ms >= eff_end_silence_ms {
                     if buf.len() >= min_bytes {
@@ -3607,7 +3644,9 @@ fn run_daemon() -> i32 {
             voice_timing("vad_end");
             let peak_rms = utt_rms.iter().copied().fold(0.0f64, f64::max);
             let mean_rms = utt_rms.iter().sum::<f64>() / (utt_rms.len().max(1) as f64);
-            if !is_valid_speech(&utt_rms, vad.noise_rms, last_start_thr, music_on, mode) {
+            let sp_end = crate::silero_vad::profile_for(mode == PipelineMode::WakeSpotter, music_on, cfg.silence_ms);
+            let neural_valid = utt_used_silero && utt_peak_prob >= sp_end.start_prob * 0.90;
+            if !neural_valid && !is_valid_speech(&utt_rms, vad.noise_rms, last_start_thr, music_on, mode) {
                 // Rejected playback/lyrics must not become the new VAD floor;
                 // otherwise the threshold keeps climbing while music plays.
                 if !music_on {
@@ -3628,7 +3667,7 @@ fn run_daemon() -> i32 {
             }
             let dur_ms = (buf.len() * 1000) / (SR * 2);
             println!(
-                "[vad] speech segment captured: dur_ms={dur_ms} peak_rms={peak_rms:.0} noise_rms={:.0} mode={}",
+                "[vad] speech segment captured: dur_ms={dur_ms} peak_rms={peak_rms:.0} noise_rms={:.0} silero_peak={utt_peak_prob:.2} mode={}",
                 vad.noise_rms,
                 mode.as_str()
             );
