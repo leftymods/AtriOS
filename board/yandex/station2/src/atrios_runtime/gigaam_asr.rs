@@ -708,9 +708,7 @@ pub fn transcribe_pcm16(pcm: &[u8]) -> Result<String, String> {
     let elapsed_ms = t0.elapsed().as_millis() as u64;
     LAST_INFER_MS.store(elapsed_ms, Ordering::Relaxed);
     TOTAL_INFER_COUNT.fetch_add(1, Ordering::Relaxed);
-    if !text.is_empty() {
-        println!("[gigaam-asr] local decoded in {} ms: {:?}", elapsed_ms, text);
-    }
+    println!("[gigaam-asr] local decoded in {} ms: {:?}", elapsed_ms, text);
     Ok(text)
 }
 

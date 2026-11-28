@@ -2684,7 +2684,7 @@ fn send_phrase_to_server(
             }
         }
 
-        if text.is_empty() && (gigaam_checked_empty || !(use_local_stt && !wake_word.is_empty())) {
+        if text.is_empty() && (gigaam_checked_empty || pcm.len() < SR * 2 * 32 / 100 || !(use_local_stt && !wake_word.is_empty())) {
             set_error("voice", None, "", 15);
             if force_active {
                 keep_listening = true;

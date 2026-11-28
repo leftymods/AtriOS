@@ -605,10 +605,10 @@ pub struct SileroProfile {
 pub fn profile_for(is_wake_mode: bool, music_on: bool, active_silence_cfg: f64) -> SileroProfile {
     match (is_wake_mode, music_on) {
         (true, false) => SileroProfile {
-            start_prob: 0.44,
-            keep_prob: 0.20,
+            start_prob: 0.36,
+            keep_prob: 0.10,
             min_start_hits: 1, // Silero v5 already has 64-sample context + LSTM history -> 32ms instant onset!
-            end_silence_ms: 224.0,
+            end_silence_ms: 352.0,
         },
         (true, true) => SileroProfile {
             start_prob: 0.52,
