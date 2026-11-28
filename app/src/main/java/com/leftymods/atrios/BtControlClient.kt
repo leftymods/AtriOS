@@ -682,6 +682,14 @@ class BtControlClient(
         JSONObject().put("cmd", "set_ynison_enabled").put("enabled", enabled)
     )
 
+    fun setSileroVad(enabled: Boolean) = sendCommand(
+        JSONObject().put("cmd", "set_silero_vad").put("enabled", enabled)
+    )
+
+    fun clearAiMemory() = sendCommand(
+        JSONObject().put("cmd", "clear_ai_memory")
+    )
+
     // Timers (#10 contract)
     fun getTimers() = sendCommand(JSONObject().put("cmd", "get_timers"))
 

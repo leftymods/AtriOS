@@ -184,6 +184,50 @@ enum class VoicePreference(val key: String) {
     QUICK_BLUETOOTH("quick_bluetooth")
 }
 
+data class SileroVadStatus(
+    val enabled: Boolean = true,
+    val active: Boolean = false,
+    val modelPresent: Boolean = false,
+    val lastHopUs: Long = 0L,
+    val avgHopUs: Long = 0L
+) {
+    companion object {
+        fun fromJson(obj: JSONObject?): SileroVadStatus? {
+            if (obj == null) return null
+            return SileroVadStatus(
+                enabled = obj.optBoolean("enabled", true),
+                active = obj.optBoolean("active", false),
+                modelPresent = obj.optBoolean("model_present", false),
+                lastHopUs = obj.optLong("last_hop_us", 0L),
+                avgHopUs = obj.optLong("avg_hop_us", 0L)
+            )
+        }
+    }
+}
+
+data class AiMemoryStatus(
+    val count: Int = 0,
+    val maxEntries: Int = 256,
+    val primaryOk: Boolean = false,
+    val backupOk: Boolean = false,
+    val encrypted: Boolean = true,
+    val serverSync: Boolean = false
+) {
+    companion object {
+        fun fromJson(obj: JSONObject?): AiMemoryStatus? {
+            if (obj == null) return null
+            return AiMemoryStatus(
+                count = obj.optInt("count", 0),
+                maxEntries = obj.optInt("max_entries", 256),
+                primaryOk = obj.optBoolean("primary_ok", false),
+                backupOk = obj.optBoolean("backup_ok", false),
+                encrypted = obj.optBoolean("encrypted", true),
+                serverSync = obj.optBoolean("server_sync", false)
+            )
+        }
+    }
+}
+
 data class AiStatus(
     val enabled: Boolean = false,
     val mode: String = "hybrid",
@@ -195,7 +239,9 @@ data class AiStatus(
     val lastAsr: String = "",
     val lastAnswer: String = "",
     val error: String = "",
-    val voicePreferences: Map<VoicePreference, Boolean>? = null
+    val voicePreferences: Map<VoicePreference, Boolean>? = null,
+    val sileroVad: SileroVadStatus? = null,
+    val aiMemory: AiMemoryStatus? = null
 ) {
     companion object {
         val MODES: List<Pair<String, String>> = listOf(
@@ -247,7 +293,9 @@ data class AiStatus(
                             (prefs.opt(preference.key) as? Boolean)?.let { put(preference, it) }
                         }
                     }
-                }
+                },
+                sileroVad = SileroVadStatus.fromJson(obj.optJSONObject("silero_vad")),
+                aiMemory = AiMemoryStatus.fromJson(obj.optJSONObject("ai_memory"))
             )
         }
     }

@@ -81,6 +81,7 @@ import com.leftymods.atrios.model.YMusicOrb
 import com.leftymods.atrios.model.YMusicTrack
 import com.leftymods.atrios.ui.AiAssistantCard
 import com.leftymods.atrios.ui.VoicePreferencesCard
+import com.leftymods.atrios.ui.MiniBrainAndVadCard
 import com.leftymods.atrios.ui.MusicQualityCard
 import com.leftymods.atrios.ui.RoomCard
 import com.leftymods.atrios.ui.WeatherCard
@@ -1492,6 +1493,16 @@ fun AtriOSApp(
                                                     quickCommands = curPage == SettingsPage.QUICK,
                                                     onChange = client::setVoicePreferences
                                                 )
+                                            }
+                                            if (curPage == SettingsPage.DIALOG && (status.ai.sileroVad != null || status.ai.aiMemory != null)) {
+                                                item {
+                                                    MiniBrainAndVadCard(
+                                                        sileroVad = status.ai.sileroVad,
+                                                        aiMemory = status.ai.aiMemory,
+                                                        onToggleSileroVad = client::setSileroVad,
+                                                        onClearMemory = client::clearAiMemory
+                                                    )
+                                                }
                                             }
                                         }
                                         SettingsPage.VOICE -> {

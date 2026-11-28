@@ -597,19 +597,19 @@ fun VoicePreferencesCard(
                 return@Column
             }
 
-            VoicePreferenceRow("Воспроизведение и пауза", "Пауза, продолжи",
+            VoicePreferenceRow("Воспроизведение и пауза", "Стоп, хватит, пауза, продолжи, играй",
                 preferences[VoicePreference.QUICK_MEDIA] == true) {
                 onChange(mapOf(VoicePreference.QUICK_MEDIA to it))
             }
-            VoicePreferenceRow("Переключение треков", "Следующий или предыдущий трек",
+            VoicePreferenceRow("Переключение треков", "Дальше, вперёд, назад, следующий, предыдущий",
                 preferences[VoicePreference.QUICK_TRACKS] == true) {
                 onChange(mapOf(VoicePreference.QUICK_TRACKS to it))
             }
-            VoicePreferenceRow("Оценки треков", "Лайк и дизлайк в Яндекс Музыке",
+            VoicePreferenceRow("Оценки треков", "Лайк, лайкни, нравится, дизлайк",
                 preferences[VoicePreference.QUICK_FAVORITES] == true) {
                 onChange(mapOf(VoicePreference.QUICK_FAVORITES to it))
             }
-            VoicePreferenceRow("Громкость", "Тише, громче", preferences[VoicePreference.QUICK_VOLUME] == true) {
+            VoicePreferenceRow("Громкость", "Тише, потише, громче, погромче", preferences[VoicePreference.QUICK_VOLUME] == true) {
                 onChange(mapOf(VoicePreference.QUICK_VOLUME to it))
             }
             VoicePreferenceRow("Bluetooth", "Включи или выключи Bluetooth",
@@ -661,6 +661,84 @@ private fun VoicePreferenceRow(
             }
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+@Composable
+fun MiniBrainAndVadCard(
+    sileroVad: com.leftymods.atrios.model.SileroVadStatus?,
+    aiMemory: com.leftymods.atrios.model.AiMemoryStatus?,
+    onToggleSileroVad: (Boolean) -> Unit,
+    onClearMemory: () -> Unit
+) {
+    var confirmClear by remember { mutableStateOf(false) }
+
+    ElevatedCard(shape = RoundedCornerShape(24.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Мини-Мозг и Silero VAD v5", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+            if (sileroVad != null) {
+                val vadSubtitle = when {
+                    !sileroVad.modelPresent -> "Модель silero_vad.onnx не найдена (RMS фоллбэк)"
+                    sileroVad.active -> {
+                        val ms = if (sileroVad.avgHopUs > 0L) String.format(java.util.Locale.US, " · %.1f мс/хоп", sileroVad.avgHopUs / 1000.0) else ""
+                        "Активен (нейро-детектор речи$ms)"
+                    }
+                    else -> "Выключен (используется RMS VAD)"
+                }
+                VoicePreferenceRow(
+                    title = "Silero VAD v5",
+                    subtitle = vadSubtitle,
+                    checked = sileroVad.enabled,
+                    onChange = onToggleSileroVad
+                )
+            }
+
+            if (aiMemory != null) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                val copies = when {
+                    aiMemory.primaryOk && aiMemory.backupOk -> "2 зашифрованные копии OK"
+                    aiMemory.primaryOk || aiMemory.backupOk -> "1 копия (автовосстановление)"
+                    else -> "База создастся при первой записи"
+                }
+                val syncTag = if (aiMemory.serverSync) " · leftymods.tech" else ""
+                Text(
+                    "Векторная память ИИ: ${aiMemory.count} / ${aiMemory.maxEntries}",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    "$copies$syncTag (читает только ИИ)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = { confirmClear = true },
+                    enabled = aiMemory.count > 0
+                ) {
+                    Text("Очистить память ИИ")
+                }
+            }
+        }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Очистить память ИИ?") },
+            text = { Text("Все сохранённые факты и заметки в обеих зашифрованных копиях векторной базы будут удалены.") },
+            confirmButton = {
+                Button(onClick = {
+                    confirmClear = false
+                    onClearMemory()
+                }) { Text("Очистить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text("Отмена") }
+            }
+        )
     }
 }
 
