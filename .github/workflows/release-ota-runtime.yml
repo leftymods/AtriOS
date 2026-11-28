@@ -33,13 +33,13 @@ jobs:
           cd board/yandex/station2/src
           rustc --edition=2021 --test atrios_runtime.rs -o /tmp/atrios_runtime_test
           /tmp/atrios_runtime_test
-          rustc --edition=2021 -C opt-level=2 --target aarch64-unknown-linux-gnu -C linker=aarch64-linux-gnu-gcc atrios_runtime.rs -o "$RUNNER_TEMP/atrios-runtime"
+          rustc --edition=2021 --cfg atrios_no_atriai -C opt-level=2 --target aarch64-unknown-linux-gnu -C linker=aarch64-linux-gnu-gcc atrios_runtime.rs -o "$RUNNER_TEMP/atrios-runtime"
           aarch64-linux-gnu-gcc -O2 atri_mp3dec.c -lm -o "$RUNNER_TEMP/atri-mp3dec"
           mkdir -p "$RUNNER_TEMP/bt-headers"
           cp -r /usr/include/bluetooth /usr/include/sbc "$RUNNER_TEMP/bt-headers/"
           aarch64-linux-gnu-gcc -O2 -I "$RUNNER_TEMP/bt-headers" bt_speaker_daemon.c -ldl -o "$RUNNER_TEMP/bt-speaker-daemon"
           cd "$GITHUB_WORKSPACE"
-          bash scripts/build_audio_dsp.sh --board yndxsttion53 --output "$RUNNER_TEMP/atri-aec" --stage-dir "$RUNNER_TEMP/stage"
+          AUDIO_NS_ENGINE=bnr bash scripts/build_audio_dsp.sh --board yndxsttion53 --output "$RUNNER_TEMP/atri-aec" --stage-dir "$RUNNER_TEMP/stage"
       - name: Build RSA-signed OTA bundle for yndxsttion53
         env:
           OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
@@ -56,7 +56,6 @@ jobs:
           install -m 755 "$RUNNER_TEMP/atri-mp3dec" "$RUNNER_TEMP/stage/usr/bin/atri-mp3dec"
           install -D -m 755 "$RUNNER_TEMP/bt-speaker-daemon" "$RUNNER_TEMP/stage/usr/sbin/bt-speaker-daemon"
           install -m 755 board/yandex/station2/rootfs_overlay/usr/lib/atrios/wireless "$RUNNER_TEMP/stage/usr/lib/atrios/wireless"
-          install -D -m 644 board/yandex/station2/rootfs_overlay/usr/share/atrios/models/silero/silero_vad.onnx "$RUNNER_TEMP/stage/usr/share/atrios/models/silero/silero_vad.onnx"
 
           python3 - "$VER" "$RUNNER_TEMP/stage" "$RUNNER_TEMP/ota-signing.pem" "$RUNNER_TEMP/ota_out" <<'PY'
           import hashlib, json, os, subprocess, sys, tarfile

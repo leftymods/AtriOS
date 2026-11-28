@@ -136,6 +136,7 @@ if [ -n "$STAGE_DIR" ]; then
         install -m 644 "$OVERLAY_DIR/usr/share/atrios/models/gtcrn/LICENSE" "$STAGE_DIR/usr/share/atrios/models/gtcrn/LICENSE"
         echo "[audio-dsp] staged GTCRN runtime + ONNX model into $STAGE_DIR"
     else
+        rm -rf "$STAGE_DIR/usr/share/atrios/models/gtcrn" "$STAGE_DIR/usr/lib/atrios/libonnxruntime.so" "$STAGE_DIR/usr/lib/atrios/LICENSE.onnxruntime"
         echo "[audio-dsp] skipped GTCRN runtime/model (AUDIO_NS_ENGINE=$AUDIO_NS_ENGINE)"
     fi
 fi

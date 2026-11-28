@@ -89,7 +89,7 @@ if [ "$SKIP_RUNTIME" -eq 0 ] && command -v rustc >/dev/null 2>&1; then
     [ "${MOD_BLUETOOTH:-true}" = "false" ] && RUST_FLAGS+=(--cfg atrios_no_bluetooth)
     [ "${MOD_OTA:-true}" = "false" ]       && RUST_FLAGS+=(--cfg atrios_no_ota)
     [ "${MOD_YMUSIC:-true}" = "false" ]    && RUST_FLAGS+=(--cfg atrios_no_ymusic)
-    [ "${MOD_ATRIAI:-true}" = "false" ]    && RUST_FLAGS+=(--cfg atrios_no_atriai)
+    [ "${MOD_ATRIAI:-false}" = "false" ]    && RUST_FLAGS+=(--cfg atrios_no_atriai)
 
     if [ "$NATIVE_BUILD" -eq 0 ]; then
         RUST_TARGET="${RUST_TARGET:-aarch64-unknown-linux-gnu}"
