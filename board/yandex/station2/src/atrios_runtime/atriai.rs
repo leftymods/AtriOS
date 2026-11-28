@@ -2614,6 +2614,16 @@ fn send_phrase_to_server(
             return Ok((text, String::new(), false));
         }
 
+        if use_local_stt && text.is_empty() && pcm.len() <= SR * 2 * 22 / 10 {
+            if let Ok((recovered, r_unk)) = crate::local_stt::transcribe_command_pcm16(pcm) {
+                if !recovered.is_empty() {
+                    println!("[local-stt] whisper peak-normalized recovery: {recovered:?} (unk={r_unk})");
+                    text = recovered;
+                    had_unk = r_unk;
+                }
+            }
+        }
+
         if !user_addressed && !had_unk {
             if let Some(cmd) = quick_command(&text, &preferences) {
                 let media_command = matches!(
@@ -2677,7 +2687,11 @@ fn send_phrase_to_server(
                 let full_text = crate::local_stt::transcribe_pcm16(pcm)?;
                 used_full_stt = true;
                 voice_timing("stt_verification_final");
-                if !matches_wake_word(&full_text, wake_word) {
+                let whisper_wake_ok = fast_match
+                    && full_text.trim().is_empty()
+                    && !had_unk
+                    && is_wake_word_only(&text, wake_word);
+                if !matches_wake_word(&full_text, wake_word) && !whisper_wake_ok {
                     println!("[wake] rejected offline match (fast={text:?}, full={full_text:?})");
                     set_error("voice", None, "", 15);
                     return Ok((String::new(), String::new(), false));
@@ -2685,8 +2699,10 @@ fn send_phrase_to_server(
                 if !fast_match {
                     println!("[wake] recovered by full recognizer ({full_text:?})");
                 }
-                had_unk = full_text.split_whitespace().any(|w| w == "[unk]");
-                text = full_text;
+                if !full_text.trim().is_empty() {
+                    had_unk = full_text.split_whitespace().any(|w| w == "[unk]");
+                    text = full_text;
+                }
             }
         }
         let verified_wake_only = pcm.len() <= SR * 2 * 24 / 10 && is_wake_word_only(&text, wake_word);
