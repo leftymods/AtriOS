@@ -985,6 +985,7 @@ fn quick_command(text: &str, preferences: &VoicePreferences) -> Option<DeviceCom
 }
 
 static REMOTE_DOWN_UNTIL: AtomicI64 = AtomicI64::new(0);
+static LAST_WHISPER_CLOUD_TS: AtomicI64 = AtomicI64::new(0);
 
 // --- Visuals ---
 struct VisualState {
@@ -2622,6 +2623,37 @@ fn send_phrase_to_server(
                     had_unk = r_unk;
                 }
             }
+            // Pure unvoiced whisper fallback: Kaldi/Vosk cannot decode voiceless breath,
+            // so forward short Silero-confirmed quiet clips (from clean vqe_0) to GPU Whisper /asr (3s cooldown).
+            let now_s = now_unix_i64();
+            let last_w = LAST_WHISPER_CLOUD_TS.load(Ordering::Relaxed);
+            if text.is_empty()
+                && has_remote
+                && now_s >= REMOTE_DOWN_UNTIL.load(Ordering::Relaxed)
+                && now_s - last_w >= 3
+                && !playback_running()
+            {
+                LAST_WHISPER_CLOUD_TS.store(now_s, Ordering::Relaxed);
+                let wav = prepare_asr_wav(pcm);
+                let auth = format!("Bearer {}", cfg.token);
+                let mut h = vec![("Content-Type", "audio/wav"), ("Accept", "application/json")];
+                if !cfg.token.is_empty() {
+                    h.push(("Authorization", &auth));
+                }
+                let ca_opt = if cfg.ca_file.is_empty() { None } else { Some(cfg.ca_file.as_str()) };
+                if let Ok(raw_asr) = request_bytes(&format!("{base}/asr"), Some(&wav), &h, ca_opt, 4, 65536, None) {
+                    if let Ok(s) = String::from_utf8(raw_asr) {
+                        if let Ok(j) = Json::parse(&s) {
+                            let wtxt = j.get_str("text").unwrap_or("").trim().to_string();
+                            if !wtxt.is_empty() {
+                                println!("[whisper-asr] cloud Whisper recovered pure whisper: {wtxt:?}");
+                                text = wtxt;
+                                had_unk = false;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         if !user_addressed && !had_unk {
@@ -3355,6 +3387,7 @@ fn run_daemon() -> i32 {
             use_aec = Path::new(AEC_BIN).exists();
             proc_child = if use_aec {
                 Command::new(AEC_BIN)
+                    .arg("--dual-vqe")
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .spawn()
@@ -3377,7 +3410,7 @@ fn run_daemon() -> i32 {
             thread::sleep(Duration::from_secs(2));
             continue;
         };
-        let read_bytes = if use_aec { FRAME_BYTES } else { CAP_FRAME_BYTES };
+        let read_bytes = if use_aec { FRAME_BYTES * 2 } else { CAP_FRAME_BYTES };
         CAPTURE_FRAME_BYTES.store(read_bytes, Ordering::SeqCst);
         let cap_fd = child.stdout.as_ref().map(|s| s.as_raw_fd()).unwrap_or(-1);
         CAPTURE_FD.store(cap_fd, Ordering::SeqCst);
@@ -3473,7 +3506,18 @@ fn run_daemon() -> i32 {
                 break;
             }
             let chunk = if use_aec {
-                raw.clone()
+                // De-interleave Yandex-style Dual-VQE: ch0 = vqe_0 (clean AEC, preserves whispers),
+                // ch1 = vqe_bnr_0 (GTCRN neural denoiser, crushes loud music).
+                let mut selected = Vec::with_capacity(FRAME_BYTES);
+                let pick_bnr = music_on;
+                for frame in raw.chunks_exact(4) {
+                    if pick_bnr {
+                        selected.extend_from_slice(&frame[2..4]);
+                    } else {
+                        selected.extend_from_slice(&frame[0..2]);
+                    }
+                }
+                selected
             } else {
                 downsample_48k_8ch_s32_to_16k_s16(&raw)
             };

@@ -548,6 +548,7 @@ int main(int argc, char **argv) {
     if (argc == 4 && strcmp(argv[1], "--gtcrn-file") == 0) {
         return gtcrn_ns_process_raw_file(argv[2], argv[3]);
     }
+    int dual_vqe = (argc >= 2 && strcmp(argv[1], "--dual-vqe") == 0);
     int live_test_sec = 0;
     FILE *lt_raw = NULL, *lt_clean = NULL, *lt_ref = NULL;
     if (argc >= 5 && strcmp(argv[1], "--live-test") == 0) {
@@ -606,6 +607,7 @@ int main(int argc, char **argv) {
     long mp = now_pos();
     static uint8_t inbuf[IN_BYTES];
     static int16_t outbuf[OUT_BLK];
+    static int16_t outbuf_dual[OUT_BLK * 2];
     int outn = 0;
     double pw_in = 0, pw_out = 0;
     int stat_cnt = 0, ref_active_cnt = 0;
@@ -783,6 +785,11 @@ int main(int argc, char **argv) {
         stft_kalman_process_block(blk_e, blk_r, blk_ref_active, (ATRIOS_NS_BNR && !gtcrn_active));
 #endif
 
+        /* Preserve clean AEC + beamforming channel (vqe_0, zero GTCRN whisper loss)
+         * before GTCRN neural denoiser produces vqe_bnr_0 (Yandex Station 2 dual-VQE). */
+        float blk_vqe0[BLK];
+        memcpy(blk_vqe0, blk_e, sizeof(blk_vqe0));
+
         /* Apply local streaming GTCRN neural noise suppressor (when compiled in). */
         gtcrn_ns_process_128(blk_e);
         gtcrn_active = gtcrn_ns_is_active();
@@ -822,6 +829,14 @@ int main(int argc, char **argv) {
             if (fabsf(o) > 26000.f) o = 26000.f * tanhf(o / 26000.f);
             if (o > 32767.f) o = 32767.f;
             if (o < -32768.f) o = -32768.f;
+            if (dual_vqe) {
+                float o0 = blk_vqe0[i] * g_agc_gain;
+                if (fabsf(o0) > 26000.f) o0 = 26000.f * tanhf(o0 / 26000.f);
+                if (o0 > 32767.f) o0 = 32767.f;
+                if (o0 < -32768.f) o0 = -32768.f;
+                outbuf_dual[outn * 2] = (int16_t)o0;
+                outbuf_dual[outn * 2 + 1] = (int16_t)o;
+            }
             outbuf[outn++] = (int16_t)o;
             if (lt_raw) {
                 float rm = blk_mic[i];
@@ -844,7 +859,11 @@ int main(int argc, char **argv) {
             live_done++;
             if (outn == OUT_BLK) {
                 if (!lt_clean) {
-                    fwrite(outbuf, 2, OUT_BLK, stdout);
+                    if (dual_vqe) {
+                        fwrite(outbuf_dual, 2, OUT_BLK * 2, stdout);
+                    } else {
+                        fwrite(outbuf, 2, OUT_BLK, stdout);
+                    }
                     fflush(stdout);
                 }
                 outn = 0;
