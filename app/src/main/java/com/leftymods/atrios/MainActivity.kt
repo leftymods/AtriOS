@@ -79,9 +79,7 @@ import com.leftymods.atrios.model.YMusicAlbum
 import com.leftymods.atrios.model.YMusicCollection
 import com.leftymods.atrios.model.YMusicOrb
 import com.leftymods.atrios.model.YMusicTrack
-import com.leftymods.atrios.ui.AiAssistantCard
-import com.leftymods.atrios.ui.VoicePreferencesCard
-import com.leftymods.atrios.ui.MiniBrainAndVadCard
+import com.leftymods.atrios.model.OvosPluginInfo
 import com.leftymods.atrios.ui.MusicQualityCard
 import com.leftymods.atrios.ui.RoomCard
 import com.leftymods.atrios.ui.WeatherCard
@@ -143,12 +141,10 @@ private enum class SettingsPage(val title: String, val subtitle: String, val ico
     ROOT("Настройки", "", Icons.Rounded.Tune),
     WIFI("Wi-Fi и сеть", "Текущая сеть и подключение к другой", Icons.Rounded.Wifi),
     BLUETOOTH("Bluetooth", "Видимость и сопряжение", Icons.Rounded.Bluetooth),
-    ASSISTANT("Ассистент", "Активация, диалог и быстрые команды", Icons.Rounded.AutoAwesome),
+    ASSISTANT("Голосовой стек OVOS", "Управление установленными Rust-плагинами", Icons.Rounded.AutoAwesome),
+    PLUGINS("Плагины OVOS", "Активация, распознавание речи и другие модули", Icons.Rounded.Extension),
     SOUND("Звук и индикация", "Громкость, эквалайзер, дисплей и кольцо", Icons.Rounded.GraphicEq),
     WEATHER("Погода", "Город и сведения для голосового ответа", Icons.Rounded.WbSunny),
-    DIALOG("Активация и диалог", "Сигнал пробуждения и продолжение разговора", Icons.Rounded.Mic),
-    QUICK("Быстрые команды", "Управление колонкой без слова активации", Icons.Rounded.Bolt),
-    VOICE("Ассистент и сервер", "Слово активации и подключение к AtriAI", Icons.Rounded.RecordVoiceOver),
     QUALITY("Качество музыки", "Поток Яндекс Музыки для следующих треков", Icons.Rounded.MusicNote),
     LIGHTING("Экран и кольцо", "Индикация на колонке", Icons.Rounded.LightMode),
     PALETTE("Оформление и палитра", "Цвет интерфейса и анимации волны", Icons.Rounded.Palette),
@@ -159,7 +155,7 @@ private enum class SettingsPage(val title: String, val subtitle: String, val ico
 
     val parent: SettingsPage
         get() = when (this) {
-            DIALOG, QUICK, VOICE -> ASSISTANT
+            PLUGINS -> ASSISTANT
             QUALITY, LIGHTING -> SOUND
             DEBUG -> ABOUT
             else -> ROOT
@@ -280,6 +276,8 @@ fun AtriOSApp(
 
     var selectedTab by remember { mutableStateOf(AppTab.HOME) }
     var settingsPage by remember { mutableStateOf(SettingsPage.ROOT) }
+    var ovosPluginSupport by remember { mutableStateOf(false) }
+    var ovosPlugins by remember { mutableStateOf<List<OvosPluginInfo>>(emptyList()) }
     var showBigPlayer by remember { mutableStateOf(false) }
     val lastUserActionRef = remember { java.util.concurrent.atomic.AtomicLong(0L) }
     val rejectedOldTitleRef = remember { java.util.concurrent.atomic.AtomicReference<String?>(null) }
@@ -477,6 +475,10 @@ fun AtriOSApp(
             onWeatherForecast = { weatherForecast = it },
             onTimersUpdate = { list -> timers = list },
             onAlarmsUpdate = { list -> alarms = list },
+            onOvosPluginsUpdate = { available, plugins ->
+                ovosPluginSupport = available
+                ovosPlugins = plugins
+            },
             onRelayInfo = { did, gw, tok ->
                 val updated = relayConfig.copy(
                     deviceId = did,
@@ -1365,7 +1367,7 @@ fun AtriOSApp(
                                             SettingsPage.BLUETOOTH to status.bluetoothVisibility
                                         ),
                                         "Управление колонкой" to listOf(
-                                            SettingsPage.ASSISTANT to if (status.ai.enabled) "Активация и голосовые команды" else "Ассистент выключен",
+                                            SettingsPage.ASSISTANT to if (ovosPluginSupport) "OVOS · ${ovosPlugins.size} модулей" else "Голосовые плагины beta-прошивки",
                                             SettingsPage.SOUND to "Громкость, эквалайзер, дисплей и кольцо",
                                             SettingsPage.WEATHER to status.weather?.city.orEmpty().ifBlank { "Город и голосовой ответ" }
                                         ),
@@ -1410,6 +1412,7 @@ fun AtriOSApp(
                                                                 .clickable {
                                                                     settingsPage = page
                                                                     if (page == SettingsPage.UPDATES) client.otaStatus()
+                                                                    if (page == SettingsPage.PLUGINS) client.requestOvosPlugins()
                                                                 }
                                                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                                                             verticalAlignment = Alignment.CenterVertically,
@@ -1480,39 +1483,123 @@ fun AtriOSApp(
                                             }
                                         }
                                         SettingsPage.ASSISTANT -> {
-                                            listOf(SettingsPage.DIALOG, SettingsPage.QUICK, SettingsPage.VOICE).forEach { page ->
+                                            listOf(SettingsPage.PLUGINS).forEach { page ->
                                                 item {
-                                                    SettingsLink(page.title, page.subtitle, page.icon, palette.accent) { settingsPage = page }
+                                                    SettingsLink(page.title, page.subtitle, page.icon, palette.accent) {
+                                                        settingsPage = page
+                                                        if (page == SettingsPage.PLUGINS) client.requestOvosPlugins()
+                                                    }
                                                 }
                                             }
                                         }
-                                        SettingsPage.DIALOG, SettingsPage.QUICK -> {
+                                        SettingsPage.PLUGINS -> {
                                             item {
-                                                VoicePreferencesCard(
-                                                    status.ai.voicePreferences,
-                                                    quickCommands = curPage == SettingsPage.QUICK,
-                                                    onChange = client::setVoicePreferences
-                                                )
-                                            }
-                                            if (curPage == SettingsPage.DIALOG && (status.ai.sileroVad != null || status.ai.aiMemory != null)) {
-                                                item {
-                                                    MiniBrainAndVadCard(
-                                                        sileroVad = status.ai.sileroVad,
-                                                        aiMemory = status.ai.aiMemory,
-                                                        onToggleSileroVad = client::setSileroVad,
-                                                        onClearMemory = client::clearAiMemory
+                                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.End
+                                                    ) {
+                                                        TextButton(onClick = { client.requestOvosPlugins() }) {
+                                                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                            Spacer(Modifier.width(6.dp))
+                                                            Text("Обновить список")
+                                                        }
+                                                    }
+                                                    if (client.isRelayActive()) {
+                                                        Surface(shape = RoundedCornerShape(16.dp), color = OledCardHigh) {
+                                                            Text(
+                                                                "Список можно просматривать через интернет, а включать плагины — только при прямом подключении по Bluetooth.",
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                modifier = Modifier.padding(14.dp),
+                                                                fontSize = 13.sp
+                                                            )
+                                                        }
+                                                    }
+                                                    when {
+                                                        !ovosPluginSupport -> {
+                                                            Surface(shape = RoundedCornerShape(20.dp), color = OledCard) {
+                                                                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                                    Text("OVOS runtime не найден", color = Color.White, fontWeight = FontWeight.SemiBold)
+                                                                    Text(
+                                                                        "Установите beta-OTA с локальным MessageBus и менеджером плагинов. Новые модули должны приходить только в подписанных обновлениях.",
+                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                        fontSize = 13.sp
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                        ovosPlugins.isEmpty() -> {
+                                                            Surface(shape = RoundedCornerShape(20.dp), color = OledCard) {
+                                                                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                                    Text("Плагины пока не установлены", color = Color.White, fontWeight = FontWeight.SemiBold)
+                                                                    Text(
+                                                                        "После переноса сервисов OVOS сюда появятся модули активации, VAD, STT, TTS и обработки намерений.",
+                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                        fontSize = 13.sp
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                        else -> ovosPlugins.forEach { plugin ->
+                                                            Surface(shape = RoundedCornerShape(20.dp), color = OledCard) {
+                                                                Column(
+                                                                    Modifier.fillMaxWidth().padding(14.dp),
+                                                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                                ) {
+                                                                    Row(
+                                                                        modifier = Modifier.fillMaxWidth(),
+                                                                        verticalAlignment = Alignment.CenterVertically,
+                                                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                                    ) {
+                                                                        Column(Modifier.weight(1f)) {
+                                                                            Text(plugin.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                                                                            Text(
+                                                                                "${plugin.id} · v${plugin.version}",
+                                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                                fontSize = 11.sp
+                                                                            )
+                                                                        }
+                                                                        Switch(
+                                                                            checked = plugin.enabled,
+                                                                            onCheckedChange = { client.setOvosPlugin(plugin.id, it) },
+                                                                            enabled = !client.isRelayActive()
+                                                                        )
+                                                                    }
+                                                                    if (plugin.capabilities.isNotEmpty()) {
+                                                                        Text(
+                                                                            plugin.capabilities.joinToString(" · ") { cap ->
+                                                                                when (cap) {
+                                                                                    "wake_word" -> "Активация"
+                                                                                    "audio.capture" -> "Микрофон"
+                                                                                    "audio.playback" -> "Звук"
+                                                                                    "vad" -> "VAD"
+                                                                                    "stt" -> "Распознавание речи"
+                                                                                    "tts" -> "Синтез речи"
+                                                                                    "intent" -> "Намерения"
+                                                                                    "transformer" -> "Обработка текста"
+                                                                                    "word_correction" -> "Коррекция слов"
+                                                                                    else -> cap
+                                                                                }
+                                                                            },
+                                                                            color = palette.accent,
+                                                                            fontSize = 12.sp
+                                                                        )
+                                                                    }
+                                                                    Text(
+                                                                        if (plugin.enabled) "Разрешён к запуску" else "Отключён",
+                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                        fontSize = 12.sp
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    Text(
+                                                        "Плагины — нативные Rust-сервисы из проверенных OTA. Настройка здесь включает уже установленный модуль, но не скачивает код.",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        fontSize = 12.sp
                                                     )
                                                 }
-                                            }
-                                        }
-                                        SettingsPage.VOICE -> {
-                                            item {
-                                                AiAssistantCard(
-                                                    ai = status.ai,
-                                                    onApplyAi = { enabled, server, wake ->
-                                                        client.setAi(enabled = enabled, server = server, wakeWord = wake)
-                                                    }
-                                                )
                                             }
                                         }
                                         SettingsPage.SOUND -> {

@@ -11,6 +11,7 @@ import com.leftymods.atrios.model.DeviceCapabilities
 import com.leftymods.atrios.model.EqStatus
 import com.leftymods.atrios.model.MusicQuality
 import com.leftymods.atrios.model.OtaStatus
+import com.leftymods.atrios.model.OvosPluginInfo
 import com.leftymods.atrios.model.SpeakerStatus
 import com.leftymods.atrios.model.TimerItem
 import com.leftymods.atrios.model.VqeStatus
@@ -125,6 +126,7 @@ class BtControlClient(
     private val onWeatherForecast: (String) -> Unit = {},
     private val onTimersUpdate: (List<TimerItem>) -> Unit = {},
     private val onAlarmsUpdate: (List<AlarmItem>) -> Unit = {},
+    private val onOvosPluginsUpdate: (Boolean, List<OvosPluginInfo>) -> Unit = { _, _ -> },
     private val onBtSpeakerPush: (Boolean) -> Unit = {},
     private val onRelayInfo: (String, String, String) -> Unit = { _, _, _ -> },
     private val onTermE2eeState: (Boolean, String) -> Unit = { _, _ -> },
@@ -549,6 +551,12 @@ class BtControlClient(
 
     fun requestStatus() = sendCommand(JSONObject().put("cmd", "get_status"))
 
+    fun requestOvosPlugins() = sendCommand(JSONObject().put("cmd", "get_ovos_plugins"))
+
+    fun setOvosPlugin(id: String, enabled: Boolean) = sendCommand(
+        JSONObject().put("cmd", "set_ovos_plugin").put("id", id).put("enabled", enabled)
+    )
+
     fun setVolume(volume: Int) = sendCommand(
         JSONObject().put("cmd", "set_volume").put("volume", volume.coerceIn(0, 100))
     )
@@ -826,6 +834,11 @@ class BtControlClient(
 
     private suspend fun handlePacket(json: JSONObject) {
         when (json.optString("type")) {
+            "ovos_plugins" -> {
+                val available = json.optBoolean("available", false)
+                val plugins = OvosPluginInfo.fromJsonArray(json.optJSONArray("plugins"))
+                withContext(Dispatchers.Main) { onOvosPluginsUpdate(available, plugins) }
+            }
             "status" -> {
                 val dev = json.optJSONObject("device") ?: JSONObject()
                 val mem = dev.optJSONObject("memory") ?: JSONObject()

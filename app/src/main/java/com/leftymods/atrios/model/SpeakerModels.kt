@@ -3,6 +3,40 @@ package com.leftymods.atrios.model
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class OvosPluginInfo(
+    val id: String,
+    val name: String,
+    val version: String,
+    val capabilities: List<String>,
+    val enabled: Boolean
+) {
+    companion object {
+        fun fromJsonArray(array: JSONArray?): List<OvosPluginInfo> {
+            if (array == null) return emptyList()
+            return buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val id = item.optString("id").trim()
+                    if (id.isEmpty()) continue
+                    val caps = item.optJSONArray("capabilities") ?: JSONArray()
+                    add(OvosPluginInfo(
+                        id = id,
+                        name = item.optString("name", id),
+                        version = item.optString("version"),
+                        capabilities = buildList {
+                            for (i in 0 until caps.length()) {
+                                val cap = caps.optString(i).trim()
+                                if (cap.isNotEmpty()) add(cap)
+                            }
+                        },
+                        enabled = item.optBoolean("enabled", false)
+                    ))
+                }
+            }
+        }
+    }
+}
+
 data class DeviceCapabilities(
     val hasLedMatrix: Boolean = true,
     val hasRgbRing: Boolean = true,
