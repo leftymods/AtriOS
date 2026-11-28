@@ -2615,8 +2615,10 @@ fn send_phrase_to_server(
             return Ok((text, String::new(), false));
         }
 
+        let mut gigaam_checked_empty = false;
         if use_local_stt && text.is_empty() && pcm.len() <= SR * 2 * 4 {
-            if pcm.len() <= SR * 2 * 22 / 10 {
+            let gigaam_ready = crate::gigaam_asr::is_model_ready();
+            if !gigaam_ready && pcm.len() <= SR * 2 * 22 / 10 {
                 if let Ok((recovered, r_unk)) = crate::local_stt::transcribe_whisper_command_pcm16(pcm) {
                     if !recovered.is_empty() {
                         println!("[local-stt] whisper peak-normalized recovery: {recovered:?} (unk={r_unk})");
@@ -2637,6 +2639,8 @@ fn send_phrase_to_server(
                             text = wtxt;
                             had_unk = false;
                             used_gigaam = true;
+                        } else {
+                            gigaam_checked_empty = true;
                         }
                     }
                     Err(e) => {
@@ -2680,7 +2684,7 @@ fn send_phrase_to_server(
             }
         }
 
-        if text.is_empty() && !(use_local_stt && !wake_word.is_empty()) {
+        if text.is_empty() && (gigaam_checked_empty || !(use_local_stt && !wake_word.is_empty())) {
             set_error("voice", None, "", 15);
             if force_active {
                 keep_listening = true;

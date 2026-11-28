@@ -282,7 +282,7 @@ impl GigaAmSession {
             return Err(e);
         }
         let _ = unsafe { fns.check((fns.set_opt_level)(opts, ORT_ENABLE_ALL)) };
-        let _ = unsafe { fns.check((fns.set_intra_threads)(opts, 2)) };
+        let _ = unsafe { fns.check((fns.set_intra_threads)(opts, 3)) };
         let _ = unsafe { fns.check((fns.set_inter_threads)(opts, 1)) };
 
         let c_model = CString::new(model_path.to_string_lossy().as_bytes())
@@ -500,8 +500,8 @@ pub fn compute_log_mel_features(pcm: &[u8]) -> (Vec<f32>, usize) {
     }
     // Gently normalize very quiet whispers into GigaAM's acoustic sweet spot
     // without over-amplifying pure room silence.
-    if peak > 0.004 && peak < 0.28 {
-        let gain = (0.38 / peak).min(12.0);
+    if peak > 0.0025 && peak < 0.28 {
+        let gain = (0.40 / peak).min(24.0);
         for s in &mut samples {
             *s = (*s * gain).clamp(-0.98, 0.98);
         }
@@ -600,8 +600,33 @@ fn session_mutex() -> &'static Mutex<Option<GigaAmSession>> {
 /// One-time background download of the local GigaAM-v2-CTC INT8 ONNX model (~226 MB)
 /// into `/var/lib/atrios/models/gigaam-v2-ctc/model.int8.onnx` (persists across OTAs).
 /// Once present on disk, inference is 100% local and offline.
+pub fn preload_session_bg() {
+    if !is_model_ready() {
+        return;
+    }
+    std::thread::spawn(|| {
+        let path = model_path();
+        if let Ok(mut guard) = session_mutex().lock() {
+            if guard.is_none() {
+                let t_load = Instant::now();
+                match GigaAmSession::load(&path) {
+                    Ok(sess) => {
+                        println!(
+                            "[gigaam-asr] preloaded local GigaAM-v2-CTC INT8 in {} ms",
+                            t_load.elapsed().as_millis()
+                        );
+                        *guard = Some(sess);
+                    }
+                    Err(e) => eprintln!("[gigaam-asr] preload error: {e}"),
+                }
+            }
+        }
+    });
+}
+
 pub fn ensure_model_downloaded_bg() {
     if is_model_ready() {
+        preload_session_bg();
         return;
     }
     if DOWNLOADING.swap(true, Ordering::SeqCst) {
@@ -643,6 +668,7 @@ pub fn ensure_model_downloaded_bg() {
                     "[gigaam-asr] local model ready at {} (100% offline)",
                     final_path.display()
                 );
+                preload_session_bg();
             } else {
                 let _ = fs::remove_file(&part_model);
                 eprintln!("[gigaam-asr] extract failed; will retry on next restart");
