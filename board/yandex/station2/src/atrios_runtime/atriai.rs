@@ -2709,7 +2709,15 @@ fn send_phrase_to_server(
                 set_error("voice", None, "", 15);
                 return Ok((text, String::new(), false));
             }
+            // Counter-activation guard: only exact primary wake words ("атри", "а три", "atri")
+            // skip unconstrained verification. Fuzzy aliases like "арти" (which constrained grammar
+            // can map from "арбуз"/"армия"/"адрес") MUST pass unconstrained verification.
+            let exact_primary_wake = matches!(
+                text.trim().to_lowercase().as_str(),
+                "атри" | "а три" | "atri" | "алиса" | "alice"
+            );
             let confident_fast_wake = fast_match
+                && exact_primary_wake
                 && !had_unk
                 && is_wake_word_only(&text, wake_word)
                 && pcm.len() <= SR * 2 * 15 / 10;
