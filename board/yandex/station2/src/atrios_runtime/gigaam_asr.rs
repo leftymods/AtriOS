@@ -489,21 +489,23 @@ fn fbank_tables() -> &'static FbankTables {
 pub fn compute_log_mel_features(pcm: &[u8]) -> (Vec<f32>, usize) {
     let n_samples = pcm.len() / 2;
     let mut samples = Vec::with_capacity(n_samples.max(FRAME_LEN));
-    let mut peak = 0.0f32;
+    let mut sum_sq = 0.0f64;
     for chunk in pcm.chunks_exact(2) {
         let s = i16::from_le_bytes([chunk[0], chunk[1]]) as f32 / 32768.0;
-        let a = s.abs();
-        if a > peak {
-            peak = a;
-        }
+        sum_sq += (s as f64) * (s as f64);
         samples.push(s);
     }
-    // Gently normalize very quiet whispers into GigaAM's acoustic sweet spot
-    // without over-amplifying pure room silence.
-    if peak > 0.0025 && peak < 0.28 {
-        let gain = (0.40 / peak).min(24.0);
+    let rms = if !samples.is_empty() {
+        (sum_sq / samples.len() as f64).sqrt() as f32
+    } else {
+        0.0
+    };
+    // RMS-normalize quiet/off-axis whispers with soft-clipping (tanh) so a single
+    // plosive spike cannot starve the rest of the whispered word of gain.
+    if rms > 0.0012 && rms < 0.075 {
+        let gain = (0.095 / rms).min(36.0);
         for s in &mut samples {
-            *s = (*s * gain).clamp(-0.98, 0.98);
+            *s = (*s * gain).tanh();
         }
     }
     if samples.len() < FRAME_LEN {
@@ -546,7 +548,12 @@ pub fn compute_log_mel_features(pcm: &[u8]) -> (Vec<f32>, usize) {
     (feats, num_frames)
 }
 
-pub fn ctc_greedy_decode(logprobs: &[f32], t_out: usize, vocab: usize) -> String {
+pub fn ctc_greedy_decode_with_penalty(
+    logprobs: &[f32],
+    t_out: usize,
+    vocab: usize,
+    blank_penalty: f32,
+) -> String {
     let mut out = String::new();
     let mut prev: usize = usize::MAX;
     for t in 0..t_out {
@@ -554,8 +561,9 @@ pub fn ctc_greedy_decode(logprobs: &[f32], t_out: usize, vocab: usize) -> String
         let mut best_id = 0usize;
         let mut best_val = f32::NEG_INFINITY;
         for (i, &v) in row.iter().enumerate() {
-            if v > best_val {
-                best_val = v;
+            let score = if i == BLANK_ID { v - blank_penalty } else { v };
+            if score > best_val {
+                best_val = score;
                 best_id = i;
             }
         }
@@ -567,6 +575,16 @@ pub fn ctc_greedy_decode(logprobs: &[f32], t_out: usize, vocab: usize) -> String
         prev = best_id;
     }
     out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+pub fn ctc_greedy_decode(logprobs: &[f32], t_out: usize, vocab: usize) -> String {
+    let primary = ctc_greedy_decode_with_penalty(logprobs, t_out, vocab, 0.0);
+    if !primary.is_empty() {
+        return primary;
+    }
+    // Zero-cost second pass on the exact same logprobs tensor: recovers quiet/off-axis
+    // whispers (like "атри") where <blk> barely edged out the whispered phonemes.
+    ctc_greedy_decode_with_penalty(logprobs, t_out, vocab, 1.65)
 }
 
 fn model_path() -> PathBuf {
