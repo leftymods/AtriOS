@@ -233,8 +233,8 @@ mod tests {
         assert!(!atriai::should_retry_wake("атриум", true));
         assert!(!atriai::should_retry_wake("а три ум", true));
         assert!(!atriai::should_retry_wake("реклама", false));
-        assert_eq!(atriai::voice_endpoint_silence_ms(true, 500.0, false, 420.0), 128.0);
-        assert_eq!(atriai::voice_endpoint_silence_ms(false, 1800.0, false, 550.0), 350.0);
+        assert_eq!(atriai::voice_endpoint_silence_ms(true, 500.0, false, 420.0), 96.0);
+        assert_eq!(atriai::voice_endpoint_silence_ms(false, 1800.0, false, 550.0), 320.0);
     }
 
     #[test]

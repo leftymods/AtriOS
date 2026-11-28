@@ -630,13 +630,13 @@ pub(crate) fn should_retry_wake(text: &str, had_unk: bool) -> bool {
 
 pub(crate) fn voice_endpoint_silence_ms(wake_mode: bool, utterance_ms: f64, music_on: bool, configured: f64) -> f64 {
     if wake_mode && utterance_ms <= 900.0 {
-        if music_on { 160.0 } else { 128.0 }
+        if music_on { 128.0 } else { 96.0 }
     } else if wake_mode {
-        if music_on { 224.0 } else { 192.0 }
+        if music_on { 192.0 } else { 160.0 }
     } else if utterance_ms <= 960.0 {
-        192.0
+        160.0
     } else {
-        configured.clamp(240.0, 350.0)
+        configured.clamp(224.0, 320.0)
     }
 }
 
@@ -1690,7 +1690,7 @@ fn play_audio_bytes(
                         let rms = pcm16_rms(&chunk);
                         if !armed {
                             bg_rms = (bg_rms * 0.90 + rms * 0.10).clamp(180.0, 1600.0);
-                            if pre_roll.len() == 12 {
+                            if pre_roll.len() == 9 {
                                 pre_roll.pop_front();
                             }
                             pre_roll.push_back(chunk);
@@ -1720,7 +1720,7 @@ fn play_audio_bytes(
                                 bg_rms = (bg_rms * 0.94 + rms * 0.06).clamp(180.0, 1600.0);
                                 barge_hits = barge_hits.saturating_sub(1);
                             }
-                            if pre_roll.len() == 12 {
+                            if pre_roll.len() == 9 {
                                 pre_roll.pop_front();
                             }
                             pre_roll.push_back(chunk);
@@ -3353,7 +3353,7 @@ fn run_daemon() -> i32 {
         let mut utt_rms: Vec<f64> = Vec::new();
         let _silero_ready = crate::silero_vad::init();
         crate::silero_vad::reset();
-        let mut pre_roll: VecDeque<(Vec<u8>, f64)> = VecDeque::with_capacity(12);
+        let mut pre_roll: VecDeque<(Vec<u8>, f64)> = VecDeque::with_capacity(9);
         let mut speaking = false;
         let mut utt_peak = 0.0f64;
         let mut utt_peak_prob = 0.0f32;
@@ -3384,6 +3384,7 @@ fn run_daemon() -> i32 {
         let mut frame_idx = 0usize;
         let mut music_on = false;
         let mut partial_wake_hits: u8 = 0;
+        let mut partial_quick_hits: u8 = 0;
         let mut partial_wake_visual = false;
         let mut last_partial_text = String::new();
 
@@ -3446,7 +3447,7 @@ fn run_daemon() -> i32 {
             if warmup_frames > 0 {
                 warmup_frames -= 1;
                 vad.warmup(rms);
-                if pre_roll.len() == 12 {
+                if pre_roll.len() == 9 {
                     pre_roll.pop_front();
                 }
                 pre_roll.push_back((chunk, rms));
@@ -3471,7 +3472,7 @@ fn run_daemon() -> i32 {
                     } else {
                         vad.wait_quiet_frames = 10;
                     }
-                    if pre_roll.len() == 12 {
+                    if pre_roll.len() == 9 {
                         pre_roll.pop_front();
                     }
                     pre_roll.push_back((chunk, rms));
@@ -3499,6 +3500,7 @@ fn run_daemon() -> i32 {
                         utt_rms.push(rms);
                         silence_ms = 0.0;
                         partial_wake_hits = 0;
+                        partial_quick_hits = 0;
                         partial_wake_visual = false;
                         last_partial_text.clear();
                         voice_timing("vad_start");
@@ -3537,7 +3539,7 @@ fn run_daemon() -> i32 {
                         }
                     }
                 }
-                if pre_roll.len() == 12 {
+                if pre_roll.len() == 9 {
                     pre_roll.pop_front();
                 }
                 pre_roll.push_back((chunk, rms));
@@ -3564,6 +3566,11 @@ fn run_daemon() -> i32 {
                                     }
                                 } else {
                                     partial_wake_hits = 0;
+                                }
+                                if quick_command(&pt, &VoicePreferences::load()).is_some() {
+                                    partial_quick_hits = partial_quick_hits.saturating_add(1);
+                                } else {
+                                    partial_quick_hits = 0;
                                 }
                                 last_partial_text = pt;
                             }
@@ -3603,8 +3610,12 @@ fn run_daemon() -> i32 {
                         silence_ms,
                         music_on,
                     );
-                if early_wake {
-                    voice_timing("wake_early_endpoint");
+                let early_quick = mode == PipelineMode::WakeSpotter
+                    && buf.len() >= min_bytes
+                    && partial_quick_hits >= 2
+                    && silence_ms >= if music_on { 96.0 } else { 64.0 };
+                if early_wake || early_quick {
+                    voice_timing(if early_quick { "quick_early_endpoint" } else { "wake_early_endpoint" });
                     break;
                 }
                 let base_end_silence = if silero_prob.is_some() {

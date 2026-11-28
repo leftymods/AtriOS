@@ -545,28 +545,28 @@ pub struct SileroProfile {
 pub fn profile_for(is_wake_mode: bool, music_on: bool, active_silence_cfg: f64) -> SileroProfile {
     match (is_wake_mode, music_on) {
         (true, false) => SileroProfile {
-            start_prob: 0.42,
+            start_prob: 0.44,
             keep_prob: 0.20,
-            min_start_hits: 2,
-            end_silence_ms: 320.0,
+            min_start_hits: 1, // Silero v5 already has 64-sample context + LSTM history -> 32ms instant onset!
+            end_silence_ms: 224.0,
         },
         (true, true) => SileroProfile {
-            start_prob: 0.50,
+            start_prob: 0.52,
             keep_prob: 0.24,
-            min_start_hits: 2,
-            end_silence_ms: 340.0,
+            min_start_hits: 1,
+            end_silence_ms: 256.0,
         },
         (false, false) => SileroProfile {
             start_prob: 0.34,
             keep_prob: 0.16,
             min_start_hits: 1,
-            end_silence_ms: active_silence_cfg.clamp(380.0, 900.0),
+            end_silence_ms: active_silence_cfg.clamp(280.0, 650.0),
         },
         (false, true) => SileroProfile {
             start_prob: 0.40,
             keep_prob: 0.18,
             min_start_hits: 1,
-            end_silence_ms: active_silence_cfg.clamp(420.0, 950.0),
+            end_silence_ms: active_silence_cfg.clamp(320.0, 720.0),
         },
     }
 }
@@ -582,7 +582,7 @@ mod tests {
                 let p = profile_for(wake, music, 550.0);
                 assert!(p.keep_prob > 0.0 && p.keep_prob < p.start_prob && p.start_prob < 1.0);
                 assert!(p.min_start_hits >= 1);
-                assert!(p.end_silence_ms >= 300.0);
+                assert!(p.end_silence_ms >= 200.0);
             }
         }
     }
