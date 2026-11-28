@@ -343,6 +343,8 @@ fn get_ai_info() -> Json {
         ("tts_voice", Json::Str(tts_voice)),
         ("tts_emotion", Json::Str(tts_emotion)),
         ("voice_preferences", crate::atriai::voice_preferences_json()),
+        ("silero_vad", crate::silero_vad::status_json()),
+        ("ai_memory", crate::mini_brain::memory_status_json()),
         ("state", Json::Str(state)),
         ("last_asr", Json::Str(last_asr)),
         ("last_answer", Json::Str(last_answer)),
@@ -983,6 +985,15 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
         }
         "set_voice_preferences" => {
             crate::atriai::set_voice_preferences(map.get("preferences").ok_or("Missing voice preferences")?)?;
+            Ok(build_status_payload())
+        }
+        "set_silero_vad" => {
+            let enabled = map.get("enabled").and_then(Json::as_bool).ok_or("Missing enabled boolean")?;
+            crate::silero_vad::set_enabled(enabled)?;
+            Ok(build_status_payload())
+        }
+        "clear_ai_memory" => {
+            let _ = crate::mini_brain::clear_all_memory();
             Ok(build_status_payload())
         }
         "set_ai" => {

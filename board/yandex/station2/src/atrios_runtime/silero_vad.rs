@@ -11,7 +11,9 @@ use crate::sys::{dlopen, dlsym, RTLD_NOW};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
+use crate::json::{obj, Json};
 use std::time::Instant;
 
 const ORT_LIB_PATHS: &[&str] = &[
@@ -451,6 +453,10 @@ impl SileroEngine {
                 }
             }
 
+            let us = elapsed_us as u64;
+            LAST_HOP_US.store(us, Ordering::Relaxed);
+            TOTAL_HOPS.fetch_add(1, Ordering::Relaxed);
+            TOTAL_HOP_US.fetch_add(us, Ordering::Relaxed);
             // Watchdog: 8 consecutive hops > 25ms disables neural VAD cleanly
             if elapsed_us > 25_000 {
                 self.consec_overruns += 1;
@@ -504,6 +510,9 @@ impl SileroEngine {
 }
 
 static ENGINE: OnceLock<Option<Mutex<SileroEngine>>> = OnceLock::new();
+static LAST_HOP_US: AtomicU64 = AtomicU64::new(0);
+static TOTAL_HOPS: AtomicU64 = AtomicU64::new(0);
+static TOTAL_HOP_US: AtomicU64 = AtomicU64::new(0);
 
 pub fn init() -> bool {
     ENGINE
@@ -527,6 +536,57 @@ pub fn reset() {
 
 /// Feed a 16 kHz mono PCM16 chunk and return neural speech probability `p_speech ∈ [0.0, 1.0]`,
 /// or `None` if Silero VAD is unavailable/disabled (caller transparently uses RMS VAD).
+pub fn is_flag_enabled() -> bool {
+    !Path::new(DISABLE_FLAG_PATH).exists()
+        && std::env::var("ATRIOS_SILERO_VAD_DISABLE").as_deref() != Ok("1")
+}
+
+pub fn set_enabled(enabled: bool) -> Result<(), String> {
+    if enabled {
+        let _ = std::fs::remove_file(DISABLE_FLAG_PATH);
+        if let Some(Some(mtx)) = ENGINE.get() {
+            if let Ok(mut g) = mtx.lock() {
+                g.disabled = false;
+                g.consec_overruns = 0;
+                g.reset_state();
+            }
+        }
+    } else {
+        if let Some(parent) = Path::new(DISABLE_FLAG_PATH).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::write(DISABLE_FLAG_PATH, b"1
+").map_err(|e| e.to_string())?;
+        if let Some(Some(mtx)) = ENGINE.get() {
+            if let Ok(mut g) = mtx.lock() {
+                g.disabled = true;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn status_json() -> Json {
+    let model_present = MODEL_PATHS.iter().any(|p| Path::new(p).exists());
+    let enabled = is_flag_enabled();
+    let active = enabled
+        && model_present
+        && ENGINE
+            .get()
+            .and_then(|o| o.as_ref())
+            .and_then(|m| m.lock().ok().map(|g| !g.disabled))
+            .unwrap_or(model_present);
+    let hops = TOTAL_HOPS.load(Ordering::Relaxed);
+    let avg_us = if hops > 0 { TOTAL_HOP_US.load(Ordering::Relaxed) / hops } else { 0 };
+    obj(vec![
+        ("enabled", Json::Bool(enabled)),
+        ("active", Json::Bool(active)),
+        ("model_present", Json::Bool(model_present)),
+        ("last_hop_us", Json::Num(LAST_HOP_US.load(Ordering::Relaxed) as f64)),
+        ("avg_hop_us", Json::Num(avg_us as f64)),
+    ])
+}
+
 pub fn process_pcm16(pcm: &[u8]) -> Option<f32> {
     let mtx = ENGINE.get()?.as_ref()?;
     let mut g = mtx.lock().ok()?;

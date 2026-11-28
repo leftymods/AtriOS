@@ -480,6 +480,26 @@ pub fn forget_by_id(id: u64) -> bool {
     removed
 }
 
+pub fn memory_status_json() -> Json {
+    let (count, p1, p2) = {
+        let mut rt = brain().lock().unwrap();
+        ensure_loaded_locked(&mut rt);
+        (rt.memories.len(), rt.primary_path.clone(), rt.backup_path.clone())
+    };
+    let primary_ok = p1.exists() && fs::metadata(&p1).map(|m| m.len() >= 52).unwrap_or(false);
+    let backup_ok = p2.exists() && fs::metadata(&p2).map(|m| m.len() >= 52).unwrap_or(false);
+    let cfg = crate::atriai::load_config();
+    let server_sync = !cfg.server.trim().is_empty() && !cfg.token.trim().is_empty();
+    obj(vec![
+        ("count", Json::Num(count as f64)),
+        ("max_entries", Json::Num(MAX_MEMORIES as f64)),
+        ("primary_ok", Json::Bool(primary_ok)),
+        ("backup_ok", Json::Bool(backup_ok)),
+        ("encrypted", Json::Bool(true)),
+        ("server_sync", Json::Bool(server_sync)),
+    ])
+}
+
 pub fn clear_all_memory() -> usize {
     let key = derive_ai_memory_key();
     let (count, blob_opt) = {
