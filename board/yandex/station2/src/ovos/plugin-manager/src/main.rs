@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::sync::{Arc, Mutex};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs::{self, File, OpenOptions};
@@ -17,6 +18,8 @@ use tracing::{error, info, warn};
 const REGISTRY_DIR: &str = "/usr/share/atrios/ovos/plugins.d";
 const PLUGIN_DIR: &str = "/usr/lib/atrios/ovos/plugins";
 const STATE_FILE: &str = "/var/lib/atrios/ovos/plugins-enabled.json";
+const SETTINGS_FILE: &str = "/var/lib/atrios/ovos/plugin-settings.json";
+const RUNTIME_STATUS_FILE: &str = "/var/run/atrios/ovos-plugins-status.json";
 const BUS_HOST: &str = "127.0.0.1";
 const BUS_PORT: u16 = 8181;
 const PLUGIN_API_VERSION: u32 = 1;
@@ -55,6 +58,108 @@ struct Plugin {
     manifest: Manifest,
     binary: PathBuf,
     enabled: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+struct RuntimePluginStatus {
+    running: bool,
+    restarts: u32,
+    #[serde(default)]
+    last_error: String,
+    #[serde(default)]
+    updated_unix: u64,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct PluginSettingsStore {
+    schema: u32,
+    #[serde(default)]
+    plugins: BTreeMap<String, BTreeMap<String, serde_json::Value>>,
+}
+
+fn validate_manifest_fields(manifest: &Manifest) -> Result<(), String> {
+    if manifest.schema != 1 || manifest.api_version != PLUGIN_API_VERSION {
+        return Err("unsupported schema or plugin API version".into());
+    }
+    if !valid_token(&manifest.id, 64)
+        || manifest.name.trim().is_empty()
+        || manifest.name.len() > 128
+        || manifest.version.trim().is_empty()
+        || manifest.version.len() > 64
+    {
+        return Err("invalid plugin metadata".into());
+    }
+    if !valid_token(&manifest.binary, 128) || manifest.binary == "." || manifest.binary == ".." {
+        return Err("binary must be a plain filename, not a path".into());
+    }
+    if manifest.capabilities.iter().any(|cap| !ALLOWED_CAPABILITIES.contains(&cap.as_str())) {
+        return Err("unknown capability".into());
+    }
+    let unique_caps: BTreeSet<_> = manifest.capabilities.iter().collect();
+    if unique_caps.len() != manifest.capabilities.len() {
+        return Err("duplicate capability".into());
+    }
+    Ok(())
+}
+
+fn read_runtime_status() -> BTreeMap<String, RuntimePluginStatus> {
+    fs::read_to_string(RUNTIME_STATUS_FILE)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
+}
+
+fn write_runtime_status(map: &BTreeMap<String, RuntimePluginStatus>) {
+    let _ = fs::create_dir_all("/var/run/atrios");
+    if let Ok(json) = serde_json::to_string_pretty(map) {
+        let tmp = format!("{RUNTIME_STATUS_FILE}.tmp");
+        if fs::write(&tmp, json).is_ok() {
+            let _ = fs::rename(&tmp, RUNTIME_STATUS_FILE);
+        }
+    }
+}
+
+fn read_settings() -> PluginSettingsStore {
+    fs::read_to_string(SETTINGS_FILE)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or(PluginSettingsStore { schema: 1, plugins: BTreeMap::new() })
+}
+
+fn write_settings(store: &PluginSettingsStore) -> AppResult<()> {
+    let parent = state_directory(true)?.ok_or("failed to create plugin state directory")?;
+    let path = parent.join("plugin-settings.json");
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let temp = parent.join(format!(".plugin-settings.{}.{}.tmp", std::process::id(), nonce));
+    let mut file = OpenOptions::new().write(true).create_new(true).mode(0o600).open(&temp)?;
+    serde_json::to_writer(&mut file, store)?;
+    file.write_all(b"
+")?;
+    file.sync_all()?;
+    fs::rename(&temp, path)?;
+    File::open(parent)?.sync_all()?;
+    Ok(())
+}
+
+fn set_plugin_setting(id: &str, key: &str, raw_value: &str) -> AppResult<()> {
+    if !valid_token(id, 64) { return Err("invalid plugin id".into()); }
+    if !valid_token(key, 64) { return Err("invalid setting key".into()); }
+    if raw_value.len() > 256 { return Err("setting value too long".into()); }
+    let mut store = read_settings();
+    store.schema = 1;
+    let parsed: serde_json::Value = match raw_value {
+        "true" => serde_json::Value::Bool(true),
+        "false" => serde_json::Value::Bool(false),
+        _ => if let Ok(n) = raw_value.parse::<i64>() {
+            serde_json::Value::Number(n.into())
+        } else {
+            serde_json::Value::String(raw_value.to_string())
+        },
+    };
+    store.plugins.entry(id.to_string()).or_default().insert(key.to_string(), parsed);
+    write_settings(&store)?;
+    println!("Updated setting {id}.{key}={raw_value}");
+    Ok(())
 }
 
 fn valid_token(value: &str, max: usize) -> bool {
@@ -272,14 +377,24 @@ fn print_plugins(plugins: &[Plugin]) {
 }
 
 fn print_plugins_json(plugins: &[Plugin]) {
-    let entries: Vec<_> = plugins.iter().map(|plugin| serde_json::json!({
-        "id": plugin.manifest.id,
-        "name": plugin.manifest.name,
-        "version": plugin.manifest.version,
-        "api_version": plugin.manifest.api_version,
-        "capabilities": plugin.manifest.capabilities,
-        "enabled": plugin.enabled
-    })).collect();
+    let runtime = read_runtime_status();
+    let settings = read_settings();
+    let entries: Vec<_> = plugins.iter().map(|plugin| {
+        let rt = runtime.get(&plugin.manifest.id).cloned().unwrap_or_default();
+        let cfg = settings.plugins.get(&plugin.manifest.id).cloned().unwrap_or_default();
+        serde_json::json!({
+            "id": plugin.manifest.id,
+            "name": plugin.manifest.name,
+            "version": plugin.manifest.version,
+            "api_version": plugin.manifest.api_version,
+            "capabilities": plugin.manifest.capabilities,
+            "enabled": plugin.enabled,
+            "running": rt.running,
+            "restarts": rt.restarts,
+            "last_error": rt.last_error,
+            "settings": cfg
+        })
+    }).collect();
     println!("{}", serde_json::json!({
         "type": "ovos_plugins",
         "available": true,
@@ -305,7 +420,37 @@ async fn wait_for_bus() -> AppResult<()> {
     Err("OVOS MessageBus did not become healthy on 127.0.0.1:8181".into())
 }
 
-async fn supervise_plugin(plugin: Plugin, mut shutdown: watch::Receiver<bool>) {
+fn update_status(
+    state: &Arc<Mutex<BTreeMap<String, RuntimePluginStatus>>>,
+    id: &str,
+    running: bool,
+    inc_restart: bool,
+    err: Option<String>,
+) {
+    if let Ok(mut guard) = state.lock() {
+        let entry = guard.entry(id.to_string()).or_default();
+        entry.running = running;
+        if inc_restart {
+            entry.restarts = entry.restarts.saturating_add(1);
+        }
+        if let Some(msg) = err {
+            entry.last_error = msg;
+        } else if running {
+            entry.last_error.clear();
+        }
+        entry.updated_unix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        write_runtime_status(&guard);
+    }
+}
+
+async fn supervise_plugin(
+    plugin: Plugin,
+    mut shutdown: watch::Receiver<bool>,
+    status_map: Arc<Mutex<BTreeMap<String, RuntimePluginStatus>>>,
+) {
     let mut delay = 1u64;
     loop {
         if *shutdown.borrow() { return; }
@@ -316,6 +461,7 @@ async fn supervise_plugin(plugin: Plugin, mut shutdown: watch::Receiver<bool>) {
             .env("OVOS_BUS_PORT", BUS_PORT.to_string())
             .env("OVOS_BUS_ROUTE", "/core")
             .env("OVOS_PLUGIN_CAPABILITIES", plugin.manifest.capabilities.join(","))
+            .env("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
             .current_dir("/")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::inherit())
@@ -324,10 +470,12 @@ async fn supervise_plugin(plugin: Plugin, mut shutdown: watch::Receiver<bool>) {
         let mut child = match command.spawn() {
             Ok(child) => {
                 info!(plugin = %plugin.manifest.id, "started OVOS Rust plugin");
+                update_status(&status_map, &plugin.manifest.id, true, false, None);
                 child
             }
             Err(error) => {
                 error!(plugin = %plugin.manifest.id, %error, "failed to start plugin");
+                update_status(&status_map, &plugin.manifest.id, false, true, Some(format!("spawn failed: {error}")));
                 tokio::select! {
                     _ = sleep(Duration::from_secs(delay)) => {},
                     result = shutdown.changed() => { if result.is_ok() && *shutdown.borrow() { return; } }
@@ -340,14 +488,21 @@ async fn supervise_plugin(plugin: Plugin, mut shutdown: watch::Receiver<bool>) {
         tokio::select! {
             result = child.wait() => {
                 match result {
-                    Ok(status) => warn!(plugin = %plugin.manifest.id, %status, "plugin exited; restarting"),
-                    Err(error) => error!(plugin = %plugin.manifest.id, %error, "failed waiting for plugin"),
+                    Ok(status) => {
+                        warn!(plugin = %plugin.manifest.id, %status, "plugin exited; restarting");
+                        update_status(&status_map, &plugin.manifest.id, false, true, Some(format!("exited: {status}")));
+                    }
+                    Err(error) => {
+                        error!(plugin = %plugin.manifest.id, %error, "failed waiting for plugin");
+                        update_status(&status_map, &plugin.manifest.id, false, true, Some(format!("wait failed: {error}")));
+                    }
                 }
             }
             result = shutdown.changed() => {
                 if result.is_ok() && *shutdown.borrow() {
                     let _ = child.kill().await;
                     let _ = child.wait().await;
+                    update_status(&status_map, &plugin.manifest.id, false, false, None);
                     return;
                 }
             }
@@ -382,8 +537,9 @@ async fn run_daemon() -> AppResult<()> {
     let mut active = load_registry()?.into_iter().filter(|plugin| plugin.enabled).collect::<Vec<_>>();
     info!(count = active.len(), "OVOS Rust plugin supervisor ready");
     let (mut shutdown_tx, initial_rx) = watch::channel(false);
+    let status_map = Arc::new(Mutex::new(BTreeMap::<String, RuntimePluginStatus>::new()));
     let mut tasks = JoinSet::new();
-    for plugin in &active { tasks.spawn(supervise_plugin(plugin.clone(), initial_rx.clone())); }
+    for plugin in &active { tasks.spawn(supervise_plugin(plugin.clone(), initial_rx.clone(), Arc::clone(&status_map))); }
 
     let shutdown = wait_for_shutdown();
     tokio::pin!(shutdown);
@@ -410,7 +566,7 @@ async fn run_daemon() -> AppResult<()> {
                             while tasks.join_next().await.is_some() {}
                             let (new_tx, new_rx) = watch::channel(false);
                             for plugin in &current {
-                                tasks.spawn(supervise_plugin(plugin.clone(), new_rx.clone()));
+                                tasks.spawn(supervise_plugin(plugin.clone(), new_rx.clone(), Arc::clone(&status_map)));
                             }
                             active = current;
                             shutdown_tx = new_tx;
@@ -446,9 +602,70 @@ async fn main() -> AppResult<()> {
         }
         [arg, id] if arg == "--enable" || arg == "--disable" =>
             change_state(id, arg == "--enable"),
+        [arg, id, key, val] if arg == "--set-setting" =>
+            set_plugin_setting(id, key, val),
         _ => {
             eprintln!("Usage: atrios-ovos-plugin-manager [run|--list|--validate|--enable ID|--disable ID]");
             std::process::exit(2);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_manifest() -> Manifest {
+        Manifest {
+            schema: 1,
+            id: "ovos-dinkum-listener".into(),
+            name: "OVOS Dinkum Listener".into(),
+            version: "0.1.0".into(),
+            api_version: 1,
+            binary: "ovos-dinkum-listener".into(),
+            capabilities: vec!["audio.capture".into(), "vad".into(), "wake_word".into(), "stt".into()],
+            default_enabled: true,
+        }
+    }
+
+    #[test]
+    fn manifest_validation_accepts_valid_and_rejects_bad_fields() {
+        assert!(validate_manifest_fields(&sample_manifest()).is_ok());
+
+        let mut bad_schema = sample_manifest();
+        bad_schema.schema = 2;
+        assert!(validate_manifest_fields(&bad_schema).is_err());
+
+        let mut bad_bin = sample_manifest();
+        bad_bin.binary = "../evil".into();
+        assert!(validate_manifest_fields(&bad_bin).is_err());
+
+        let mut bad_cap = sample_manifest();
+        bad_cap.capabilities.push("shell.exec".into());
+        assert!(validate_manifest_fields(&bad_cap).is_err());
+
+        let mut dup_cap = sample_manifest();
+        dup_cap.capabilities.push("vad".into());
+        assert!(validate_manifest_fields(&dup_cap).is_err());
+    }
+
+    #[test]
+    fn status_tracker_records_errors_and_clears_on_recovery() {
+        let map = Arc::new(Mutex::new(BTreeMap::new()));
+        update_status(&map, "ovos-tts-audio", false, true, Some("aplay missing".into()));
+        {
+            let g = map.lock().unwrap();
+            let s = &g["ovos-tts-audio"];
+            assert!(!s.running);
+            assert_eq!(s.restarts, 1);
+            assert_eq!(s.last_error, "aplay missing");
+        }
+        update_status(&map, "ovos-tts-audio", true, false, None);
+        {
+            let g = map.lock().unwrap();
+            let s = &g["ovos-tts-audio"];
+            assert!(s.running);
+            assert!(s.last_error.is_empty());
         }
     }
 }
