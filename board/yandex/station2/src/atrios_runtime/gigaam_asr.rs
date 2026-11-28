@@ -615,7 +615,7 @@ pub fn ensure_model_downloaded_bg() {
         let part_arc = dir.join("gigaam.tar.bz2.part");
         println!("[gigaam-asr] downloading local Russian neural whisper model (~226 MB) once...");
         let dl_ok = Command::new("wget")
-            .args(["-q", "-T", "60", "-O"])
+            .args(["-q", "-O"])
             .arg(&part_arc)
             .arg(MODEL_ARCHIVE_URL)
             .status()
@@ -623,12 +623,14 @@ pub fn ensure_model_downloaded_bg() {
             .unwrap_or(false);
         if dl_ok {
             let extract_cmd = format!(
-                "tar -xOjf {} {} > {} && mv -f {} {}",
+                "tar -xjf {} -C {} {} && mv -f {}/{} {} && rm -rf {}/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19",
                 part_arc.display(),
+                dir.display(),
                 MODEL_ARCHIVE_MEMBER,
-                part_model.display(),
-                part_model.display(),
-                final_path.display()
+                dir.display(),
+                MODEL_ARCHIVE_MEMBER,
+                final_path.display(),
+                dir.display()
             );
             let ext_ok = Command::new("sh")
                 .args(["-c", &extract_cmd])
