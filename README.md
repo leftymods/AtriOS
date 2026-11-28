@@ -76,5 +76,6 @@ make verify
 
 - [Устройства и добавление профиля платы](DEVICES.md)
 - [Драйверы и статусы поддержки](DRIVERS.md)
+- [OVOS Rust runtime и формат плагинов](board/yandex/station2/src/ovos/README.md)
 - [История версий](CHANGELOG.md)
 - [Готовые релизы](https://github.com/leftymods/AtriOS/releases)

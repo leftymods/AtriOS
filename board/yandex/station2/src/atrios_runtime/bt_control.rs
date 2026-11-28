@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::os::raw::{c_int, c_void};
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -695,6 +696,74 @@ fn truncate_utf8(text: &mut String, max_bytes: usize) {
     text.truncate(end);
 }
 
+const OVOS_PLUGIN_MANAGER: &str = "/usr/lib/atrios/atrios-ovos-plugin-manager";
+
+fn ovos_plugin_manager_ready() -> bool {
+    let path = Path::new(OVOS_PLUGIN_MANAGER);
+    let Ok(metadata) = fs::symlink_metadata(path) else { return false; };
+    metadata.file_type().is_file()
+        && metadata.uid() == 0
+        && metadata.mode() & 0o022 == 0
+        && metadata.mode() & 0o111 != 0
+}
+
+fn get_ovos_plugins() -> Result<Json, String> {
+    if !ovos_plugin_manager_ready() {
+        return Ok(obj(vec![
+            ("type", Json::Str("ovos_plugins".into())),
+            ("available", Json::Bool(false)),
+            ("plugins", Json::Arr(Vec::new())),
+        ]));
+    }
+    let output = Command::new(OVOS_PLUGIN_MANAGER)
+        .args(["--list", "--json"])
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| format!("Could not read the OVOS plugin registry: {error}"))?;
+    if !output.status.success() {
+        return Err("The OVOS plugin registry is invalid".into());
+    }
+    if output.stdout.len() > 32 * 1024 {
+        return Err("The OVOS plugin list exceeds the response size limit".into());
+    }
+    let text = std::str::from_utf8(&output.stdout)
+        .map_err(|_| "The OVOS plugin list is not valid UTF-8")?;
+    Json::parse(text.trim())
+}
+
+fn set_ovos_plugin(
+    command: &BTreeMap<String, Json>,
+    connection_id: Option<&str>,
+) -> Result<Json, String> {
+    if connection_id.is_none() {
+        return Err("Plugin settings can only be changed over a local Bluetooth connection".into());
+    }
+    let id = command.get("id").and_then(Json::as_str).unwrap_or("");
+    if id.is_empty() || id.len() > 64
+        || !id.as_bytes()[0].is_ascii_alphanumeric()
+        || !id.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')) {
+        return Err("Invalid OVOS plugin id".into());
+    }
+    let enabled = match command.get("enabled") {
+        Some(Json::Bool(value)) => *value,
+        _ => return Err("Missing plugin enabled state".into()),
+    };
+    if !ovos_plugin_manager_ready() {
+        return Err("OVOS plugin support is not installed on this firmware".into());
+    }
+    let action = if enabled { "--enable" } else { "--disable" };
+    let output = Command::new(OVOS_PLUGIN_MANAGER)
+        .arg(action)
+        .arg(id)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| format!("Could not update the OVOS plugin: {error}"))?;
+    if !output.status.success() {
+        return Err("The OVOS plugin could not be changed; it may not be installed".into());
+    }
+    get_ovos_plugins()
+}
+
 fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -> Result<Json, String> {
     let Some(map) = cmd_obj.as_obj() else {
         return Err("Command must be a JSON object".into());
@@ -706,6 +775,8 @@ fn process_command_for_connection(cmd_obj: &Json, connection_id: Option<&str>) -
         .unwrap_or("");
     match cmd {
         "get_status" | "status" => Ok(build_status_payload()),
+        "get_ovos_plugins" => get_ovos_plugins(),
+        "set_ovos_plugin" => set_ovos_plugin(map, connection_id),
         "get_relay_info" => {
             let cfg = crate::atriai::load_config();
             let id_pub = crate::e2ee::ensure_station_identity_pub_b64().unwrap_or_default();

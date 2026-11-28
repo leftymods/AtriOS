@@ -1,0 +1,9 @@
+OVOS Rust plugins are packaged in signed OTA releases.
+
+Each plugin needs a root-owned AArch64 executable in:
+  /usr/lib/atrios/ovos/plugins/
+
+and a root-owned JSON manifest in:
+  /usr/share/atrios/ovos/plugins.d/
+
+The station does not download or execute plugins from the network.

@@ -27,6 +27,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross libbluetooth-dev libsbc-dev openssl python3
           rustup target add aarch64-unknown-linux-gnu
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+            cargo build --manifest-path board/yandex/station2/src/ovos/Cargo.toml \
+              --workspace --release --locked --target aarch64-unknown-linux-gnu
       - name: Cross-compile aarch64 runtime, mp3dec, and aec
         run: |
           set -euo pipefail
@@ -40,6 +43,25 @@ jobs:
           aarch64-linux-gnu-gcc -O2 -I "$RUNNER_TEMP/bt-headers" bt_speaker_daemon.c -ldl -o "$RUNNER_TEMP/bt-speaker-daemon"
           cd "$GITHUB_WORKSPACE"
           AUDIO_NS_ENGINE=bnr bash scripts/build_audio_dsp.sh --board yndxsttion53 --output "$RUNNER_TEMP/atri-aec" --stage-dir "$RUNNER_TEMP/stage"
+      - name: Stage OVOS Rust services and plugin metadata
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/stage"
+          BIN="board/yandex/station2/src/ovos/target/aarch64-unknown-linux-gnu/release"
+          mkdir -p "$STAGE/usr/lib/atrios/ovos/plugins" \
+            "$STAGE/usr/share/atrios/ovos/plugins.d" \
+            "$STAGE/usr/share/licenses/atrios/ovos-messagebus" \
+            "$STAGE/usr/share/doc/atrios/ovos" "$STAGE/etc/init.d"
+          install -m 755 "$BIN/ovos_messagebus" "$STAGE/usr/lib/atrios/ovos-messagebus"
+          install -m 755 "$BIN/atrios-ovos-plugin-manager" "$STAGE/usr/lib/atrios/atrios-ovos-plugin-manager"
+          install -m 755 board/yandex/station2/rootfs_overlay/etc/init.d/S58ovos-messagebus "$STAGE/etc/init.d/S58ovos-messagebus"
+          install -m 755 board/yandex/station2/rootfs_overlay/etc/init.d/S59ovos-plugin-manager "$STAGE/etc/init.d/S59ovos-plugin-manager"
+          install -m 644 board/yandex/station2/src/ovos/plugins.d.README "$STAGE/usr/share/atrios/ovos/plugins.d/README"
+          install -m 644 board/yandex/station2/src/ovos/messagebus/LICENSE "$STAGE/usr/share/licenses/atrios/ovos-messagebus/LICENSE"
+          install -m 644 board/yandex/station2/src/ovos/README.md "$STAGE/usr/share/doc/atrios/ovos/README.md"
+          install -m 644 board/yandex/station2/src/ovos/PLUGIN_MANIFEST.md "$STAGE/usr/share/doc/atrios/ovos/PLUGIN_MANIFEST.md"
+          install -m 644 board/yandex/station2/src/ovos/messagebus/UPSTREAM.md "$STAGE/usr/share/doc/atrios/ovos/UPSTREAM.md"
+
       - name: Build RSA-signed OTA bundle for yndxsttion53
         env:
           OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}

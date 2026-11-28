@@ -49,6 +49,17 @@ prune_disabled_rootfs_modules() {
         _mod_rm "$stage_dir/usr/lib/atrios/atriai"
     fi
 
+    if _mod_is_false "${MOD_OVOS:-false}"; then
+        _mod_rm "$stage_dir/etc/init.d/S58ovos-messagebus"
+        _mod_rm "$stage_dir/etc/init.d/S59ovos-plugin-manager"
+        _mod_rm "$stage_dir/usr/lib/atrios/ovos-messagebus"
+        _mod_rm "$stage_dir/usr/lib/atrios/atrios-ovos-plugin-manager"
+        _mod_rm "$stage_dir/usr/lib/atrios/ovos"
+        _mod_rm "$stage_dir/usr/share/atrios/ovos"
+        _mod_rm "$stage_dir/usr/share/doc/atrios/ovos"
+        _mod_rm "$stage_dir/usr/share/licenses/atrios/ovos-messagebus"
+    fi
+
     if _mod_is_false "${MOD_YMUSIC:-true}"; then
         _mod_rm "$stage_dir/usr/lib/atrios/ymusic"
         _mod_rm "$stage_dir/usr/bin/atri-mp3dec"
@@ -158,6 +169,7 @@ write_modules_manifest() {
   },
   "modules": {
     "atriai": ${MOD_ATRIAI:-true},
+      "ovos": ${MOD_OVOS:-false},
     "ymusic": ${MOD_YMUSIC:-true},
     "bluetooth": ${MOD_BLUETOOTH:-true},
     "pipewire": ${MOD_PIPEWIRE:-true},

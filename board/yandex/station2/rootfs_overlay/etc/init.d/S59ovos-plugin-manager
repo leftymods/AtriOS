@@ -1,0 +1,38 @@
+#!/bin/sh
+# Start root-owned Rust plugins shipped by a signed OTA package.
+
+BIN=/usr/lib/atrios/atrios-ovos-plugin-manager
+PID=/var/run/atrios/ovos-plugin-manager.pid
+LOG=/var/log/atrios-ovos-plugin-manager.log
+
+case "$1" in
+  start)
+    [ -x "$BIN" ] || exit 0
+    mkdir -p /var/run/atrios /var/log
+    if [ -s "$PID" ]; then
+      old_pid=$(cat "$PID" 2>/dev/null)
+      case "$old_pid" in ''|*[!0-9]*|1) rm -f "$PID" ;; *)
+        if kill -0 "$old_pid" 2>/dev/null; then exit 0; fi
+        rm -f "$PID"
+      esac
+    fi
+    "$BIN" run >>"$LOG" 2>&1 &
+    echo "$!" >"$PID"
+    ;;
+  stop)
+    if [ -s "$PID" ]; then
+      old_pid=$(cat "$PID" 2>/dev/null)
+      case "$old_pid" in ''|*[!0-9]*|1) ;; *) kill "$old_pid" 2>/dev/null || true ;; esac
+      rm -f "$PID"
+    fi
+    ;;
+  restart)
+    "$0" stop
+    "$0" start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 1
+    ;;
+esac
+exit 0

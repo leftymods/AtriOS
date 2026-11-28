@@ -102,7 +102,16 @@ if [ "$SKIP_RUNTIME" -eq 0 ] && command -v rustc >/dev/null 2>&1; then
     echo "[modules] built atrios-runtime ($(stat -c %s "$STAGE_DIR/usr/lib/atrios/atrios-runtime") bytes)"
 fi
 
-# 4. Prune disabled modules and write manifests
+# 4. Build the OVOS Rust MessageBus and isolated Rust plugin supervisor.
+if [ "${MOD_OVOS:-false}" = "true" ]; then
+    OVOS_ARGS=(--stage-dir "$STAGE_DIR")
+    [ "$NATIVE_BUILD" -eq 1 ] && OVOS_ARGS+=(--native)
+    bash "$PROJECT_ROOT/scripts/build_ovos_runtime.sh" "${OVOS_ARGS[@]}"
+else
+    echo "[modules] skipped OVOS Rust services (MOD_OVOS=${MOD_OVOS:-false})"
+fi
+
+# 5. Prune disabled modules and write manifests
 prune_disabled_rootfs_modules "$STAGE_DIR"
 write_hardware_manifest "$STAGE_DIR"
 write_modules_manifest "$STAGE_DIR"

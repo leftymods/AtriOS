@@ -1,0 +1,39 @@
+#!/bin/sh
+# Start the local OVOS-compatible WebSocket message bus on loopback only.
+
+BIN=/usr/lib/atrios/ovos-messagebus
+PID=/var/run/atrios/ovos-messagebus.pid
+LOG=/var/log/atrios-ovos-messagebus.log
+
+case "$1" in
+  start)
+    [ -x "$BIN" ] || exit 0
+    mkdir -p /var/run/atrios /var/log
+    if [ -s "$PID" ]; then
+      old_pid=$(cat "$PID" 2>/dev/null)
+      case "$old_pid" in ''|*[!0-9]*|1) rm -f "$PID" ;; *)
+        if kill -0 "$old_pid" 2>/dev/null; then exit 0; fi
+        rm -f "$PID"
+      esac
+    fi
+    OVOS_BUS_HOST=127.0.0.1 OVOS_BUS_PORT=8181 OVOS_BUS_ROUTE=/core \
+      OVOS_BUS_HEALTH_ENDPOINT=true RUST_LOG=info "$BIN" >>"$LOG" 2>&1 &
+    echo "$!" >"$PID"
+    ;;
+  stop)
+    if [ -s "$PID" ]; then
+      old_pid=$(cat "$PID" 2>/dev/null)
+      case "$old_pid" in ''|*[!0-9]*|1) ;; *) kill "$old_pid" 2>/dev/null || true ;; esac
+      rm -f "$PID"
+    fi
+    ;;
+  restart)
+    "$0" stop
+    "$0" start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 1
+    ;;
+esac
+exit 0
