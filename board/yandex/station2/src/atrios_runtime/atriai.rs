@@ -3461,7 +3461,11 @@ fn run_daemon() -> i32 {
                 vad.thresholds(mode, vad_thr, cfg.silence_ms, music_on);
             last_start_thr = start_thr;
             let silero_prob = crate::silero_vad::process_pcm16(&chunk);
-            let sp = crate::silero_vad::profile_for(mode == PipelineMode::WakeSpotter, music_on, cfg.silence_ms);
+            let mut sp = crate::silero_vad::profile_for(mode == PipelineMode::WakeSpotter, music_on, cfg.silence_ms);
+            if !music_on && VoicePreferences::load().enabled("quiet_reply") {
+                sp.start_prob = (sp.start_prob - 0.08).max(0.28);
+                sp.keep_prob = (sp.keep_prob - 0.04).max(0.14);
+            }
 
             if !speaking {
                 if vad.wait_quiet_frames > 0 && !force_active {

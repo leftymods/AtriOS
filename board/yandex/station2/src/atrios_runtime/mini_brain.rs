@@ -990,7 +990,6 @@ pub fn try_handle_local_brain(clean_query: &str) -> BrainOutcome {
 
     // 8b. Smart routines & voice control over Room, Weather, MusicQuality, and VoicePreferences
     if norm == "доброе утро" || norm == "сводка дня" || norm == "утренняя сводка" {
-        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(false))]));
         let mut parts = vec!["Доброе утро!".to_string()];
         if let Ok(fc) = crate::weather::forecast(None) {
             parts.push(fc);
@@ -1014,26 +1013,17 @@ pub fn try_handle_local_brain(clean_query: &str) -> BrainOutcome {
         return BrainOutcome::Handled { answer: Some(ans), chime: None };
     }
 
-    if norm == "спокойной ночи" || norm == "я ложусь спать" || norm == "ночной режим" {
-        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(true))]));
+    if norm == "спокойной ночи" || norm == "я ложусь спать" {
         let cur_vol = crate::bt_control::get_current_volume();
         if cur_vol > 20 {
             crate::bt_control::set_system_volume(18);
         }
-        let ans = "Спокойной ночи. Включила тихий режим.".to_string();
+        let ans = "Спокойной ночи.".to_string();
         record_dialog_turn(clean_query, &ans);
         return BrainOutcome::Handled { answer: Some(ans), chime: None };
     }
 
-    // VoicePreferencesCard voice controls
-    if norm == "включи шепот" || norm == "включи тихий режим" || norm == "включи тихий ответ" {
-        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(true))]));
-        return BrainOutcome::Handled { answer: Some("Тихий режим включён.".into()), chime: Some("ok") };
-    }
-    if norm == "выключи шепот" || norm == "выключи тихий режим" || norm == "выключи тихий ответ" || norm == "говори нормально" {
-        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(false))]));
-        return BrainOutcome::Handled { answer: Some("Тихий режим выключен.".into()), chime: Some("ok") };
-    }
+    // VoicePreferencesCard voice controls (quiet_reply / whisper stays strictly app-controlled!)
     if norm == "включи адаптивную громкость" {
         let _ = crate::atriai::set_voice_preferences(&obj(vec![("adaptive_reply_volume", Json::Bool(true))]));
         return BrainOutcome::Handled { answer: Some("Адаптивная громкость включена.".into()), chime: Some("ok") };
