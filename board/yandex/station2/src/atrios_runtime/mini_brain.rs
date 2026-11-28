@@ -576,8 +576,15 @@ pub fn build_chat_context_json(query: &str) -> Json {
 
     let ym = crate::ymusic::read_status();
     let vol = crate::bt_control::get_current_volume();
+    let room = fs::read_to_string("/var/lib/atrios/room").unwrap_or_default().trim().to_string();
+    let weather_cfg = crate::weather::settings();
+    let weather_city = weather_cfg.get_str("city").unwrap_or("").to_string();
     let device = obj(vec![
         ("volume", Json::Num(vol as f64)),
+        ("room", Json::Str(room)),
+        ("weather_city", Json::Str(weather_city)),
+        ("music_quality", Json::Str(crate::ymusic::music_quality().into())),
+        ("voice_preferences", crate::atriai::voice_preferences_json()),
         ("music_state", Json::Str(ym.state)),
         ("track_title", Json::Str(ym.title)),
         ("track_artist", Json::Str(ym.artist)),
@@ -981,6 +988,131 @@ pub fn try_handle_local_brain(clean_query: &str) -> BrainOutcome {
         };
     }
 
+    // 8b. Smart routines & voice control over Room, Weather, MusicQuality, and VoicePreferences
+    if norm == "доброе утро" || norm == "сводка дня" || norm == "утренняя сводка" {
+        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(false))]));
+        let mut parts = vec!["Доброе утро!".to_string()];
+        if let Ok(fc) = crate::weather::forecast(None) {
+            parts.push(fc);
+        }
+        let notes: Vec<String> = {
+            let mut rt = brain().lock().unwrap();
+            ensure_loaded_locked(&mut rt);
+            rt.memories
+                .iter()
+                .filter(|m| m.kind == "note")
+                .rev()
+                .take(2)
+                .map(|m| m.text.clone())
+                .collect()
+        };
+        if !notes.is_empty() {
+            parts.push(format!("Напоминаю: {}.", notes.join("; ")));
+        }
+        let ans = parts.join(" ");
+        record_dialog_turn(clean_query, &ans);
+        return BrainOutcome::Handled { answer: Some(ans), chime: None };
+    }
+
+    if norm == "спокойной ночи" || norm == "я ложусь спать" || norm == "ночной режим" {
+        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(true))]));
+        let cur_vol = crate::bt_control::get_current_volume();
+        if cur_vol > 20 {
+            crate::bt_control::set_system_volume(18);
+        }
+        let ans = "Спокойной ночи. Включила тихий режим.".to_string();
+        record_dialog_turn(clean_query, &ans);
+        return BrainOutcome::Handled { answer: Some(ans), chime: None };
+    }
+
+    // VoicePreferencesCard voice controls
+    if norm == "включи шепот" || norm == "включи тихий режим" || norm == "включи тихий ответ" {
+        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(true))]));
+        return BrainOutcome::Handled { answer: Some("Тихий режим включён.".into()), chime: Some("ok") };
+    }
+    if norm == "выключи шепот" || norm == "выключи тихий режим" || norm == "выключи тихий ответ" || norm == "говори нормально" {
+        let _ = crate::atriai::set_voice_preferences(&obj(vec![("quiet_reply", Json::Bool(false))]));
+        return BrainOutcome::Handled { answer: Some("Тихий режим выключен.".into()), chime: Some("ok") };
+    }
+    if norm == "включи адаптивную громкость" {
+        let _ = crate::atriai::set_voice_preferences(&obj(vec![("adaptive_reply_volume", Json::Bool(true))]));
+        return BrainOutcome::Handled { answer: Some("Адаптивная громкость включена.".into()), chime: Some("ok") };
+    }
+    if norm == "выключи адаптивную громкость" {
+        let _ = crate::atriai::set_voice_preferences(&obj(vec![("adaptive_reply_volume", Json::Bool(false))]));
+        return BrainOutcome::Handled { answer: Some("Адаптивная громкость выключена.".into()), chime: Some("ok") };
+    }
+    if norm == "включи быстрые команды" || norm == "выключи быстрые команды" {
+        let en = norm.starts_with("включи");
+        let patch = obj(vec![
+            ("quick_media", Json::Bool(en)),
+            ("quick_tracks", Json::Bool(en)),
+            ("quick_favorites", Json::Bool(en)),
+            ("quick_volume", Json::Bool(en)),
+            ("quick_bluetooth", Json::Bool(en)),
+        ]);
+        let _ = crate::atriai::set_voice_preferences(&patch);
+        let ans = if en { "Быстрые команды без активации включены." } else { "Быстрые команды выключены." };
+        return BrainOutcome::Handled { answer: Some(ans.into()), chime: Some("ok") };
+    }
+
+    // MusicQualityCard voice controls
+    if norm.contains("качество музыки") {
+        let target = if norm.contains("высок") || norm.contains("максим") || norm.contains("лучш") {
+            Some(("high", "Высокое"))
+        } else if norm.contains("обычн") || norm.contains("стандарт") || norm.contains("средн") {
+            Some(("normal", "Стандартное"))
+        } else if norm.contains("низк") || norm.contains("эконом") || norm.contains("миним") {
+            Some(("low", "Экономичное"))
+        } else {
+            None
+        };
+        if let Some((id, label)) = target {
+            let _ = crate::ymusic::set_music_quality(id);
+            return BrainOutcome::Handled {
+                answer: Some(format!("Установила качество музыки: {label}. Применится со следующего трека.")),
+                chime: Some("ok"),
+            };
+        }
+        let cur_label = match crate::ymusic::music_quality() {
+            "high" => "высокое",
+            "low" => "экономичное",
+            _ => "стандартное",
+        };
+        return BrainOutcome::Handled {
+            answer: Some(format!("Сейчас выбрано {cur_label} качество музыки.")),
+            chime: None,
+        };
+    }
+
+    // RoomCard voice queries & renaming
+    if norm.contains("в какой ты комнате") || norm.contains("какая это комната") || norm == "где ты стоишь" {
+        let room = fs::read_to_string("/var/lib/atrios/room").unwrap_or_default().trim().to_string();
+        let ans = if room.is_empty() {
+            "Комната пока не указана в настройках.".to_string()
+        } else {
+            format!("Я в комнате {room}.")
+        };
+        return BrainOutcome::Handled { answer: Some(ans), chime: None };
+    }
+    for prefix in ["переименуй комнату в ", "назови комнату ", "эта комната "] {
+        if let Some(rest) = norm.strip_prefix(prefix) {
+            let room = rest.trim();
+            if !room.is_empty() && room.len() <= 40 {
+                let mut chars = room.chars();
+                let capitalized = match chars.next() {
+                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                    None => String::new(),
+                };
+                let _ = atomic_write_bytes(Path::new("/var/lib/atrios/room"), capitalized.as_bytes(), 0o644, true);
+                return BrainOutcome::Handled {
+                    answer: Some(format!("Запомнила, теперь эта комната — {capitalized}.")),
+                    chime: Some("ok"),
+                };
+            }
+        }
+    }
+
     // 9. Semantic paraphrase match for common volume/music phrases (using 128-dim cosine similarity)
     let qv = embed_text(&norm);
     const PARAPHRASES: &[(&str, &str)] = &[
@@ -1043,6 +1175,21 @@ pub fn execute_server_actions(chat: &Json) {
                 if let Some(text) = act.get_str("text") {
                     let kind = act.get_str("kind").unwrap_or("fact");
                     remember(kind, text);
+                }
+            }
+            "set_voice_preferences" => {
+                if let Some(prefs) = act.get("preferences") {
+                    let _ = crate::atriai::set_voice_preferences(prefs);
+                }
+            }
+            "set_music_quality" => {
+                if let Some(q) = act.get_str("quality") {
+                    let _ = crate::ymusic::set_music_quality(q);
+                }
+            }
+            "set_room" => {
+                if let Some(r) = act.get_str("room").map(str::trim).filter(|s| !s.is_empty() && s.len() <= 40) {
+                    let _ = atomic_write_bytes(Path::new("/var/lib/atrios/room"), r.as_bytes(), 0o644, true);
                 }
             }
             _ => {}
